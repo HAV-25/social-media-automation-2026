@@ -116,7 +116,9 @@ describe("Milestone 4 n8n workflow package", () => {
     expect(manual).toContain("/webhook/source-normalize-v1");
     expect(normalize).toContain("/webhook/cluster-score-v1");
     expect(score).toContain("/api/internal/workflows/rss/analyze");
-    expect(rssAnalyze).toContain("submittedBy: feed.created_by");
+    expect(rssAnalyze).toContain("created_by: z.uuid().nullable()");
+    expect(rssAnalyze).toContain('.from("organization_members")');
+    expect(rssAnalyze).toContain("submittedBy: actorId");
     expect(rssAnalyze).toContain("originalUrl: source.canonical_url");
     expect(rssAnalyze).toContain("new Date(source.published_at).toISOString()");
   });

@@ -29,11 +29,14 @@ const sourceRowSchema = z.object({
 const feedRowSchema = z.object({
   id: z.uuid(),
   organization_id: z.uuid(),
-  created_by: z.uuid(),
+  created_by: z.uuid().nullable(),
 });
 
 const brandRouteSchema = z.object({
   brand_id: z.uuid(),
+});
+const organizationActorSchema = z.object({
+  user_id: z.uuid(),
 });
 const brandProfileSchema = z.object({
   brand_id: z.uuid(),
@@ -100,6 +103,26 @@ export async function POST(request: NextRequest) {
         }),
       );
     }
+    let actorId = feed.created_by;
+    if (!actorId) {
+      const { data: rawActor, error: actorError } = await supabase
+        .from("organization_members")
+        .select("user_id")
+        .eq("organization_id", source.organization_id)
+        .eq("role", "administrator")
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (actorError) throw actorError;
+      if (!rawActor) {
+        return failure(
+          422,
+          "rss_actor_unavailable",
+          "The RSS feed needs a creator or organization administrator before analysis.",
+        );
+      }
+      actorId = organizationActorSchema.parse(rawActor).user_id;
+    }
     const { data: rawProfiles, error: profileError } = await supabase
       .from("brand_profiles")
       .select("brand_id,audience_definition,positioning,content_pillars,restricted_topics")
@@ -139,7 +162,7 @@ export async function POST(request: NextRequest) {
       requiresManualReview: false,
       reviewReasons: [],
       provenance: {
-        submittedBy: feed.created_by,
+        submittedBy: actorId,
         originalUrl: source.canonical_url ?? undefined,
         author: source.author ?? undefined,
         publisher: source.publisher ?? undefined,
@@ -155,7 +178,7 @@ export async function POST(request: NextRequest) {
       const routeIdempotencyKey = `${payload.idempotencyKey}:${route.brand_id}`;
       const persisted = await persistNormalizedSource({
         request,
-        actorId: feed.created_by,
+        actorId,
         organizationId: source.organization_id,
         brandId: route.brand_id,
         idempotencyKey: routeIdempotencyKey,
