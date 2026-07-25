@@ -7,9 +7,19 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const cookieStore = await cookies();
-  const { activeBrand, opportunities } = await getWorkspaceSnapshot(
+  const { activeBrand, dashboardMetrics, opportunities } = await getWorkspaceSnapshot(
     cookieStore.get("active-brand")?.value,
   );
+  const today = new Intl.DateTimeFormat("en-GB", {
+    dateStyle: "long",
+    timeZone: "UTC",
+  }).format(new Date(dashboardMetrics.since));
+  const currency = new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  });
 
   return (
     <>
@@ -18,7 +28,7 @@ export default async function DashboardPage() {
           <p className="text-xs font-bold tracking-[0.16em] text-[var(--accent)] uppercase">
             {activeBrand.name}
           </p>
-          <p className="text-sm text-[var(--muted)]">Content operations · Thursday, 23 July</p>
+          <p className="text-sm text-[var(--muted)]">Content operations · {today} UTC</p>
         </div>
         <a
           href="/inputs/new"
@@ -58,9 +68,21 @@ export default async function DashboardPage() {
 
         <div className="mt-8 grid gap-3 sm:grid-cols-3">
           {[
-            ["14", "Sources today", "8 normalized"],
-            ["3", "Strong opportunities", "score ≥ 72"],
-            ["$0.84", "Research spend", "daily cap $10"],
+            [
+              String(dashboardMetrics.sourcesToday),
+              "Sources today",
+              `${dashboardMetrics.normalizedToday} normalized`,
+            ],
+            [
+              String(dashboardMetrics.activeOpportunities),
+              "Active opportunities",
+              "current brand pipeline",
+            ],
+            [
+              currency.format(dashboardMetrics.researchSpendUsd),
+              "Research spend",
+              `daily cap ${currency.format(dashboardMetrics.dailyResearchBudgetUsd)}`,
+            ],
           ].map(([value, label, note], index) => (
             <div key={label} className="rounded-2xl border border-[var(--line)] bg-white/65 p-5">
               <div className="flex items-start justify-between">
@@ -111,26 +133,29 @@ export default async function DashboardPage() {
             </p>
             <h2 className="serif mt-3 text-2xl leading-7">Research only what earns attention.</h2>
             <p className="mt-4 text-sm leading-6 text-white/60">
-              The lean pipeline has held 11 duplicate, low-value or recently covered items before
-              costly research and image generation.
+              Live processing totals for {activeBrand.name} since 00:00 UTC. Research remains
+              reviewer-triggered and budget-controlled.
             </p>
             <div className="mt-6 space-y-4 border-t border-white/10 pt-5 text-sm">
               <div className="flex justify-between">
                 <span className="text-white/55">Deduplicated</span>
-                <strong>6</strong>
+                <strong>{dashboardMetrics.deduplicatedToday}</strong>
               </div>
               <div className="flex justify-between">
-                <span className="text-white/55">Below threshold</span>
-                <strong>4</strong>
+                <span className="text-white/55">Processing</span>
+                <strong>{dashboardMetrics.processingToday}</strong>
               </div>
               <div className="flex justify-between">
-                <span className="text-white/55">Recently covered</span>
-                <strong>1</strong>
+                <span className="text-white/55">Completed</span>
+                <strong>{dashboardMetrics.completedToday}</strong>
               </div>
             </div>
-            <button className="mt-6 flex w-full items-center justify-between rounded-xl bg-white px-4 py-3 text-sm font-semibold text-[var(--ink)]">
+            <a
+              href="/sources"
+              className="mt-6 flex w-full items-center justify-between rounded-xl bg-white px-4 py-3 text-sm font-semibold text-[var(--ink)]"
+            >
               Inspect pipeline <ArrowRight size={17} />
-            </button>
+            </a>
           </aside>
         </div>
       </section>

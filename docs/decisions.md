@@ -338,3 +338,19 @@ Adding an allowlist entry backfills an existing confirmed identity, and newly
 activated brands inherit the same approved administrators. User-editable
 metadata remains display-only. Confirmed identities without an exact active
 match retain the `pending_access` state.
+
+## ADR-029 — Live dashboard metrics are exact brand-scoped aggregates
+
+**Status:** Accepted, 2026-07-25
+
+Production dashboards do not display illustrative operational counts, dates,
+costs, thresholds, or pipeline outcomes. A stable, security-invoker PostgreSQL
+function returns exact source, normalization, active-opportunity, research-cost,
+deduplication, processing, and completion totals for the selected brand and a
+caller-supplied UTC window.
+
+The function rechecks `can_read_brand`, executes under the authenticated
+caller's RLS, rejects invalid windows, and is not executable by anonymous
+users. Recorded research cost is derived from immutable generation-run usage
+provenance; the daily limit comes from validated server configuration. Empty
+brands therefore render zero rather than seeded activity.

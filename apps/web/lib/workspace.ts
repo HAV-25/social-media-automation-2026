@@ -1,5 +1,9 @@
+import "server-only";
+import { serverEnvSchema } from "@content-engine/contracts";
 import { demoBrands, demoOpportunities } from "./demo-data";
 import { cookies } from "next/headers";
+import { cache } from "react";
+import { z } from "zod";
 import { parseDemoContentRecords } from "./demo-content-store";
 import { createSupabaseServerClient } from "./supabase/server";
 
@@ -22,6 +26,30 @@ export type WorkspaceOpportunity = {
   risk: string;
 };
 
+const dashboardMetricsRowSchema = z
+  .object({
+    sources_today: z.coerce.number().int().nonnegative(),
+    normalized_today: z.coerce.number().int().nonnegative(),
+    active_opportunities: z.coerce.number().int().nonnegative(),
+    research_spend_usd: z.coerce.number().nonnegative(),
+    deduplicated_today: z.coerce.number().int().nonnegative(),
+    processing_today: z.coerce.number().int().nonnegative(),
+    completed_today: z.coerce.number().int().nonnegative(),
+  })
+  .strict();
+
+export type DashboardMetrics = {
+  sourcesToday: number;
+  normalizedToday: number;
+  activeOpportunities: number;
+  researchSpendUsd: number;
+  dailyResearchBudgetUsd: number;
+  deduplicatedToday: number;
+  processingToday: number;
+  completedToday: number;
+  since: string;
+};
+
 function relativeAge(value: string) {
   const elapsedMinutes = Math.max(1, Math.round((Date.now() - new Date(value).getTime()) / 60_000));
   if (elapsedMinutes < 60) return `${elapsedMinutes} min`;
@@ -39,7 +67,13 @@ function styleLabel(style: string | null) {
   return style ? (labels[style] ?? style) : "Perspective";
 }
 
-export async function getWorkspaceSnapshot(requestedBrandId?: string) {
+export const getWorkspaceSnapshot = cache(async function getWorkspaceSnapshot(
+  requestedBrandId?: string,
+) {
+  const env = serverEnvSchema.parse(process.env);
+  const since = new Date();
+  since.setUTCHours(0, 0, 0, 0);
+
   if (process.env.NEXT_PUBLIC_DEMO_MODE !== "false") {
     const fallbackBrand = demoBrands[0];
     if (!fallbackBrand) throw new Error("Demo mode requires at least one brand.");
@@ -69,6 +103,17 @@ export async function getWorkspaceSnapshot(requestedBrandId?: string) {
       activeBrand,
       brands: [...demoBrands],
       opportunities: [...submitted, ...demoOpportunities],
+      dashboardMetrics: {
+        sourcesToday: submitted.length,
+        normalizedToday: submitted.length,
+        activeOpportunities: submitted.length + demoOpportunities.length,
+        researchSpendUsd: 0,
+        dailyResearchBudgetUsd: env.AI_DAILY_BUDGET_USD,
+        deduplicatedToday: 0,
+        processingToday: 0,
+        completedToday: submitted.length,
+        since: since.toISOString(),
+      } satisfies DashboardMetrics,
     };
   }
 
@@ -89,19 +134,30 @@ export async function getWorkspaceSnapshot(requestedBrandId?: string) {
     brands.find((brand) => brand.name === "Business of AI") ??
     fallbackBrand;
 
-  const { data: opportunities, error: opportunityError } = await supabase
-    .from("opportunities")
-    .select(
-      "id,opportunity_score,value_nucleus,recommended_style,risk_penalty,created_at,source_documents(title,publisher),content_clusters(cluster_sources(count))",
-    )
-    .eq("brand_id", activeBrand.id)
-    .neq("status", "archived")
-    .order("opportunity_score", { ascending: false })
-    .limit(20);
+  const [
+    { data: opportunities, error: opportunityError },
+    { data: metricRows, error: metricsError },
+  ] = await Promise.all([
+    supabase
+      .from("opportunities")
+      .select(
+        "id,opportunity_score,value_nucleus,recommended_style,risk_penalty,created_at,source_documents(title,publisher),content_clusters(cluster_sources(count))",
+      )
+      .eq("brand_id", activeBrand.id)
+      .neq("status", "archived")
+      .order("opportunity_score", { ascending: false })
+      .limit(20),
+    supabase.rpc("get_brand_dashboard_metrics", {
+      p_brand_id: activeBrand.id,
+      p_since: since.toISOString(),
+    }),
+  ]);
 
   if (opportunityError) {
     throw new Error(`Unable to load content opportunities: ${opportunityError.message}`);
   }
+  if (metricsError) throw new Error("Unable to load brand dashboard metrics.");
+  const metrics = dashboardMetricsRowSchema.parse(metricRows?.[0]);
 
   return {
     activeBrand,
@@ -127,5 +183,16 @@ export async function getWorkspaceSnapshot(requestedBrandId?: string) {
         risk: Number(opportunity.risk_penalty) >= 20 ? "Review" : "Low",
       } satisfies WorkspaceOpportunity;
     }),
+    dashboardMetrics: {
+      sourcesToday: metrics.sources_today,
+      normalizedToday: metrics.normalized_today,
+      activeOpportunities: metrics.active_opportunities,
+      researchSpendUsd: metrics.research_spend_usd,
+      dailyResearchBudgetUsd: env.AI_DAILY_BUDGET_USD,
+      deduplicatedToday: metrics.deduplicated_today,
+      processingToday: metrics.processing_today,
+      completedToday: metrics.completed_today,
+      since: since.toISOString(),
+    } satisfies DashboardMetrics,
   };
-}
+});

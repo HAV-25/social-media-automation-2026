@@ -41,6 +41,9 @@
 - Immutable versions and append-only audit/pipeline events preserve human and
   model provenance.
 - Authenticated responses that can refresh cookies must not be shared-cached.
+- Dashboard aggregates execute as the authenticated caller, recheck brand-read
+  permission, and retain source, opportunity, and run-table RLS. Anonymous
+  callers cannot execute the aggregate function.
 - Errors are typed and redacted; provider/database secrets never reach users.
 - Log metadata is recursively bounded and redacts authorization, cookies,
   credentials, JWTs, connection passwords, source content, prompts, tokens, and

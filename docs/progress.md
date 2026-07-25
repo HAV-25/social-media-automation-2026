@@ -528,3 +528,23 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
 - Repository-wide formatting, lint, strict type-checking, all 183
   unit/contract/security tests, and the optimized production build passed. No
   paid AI or image-generation call was made.
+
+### Live dashboard metrics evidence
+
+- Removed the prototype source, opportunity, research-spend, date, and
+  editorial-pulse figures from the production dashboard. Cards and pulse rows
+  now render exact selected-brand values; an empty brand shows zero.
+- Migration `brand_dashboard_metrics` was applied to live project
+  `hqffgchxwtymyfwtkmdt`. The stable security-invoker function requires
+  authenticated brand-read access and computes exact UTC-window counts plus
+  recorded research cost from generation-run provenance.
+- Live execution under the existing approved user's authenticated role returned
+  zero sources, normalization, opportunities, spend, duplicates, processing,
+  and completions for the currently empty Klaank brand. This proves the same RLS
+  path the deployed application uses rather than a privileged database query.
+- The post-migration security advisor reported no new finding. Its remaining
+  notices are the intentional private-table informational notices and the
+  pre-existing leaked-password-protection warning.
+- Repository-wide formatting, lint, strict type-checking, all 187 tests, and
+  the optimized production build passed. No paid AI or image-generation call
+  was made.
