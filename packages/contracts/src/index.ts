@@ -94,7 +94,7 @@ export const serverEnvSchema = envSchema
     USER_API_RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().min(1).max(86_400).default(60),
     INTERNAL_API_RATE_LIMIT_REQUESTS: z.coerce.number().int().min(1).max(10_000).default(600),
     INTERNAL_API_RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().min(1).max(86_400).default(60),
-    RSS_ITEMS_PER_FEED_PER_RUN: z.coerce.number().int().min(1).max(20).default(3),
+    RSS_ITEMS_PER_FEED_PER_RUN: z.coerce.number().int().min(1).max(20).default(1),
     AI_MODEL_EXTRACT: z.string().min(1).default("gpt-5.6-luna"),
     AI_MODEL_SCORE: z.string().min(1).default("gpt-5.6-terra"),
     AI_MODEL_RESEARCH: z.string().min(1).default("gpt-5.6-terra"),

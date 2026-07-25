@@ -57,6 +57,7 @@ export async function POST(request: Request) {
       .slice(0, itemLimit)
       .map((item) => ({
         ...item,
+        summary: item.summary?.slice(0, 4_000),
         contentHash: itemContentHash(item),
       }));
     const fetchedAt = new Date().toISOString();

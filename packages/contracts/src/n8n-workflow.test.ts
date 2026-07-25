@@ -89,6 +89,7 @@ describe("WF-01 RSS Intake workflow", () => {
     );
     expect(fetchRoute).toContain("RSS_ITEMS_PER_FEED_PER_RUN");
     expect(fetchRoute).toContain(".slice(0, itemLimit)");
+    expect(fetchRoute).toContain("item.summary?.slice(0, 4_000)");
     expect(workflow).toContain('"name": "accept-encoding"');
     expect(workflow).toContain('"value": "identity"');
     expect(route).not.toMatch(/N8N_API_KEY|service[_-]?role/i);
