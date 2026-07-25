@@ -87,7 +87,15 @@ export async function resolveSafeSourceUrl(
 ) {
   let url: URL;
   try {
-    url = new URL(canonicalizeSourceUrl(value));
+    url = new URL(value);
+    url.hash = "";
+    url.hostname = url.hostname.toLowerCase().replace(/\.$/, "");
+    if (
+      (url.protocol === "http:" && url.port === "80") ||
+      (url.protocol === "https:" && url.port === "443")
+    ) {
+      url.port = "";
+    }
   } catch {
     throw new SourceFetchError("invalid_url", "Source URL is invalid.");
   }

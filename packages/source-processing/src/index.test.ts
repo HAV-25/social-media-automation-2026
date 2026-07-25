@@ -36,6 +36,15 @@ describe("source network boundary", () => {
     expect(result.url.hostname).toBe("feed.example.test");
   });
 
+  it("preserves fetch path and query semantics needed to follow redirects", async () => {
+    const result = await resolveSafeSourceUrl(
+      "https://Feed.Example.Test:443/rss/?page=1&utm_source=reader#latest",
+      async () => [{ address: "93.184.216.34", family: 4 }],
+    );
+
+    expect(result.url.toString()).toBe("https://feed.example.test/rss/?page=1&utm_source=reader");
+  });
+
   it("canonicalizes tracking variants to one deterministic URL", () => {
     expect(
       canonicalizeSourceUrl(
