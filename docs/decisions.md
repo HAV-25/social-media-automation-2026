@@ -386,3 +386,18 @@ later WF-01 step is therefore downloaded as binary, decoded with the built-in
 Extract From File node, and checked at a small Code-node contract boundary.
 Terminal workflow calls may ignore their response body because durable
 application state, not n8n execution output, is authoritative.
+
+## ADR-032 — Browser mutation origins are proxy-aware and centrally enforced
+
+**Status:** Accepted, 2026-07-25
+
+Browser mutation routes validate `Origin` against the direct request origin,
+the sanitized forwarded host/protocol, and the configured public application
+URL. This accommodates trusted Netlify proxy rewriting without accepting an
+unrelated browser origin. Requests without `Origin` retain the existing support
+for signed or non-browser clients; authentication, authorization, RLS, rate
+limits, and strict payload validation remain independently required.
+
+The policy is implemented once and shared by RSS dispatch/feed changes, source
+submission/upload, research, generation, regeneration, and image actions so a
+deployment-host mismatch cannot fail each feature separately.

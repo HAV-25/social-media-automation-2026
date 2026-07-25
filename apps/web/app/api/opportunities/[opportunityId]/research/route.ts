@@ -12,6 +12,7 @@ import {
 } from "@/lib/demo-content-store";
 import { getOpportunityDetail } from "@/lib/opportunity-detail";
 import { canReviewContent } from "@/lib/permissions";
+import { isSameOriginRequest } from "@/lib/request-origin";
 import {
   createResearchPlan,
   failResearchRun,
@@ -31,8 +32,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ opportunityId: string }> },
 ) {
-  const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin) {
+  if (!isSameOriginRequest(request)) {
     return failure(403, "origin_rejected", "Cross-origin research requests are not allowed.");
   }
   const user = await getCurrentUser();

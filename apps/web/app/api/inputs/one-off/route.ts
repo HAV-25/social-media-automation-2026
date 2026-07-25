@@ -11,6 +11,7 @@ import { getBrandConfiguration } from "@/lib/brand-configuration";
 import { canManageBrand } from "@/lib/permissions";
 import { persistNormalizedSource } from "@/lib/persist-normalized-source";
 import { persistSourceFailure } from "@/lib/persist-source-failure";
+import { isSameOriginRequest } from "@/lib/request-origin";
 
 export const runtime = "nodejs";
 
@@ -19,8 +20,7 @@ function failure(status: number, code: string, message: string) {
 }
 
 export async function POST(request: NextRequest) {
-  const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin) {
+  if (!isSameOriginRequest(request)) {
     return failure(403, "origin_rejected", "Cross-origin input submission is not allowed.");
   }
   const user = await getCurrentUser();

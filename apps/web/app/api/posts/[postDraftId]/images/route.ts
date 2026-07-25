@@ -5,6 +5,7 @@ import { enforceUserApiRateLimit } from "@/lib/api-rate-limit";
 import { canManageBrand } from "@/lib/permissions";
 import { getPostDetail } from "@/lib/post-detail";
 import { performPostImageAction } from "@/lib/post-image-review";
+import { isSameOriginRequest } from "@/lib/request-origin";
 
 export const runtime = "nodejs";
 
@@ -16,8 +17,7 @@ export async function POST(
   request: NextRequest,
   context: { params: Promise<{ postDraftId: string }> },
 ) {
-  const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin) {
+  if (!isSameOriginRequest(request)) {
     return failure(403, "origin_rejected", "Cross-origin image actions are not allowed.");
   }
   const user = await getCurrentUser();

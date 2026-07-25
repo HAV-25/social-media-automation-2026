@@ -22,6 +22,7 @@ import {
 } from "@/lib/demo-content-store";
 import { getOpportunityDetail } from "@/lib/opportunity-detail";
 import { canManageBrand } from "@/lib/permissions";
+import { isSameOriginRequest } from "@/lib/request-origin";
 import { getResearchEvidence } from "@/lib/research";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -42,8 +43,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ opportunityId: string }> },
 ) {
-  const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin) {
+  if (!isSameOriginRequest(request)) {
     return errorResponse(403, "origin_rejected", "Cross-origin generation is not allowed.");
   }
   const user = await getCurrentUser();

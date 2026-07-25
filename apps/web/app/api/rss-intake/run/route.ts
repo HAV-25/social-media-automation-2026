@@ -10,6 +10,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { enforceUserApiRateLimit } from "@/lib/api-rate-limit";
 import { getBrandConfiguration } from "@/lib/brand-configuration";
 import { canManageBrand } from "@/lib/permissions";
+import { isSameOriginRequest } from "@/lib/request-origin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -22,8 +23,7 @@ function failure(status: number, code: string, message: string) {
 }
 
 export async function POST(request: NextRequest) {
-  const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin) {
+  if (!isSameOriginRequest(request)) {
     return failure(403, "origin_rejected", "Cross-origin workflow requests are not allowed.");
   }
   const user = await getCurrentUser();

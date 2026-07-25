@@ -642,3 +642,16 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   opportunity, recent WF-01/WF-04 nonce evidence, and a real score of 73.19.
   Research remained reserved for a reviewer decision; no paid AI or image call
   was made.
+
+### Netlify browser-mutation origin compatibility
+
+- Replaced direct `Origin === request.url.origin` checks with one proxy-aware
+  policy that recognizes the configured public application URL and sanitized
+  forwarded host/protocol while continuing to reject unrelated and malformed
+  origins.
+- Applied the shared policy to all nine browser mutation routes so RSS
+  dispatch, feed management, source submission/upload, research, generation,
+  regeneration, and image actions use the same deployment-safe protection.
+- Five origin-policy regressions cover direct, Netlify-forwarded, configured,
+  hostile/malformed, and non-browser requests. Web lint, strict type-checking,
+  all 52 web tests, and the optimized production build passed.

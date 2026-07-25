@@ -17,6 +17,7 @@ import {
 } from "@/lib/demo-rss-feed-store";
 import { uuidFromDeterministicHash } from "@/lib/demo-content-store";
 import { canManageBrand } from "@/lib/permissions";
+import { isSameOriginRequest } from "@/lib/request-origin";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 export const runtime = "nodejs";
@@ -32,8 +33,7 @@ function failure(status: number, code: string, message: string) {
 }
 
 export async function POST(request: NextRequest) {
-  const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin) {
+  if (!isSameOriginRequest(request)) {
     return failure(403, "origin_rejected", "Cross-origin feed changes are not allowed.");
   }
   const user = await getCurrentUser();
