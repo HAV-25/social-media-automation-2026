@@ -432,6 +432,12 @@ export async function regenerateWorkflowPost(input: PostActionWorkflowRequest) {
     brandId: input.brandId,
     organizationId: context.brand.brand.organizationId,
   });
+  const verifiedClaim = context.research.evidencePackage.claims.find(
+    (claim) =>
+      claim.importance === "core" &&
+      claim.verificationState === "verified" &&
+      claim.usageGuidance !== "do_not_use",
+  );
   const content = selectivelyRegeneratePost({
     content: context.version.content,
     request: {
@@ -439,6 +445,7 @@ export async function regenerateWorkflowPost(input: PostActionWorkflowRequest) {
       instruction: input.instruction,
     },
     valueNucleus: context.opportunity.valueNucleus,
+    verifiedClaim: verifiedClaim?.text,
   });
   const evaluation = evaluateEditorialDraft({
     content,

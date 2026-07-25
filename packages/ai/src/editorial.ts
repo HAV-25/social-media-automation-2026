@@ -264,14 +264,20 @@ export function selectivelyRegeneratePost(input: {
   content: { hook: string; body: string; closing: string; fullText: string };
   request: Pick<PostRegenerationRequest, "component" | "instruction">;
   valueNucleus: string;
+  verifiedClaim?: string;
 }) {
   const instruction = normalize(input.request.instruction);
   const next = { ...input.content };
   if (input.request.component === "hook") {
     const question = instruction.includes("question");
-    next.hook = question
-      ? `What changes if we take this seriously: ${shorten(input.valueNucleus, 330)}?`
-      : `The practical consequence deserves more attention: ${shorten(input.valueNucleus, 330)}`;
+    const useVerifiedClaim =
+      Boolean(input.verifiedClaim) &&
+      (instruction.includes("verified") || instruction.includes("claim"));
+    next.hook = useVerifiedClaim
+      ? shorten(input.verifiedClaim ?? "", 500)
+      : question
+        ? `What changes if we take this seriously: ${shorten(input.valueNucleus, 330)}?`
+        : `The practical consequence deserves more attention: ${shorten(input.valueNucleus, 330)}`;
   } else if (input.request.component === "body") {
     const concise = instruction.includes("short") || instruction.includes("concise");
     next.body = concise

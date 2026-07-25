@@ -127,6 +127,29 @@ describe("deterministic editorial evaluation", () => {
     expect(regenerated.closing).toBe(content.closing);
   });
 
+  it("can replace a hook with a verified ledger claim", () => {
+    const content = {
+      hook: "Original hook",
+      body: "Original body",
+      closing: "Original closing",
+      fullText: "Original hook\n\nOriginal body\n\nOriginal closing",
+    };
+    const verifiedClaim =
+      "IEEE Spectrum featured Generative Bionics' GENE.01 humanoid in Video Friday.";
+    const regenerated = selectivelyRegeneratePost({
+      content,
+      request: {
+        component: "hook",
+        instruction: "Use the exact verified core claim as the hook.",
+      },
+      valueNucleus: "Decision design changes outcomes.",
+      verifiedClaim,
+    });
+    expect(regenerated.hook).toBe(verifiedClaim);
+    expect(regenerated.body).toBe(content.body);
+    expect(regenerated.closing).toBe(content.closing);
+  });
+
   it("calculates deterministic bounded similarity", () => {
     expect(editorialSimilarity("one useful operating model", "one useful operating model")).toBe(1);
     expect(editorialSimilarity("one useful operating model", "completely different topic")).toBe(0);
