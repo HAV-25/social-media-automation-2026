@@ -3,8 +3,14 @@
 - Application authorization comes from `organization_members` and
   `brand_members`, never user-editable profile or JWT user metadata.
 - Email/password signup proves control of an email address but creates no
-  organization or brand authorization. Verified identities without membership
-  remain in a locked `pending_access` state until administrator assignment.
+  organization or brand authorization by itself. A private, server-managed
+  exact-email allowlist provisions approved pilot identities through hardened
+  database triggers; verified identities without an active match remain in a
+  locked `pending_access` state.
+- The pilot allowlist is in the unexposed `private` schema with RLS enabled and
+  no browser grants. Its security-definer functions have an empty search path,
+  are not executable by anonymous or authenticated roles, and derive
+  authorization only from confirmed `auth.users.email` values.
 - Signup callbacks accept only email/signup verification types and fixed local
   destinations. Both six-digit token and PKCE confirmation-link flows terminate
   in the same membership gate.

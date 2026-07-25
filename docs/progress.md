@@ -500,7 +500,31 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
       build retains code/link verification when confirmation is re-enabled.
 - [x] Dashboard access still requires durable organization membership, and all
       existing brand RLS remains authoritative.
+- [x] Four approved pilot identities are held in a private live-database
+      allowlist; no personal address is committed to source control.
+- [x] A confirmed exact-email match is idempotently provisioned as organization
+      administrator across all five active brands. Non-matching signups remain
+      pending.
 - [ ] Configure the deployed Site URL/redirect allowlist and email delivery in
       Supabase after Netlify provides the stable application URL.
-- [ ] Register the two reviewers and assign administrator/editor/reviewer
-      membership across all five brands.
+- [ ] Have the remaining approved reviewers create their own credentials.
+
+### Approved pilot access evidence
+
+- Migration `approved_internal_users` was applied to live project
+  `hqffgchxwtymyfwtkmdt`. It creates the private allowlist and three hardened
+  triggers for confirmed-auth, allowlist-backfill, and new-brand provisioning.
+- The live allowlist contains four active entries. One confirmed identity
+  already existed and was verified with one organization-administrator
+  membership, five administrator brand assignments, and no missing profile or
+  access row. The other approved identities will be provisioned on signup.
+- Direct live permission checks confirmed RLS is enabled, anonymous and
+  authenticated roles cannot select or insert allowlist rows, neither role can
+  execute the provisioning function, and all three expected triggers exist.
+- The post-migration security advisor reported only the intentional
+  policy-free private-table notice plus the pre-existing leaked-password
+  protection warning. The performance advisor introduced no allowlist foreign
+  key warning because both relevant predicates are indexed.
+- Repository-wide formatting, lint, strict type-checking, all 183
+  unit/contract/security tests, and the optimized production build passed. No
+  paid AI or image-generation call was made.

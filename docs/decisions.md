@@ -320,3 +320,21 @@ product owner. The application detects the session returned by an auto-confirmed
 signup and proceeds directly to `pending_access`; when confirmation is enabled,
 the same build retains the token/link verification path. Auto-confirmation does
 not weaken the independent organization and brand membership gate.
+
+## ADR-028 — Pilot access uses a private exact-email allowlist
+
+**Status:** Accepted, 2026-07-25
+
+The controlled internal pilot provisions only confirmed identities whose
+normalized email exactly matches an active entry in
+`private.approved_internal_users`. The allowlist is server-managed, RLS-enabled,
+unexposed, and grants no browser role any table or function privilege. Approved
+addresses are operational data inserted directly in Supabase and are not
+committed to the repository.
+
+An `auth.users` trigger idempotently creates the profile, organization
+administrator membership, and administrator membership for every active brand.
+Adding an allowlist entry backfills an existing confirmed identity, and newly
+activated brands inherit the same approved administrators. User-editable
+metadata remains display-only. Confirmed identities without an exact active
+match retain the `pending_access` state.
