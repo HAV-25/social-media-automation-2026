@@ -832,9 +832,11 @@ begin
    and claims.claim_key = member.value;
 
   select count(*)::integer into sources_total
-  from public.research_sources where research_run_id = research_id;
+  from public.research_sources counted_source
+  where counted_source.research_run_id = research_id;
   select count(*)::integer into claims_total
-  from public.claims where research_run_id = research_id;
+  from public.claims counted_claim
+  where counted_claim.research_run_id = research_id;
 
   update public.opportunities
   set status = case when is_ready then 'ready_to_generate' else 'research_pending' end

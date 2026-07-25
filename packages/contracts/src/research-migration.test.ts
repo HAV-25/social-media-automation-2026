@@ -9,6 +9,15 @@ const migrationPath = fileURLToPath(
   ),
 );
 const sql = readFileSync(migrationPath, "utf8");
+const countQualificationMigration = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../../../supabase/migrations/20260725210500_qualify_research_ledger_counts.sql",
+      import.meta.url,
+    ),
+  ),
+  "utf8",
+);
 
 describe("research evidence ledger migration", () => {
   it("adds a normalized conflict ledger with immediate RLS", () => {
@@ -48,5 +57,15 @@ describe("research evidence ledger migration", () => {
     expect(sql).toContain("Daily AI research budget exhausted");
     expect(sql).toContain("research.evidence_persisted");
     expect(sql).toContain("provider_response_id");
+  });
+
+  it("qualifies ledger count predicates for fresh and existing databases", () => {
+    expect(sql).toContain("counted_source.research_run_id = research_id");
+    expect(sql).toContain("counted_claim.research_run_id = research_id");
+    expect(countQualificationMigration).toContain(
+      "'private.persist_research_evidence(jsonb)'::regprocedure",
+    );
+    expect(countQualificationMigration).toContain("counted_source.research_run_id = research_id");
+    expect(countQualificationMigration).toContain("counted_claim.research_run_id = research_id");
   });
 });

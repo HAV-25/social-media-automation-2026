@@ -209,13 +209,27 @@ function assertEvidenceIntegrity(
   }
 }
 
-function enforceEvidenceSafety(rawEvidence: unknown) {
+function enforceEvidenceSafety(
+  rawEvidence: unknown,
+  request?: ResearchRequest,
+  consultedUrls: Set<string> = new Set(),
+) {
   const evidence = evidencePackageSchema.parse(rawEvidence);
+  const allowedUrls = new Set(consultedUrls);
+  if (request?.originalSourceUrl) allowedUrls.add(normalizedUrl(request.originalSourceUrl));
+  const sources =
+    request === undefined
+      ? evidence.sources
+      : evidence.sources.filter((source) => allowedUrls.has(normalizedUrl(source.url)));
+  const retainedSourceKeys = new Set(sources.map((source) => source.sourceKey));
+  const removedSources = evidence.sources.length - sources.length;
   const quarantined: string[] = [];
+  let downgradedClaims = 0;
   let duplicateEvidenceLinks = 0;
   const claims = evidence.claims.map((claim) => {
     const sourceKeys = new Set<string>();
     const deduplicatedEvidence = claim.evidence.filter((item) => {
+      if (!retainedSourceKeys.has(item.sourceKey)) return false;
       if (sourceKeys.has(item.sourceKey)) {
         duplicateEvidenceLinks += 1;
         return false;
@@ -223,20 +237,37 @@ function enforceEvidenceSafety(rawEvidence: unknown) {
       sourceKeys.add(item.sourceKey);
       return true;
     });
+    const lostVerifiedSupport =
+      ["factual", "numerical"].includes(claim.claimType) &&
+      claim.verificationState === "verified" &&
+      !deduplicatedEvidence.some((item) => item.supportType === "supports");
+    const normalizedClaim = lostVerifiedSupport
+      ? {
+          ...claim,
+          evidence: deduplicatedEvidence,
+          verificationState: "unsupported" as const,
+          confidence: Math.min(claim.confidence, 0.25),
+          usageGuidance: "do_not_use" as const,
+          caveat:
+            claim.caveat ??
+            "Automatically blocked because its cited support was not in the consulted source set.",
+        }
+      : { ...claim, evidence: deduplicatedEvidence };
+    if (lostVerifiedSupport) downgradedClaims += 1;
     if (
-      claim.riskLevel !== "high" ||
-      claim.verificationState === "verified" ||
-      claim.usageGuidance === "do_not_use"
+      normalizedClaim.riskLevel !== "high" ||
+      normalizedClaim.verificationState === "verified" ||
+      normalizedClaim.usageGuidance === "do_not_use"
     ) {
-      return { ...claim, evidence: deduplicatedEvidence };
+      return normalizedClaim;
     }
-    quarantined.push(claim.claimKey);
+    quarantined.push(normalizedClaim.claimKey);
     return {
-      ...claim,
-      evidence: deduplicatedEvidence,
+      ...normalizedClaim,
       usageGuidance: "do_not_use" as const,
       caveat:
-        claim.caveat ?? "Automatically quarantined because this high-risk claim was not verified.",
+        normalizedClaim.caveat ??
+        "Automatically quarantined because this high-risk claim was not verified.",
     };
   });
   const hasUsableCore = claims.some(
@@ -247,11 +278,25 @@ function enforceEvidenceSafety(rawEvidence: unknown) {
   );
   return evidencePackageSchema.parse({
     ...evidence,
+    sources,
     claims,
     caveats:
-      quarantined.length > 0 || duplicateEvidenceLinks > 0
+      quarantined.length > 0 ||
+      duplicateEvidenceLinks > 0 ||
+      removedSources > 0 ||
+      downgradedClaims > 0
         ? [
             ...evidence.caveats,
+            ...(removedSources > 0
+              ? [
+                  `Provenance enforcement removed ${removedSources} source(s) not present in the consulted source set.`,
+                ]
+              : []),
+            ...(downgradedClaims > 0
+              ? [
+                  `Provenance enforcement downgraded ${downgradedClaims} claim(s) that lost verified support.`,
+                ]
+              : []),
             ...(duplicateEvidenceLinks > 0
               ? [
                   `Evidence normalization removed ${duplicateEvidenceLinks} duplicate claim-to-source link(s).`,
@@ -463,7 +508,7 @@ END_SOURCE_DATA`,
         );
       }
 
-      const evidencePackage = enforceEvidenceSafety(response.output_parsed);
+      const evidencePackage = enforceEvidenceSafety(response.output_parsed, request, details.urls);
       if (details.calls > request.plan.budget.maxQueries) {
         throw new ResearchProviderError(
           "budget_exceeded",

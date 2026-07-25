@@ -224,7 +224,7 @@ describe("bounded research providers", () => {
     expect(result.evidencePackage.claims[0]?.verificationState).toBe("verified");
   });
 
-  it("rejects a structured citation that was not returned by web search", async () => {
+  it("removes unconsulted citations and downgrades claims that lose support", async () => {
     const evidence = verifiedEvidence();
     evidence.sources[0]!.url = "https://invented.example.test/report";
     const fetchMock = vi.fn<typeof fetch>(async () => {
@@ -233,22 +233,17 @@ describe("bounded research providers", () => {
         headers: { "content-type": "application/json" },
       });
     });
-    const provider = providerWithFetch(fetchMock);
+    const result = await providerWithFetch(fetchMock).research(request());
 
-    await expect(provider.research(request())).rejects.toMatchObject({
-      code: "invalid_evidence",
-      trace: {
-        model: "gpt-5.6-terra",
-        promptVersion: "evidence-synthesizer.v1",
-        responseId: "resp_research_1",
-        usage: {
-          inputTokens: 800,
-          outputTokens: 400,
-          webSearchCalls: 1,
-          estimatedCostUsd: 0.0116,
-        },
-      },
-    } satisfies Partial<ResearchProviderError>);
+    expect(result.evidencePackage.sources).toHaveLength(0);
+    expect(result.evidencePackage.claims[0]).toMatchObject({
+      verificationState: "unsupported",
+      usageGuidance: "do_not_use",
+    });
+    expect(result.evidencePackage.readyForWriting).toBe(false);
+    expect(result.evidencePackage.caveats.join(" ")).toContain(
+      "Provenance enforcement removed 1 source",
+    );
   });
 
   it("deterministically quarantines unverified high-risk claims", async () => {

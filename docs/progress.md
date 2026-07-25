@@ -688,3 +688,14 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   more than once for one claim. Provider-boundary normalization now collapses
   duplicate claim/source links and records the count in the evidence caveats,
   matching the ledger's one-link-per-pair invariant before its atomic write.
+- The next live persistence attempt exposed ambiguous unqualified
+  `research_run_id` count predicates in the existing atomic ledger function.
+  Fresh-install SQL is corrected and a fail-closed hotfix migration qualifies
+  both predicates in already-provisioned databases without changing function
+  authority or grants.
+- With database persistence corrected, a later live model response cited one
+  URL outside the submitted/consulted source set and was correctly blocked.
+  Provider-boundary provenance enforcement now removes such sources and their
+  links, downgrades claims that lose verified support, recomputes writing
+  readiness, and records each intervention in the evidence caveats rather than
+  weakening the consulted-source invariant.
