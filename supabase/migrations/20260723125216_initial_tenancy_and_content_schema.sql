@@ -1105,6 +1105,7 @@ begin
   end if;
   if coalesce(payload ->> 'sourceType', '') not in (
       'plain_text',
+      'rss',
       'url',
       'pdf',
       'transcript',

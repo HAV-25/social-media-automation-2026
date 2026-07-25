@@ -50,6 +50,12 @@ const reservationRowSchema = z.object({
   eligible: z.boolean(),
   reason: z.enum(["reserved", "ingest_only", "below_threshold", "daily_limit", "inactive"]),
 });
+const internalFailureSchema = z.object({
+  error: z.object({
+    code: z.string().trim().min(1).max(100),
+    message: z.string().trim().min(1).max(1_000),
+  }),
+});
 
 function failure(status: number, code: string, message: string) {
   return NextResponse.json({ error: { code, message } }, { status });
@@ -195,8 +201,12 @@ export async function POST(request: NextRequest) {
         },
       });
       if (!persisted.ok) {
-        const body = (await persisted.json()) as { error?: { message?: string } };
-        throw new Error(body.error?.message ?? "RSS opportunity persistence failed.");
+        const body = internalFailureSchema.safeParse(await persisted.json());
+        return failure(
+          persisted.status,
+          body.success ? body.data.error.code : "rss_opportunity_persistence_failed",
+          body.success ? body.data.error.message : "RSS opportunity persistence failed.",
+        );
       }
       const opportunity = manualInputResultSchema.parse(await persisted.json());
       const reservationPayload = {
