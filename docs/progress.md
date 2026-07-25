@@ -684,3 +684,7 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   `readyForWriting` when no usable core claim remains. The claims ledger
   therefore preserves the research while preventing unsafe material from
   entering post generation.
+- A subsequent live response passed the safety gate but cited the same source
+  more than once for one claim. Provider-boundary normalization now collapses
+  duplicate claim/source links and records the count in the evidence caveats,
+  matching the ledger's one-link-per-pair invariant before its atomic write.

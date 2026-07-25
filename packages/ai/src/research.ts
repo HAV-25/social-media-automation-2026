@@ -212,17 +212,28 @@ function assertEvidenceIntegrity(
 function enforceEvidenceSafety(rawEvidence: unknown) {
   const evidence = evidencePackageSchema.parse(rawEvidence);
   const quarantined: string[] = [];
+  let duplicateEvidenceLinks = 0;
   const claims = evidence.claims.map((claim) => {
+    const sourceKeys = new Set<string>();
+    const deduplicatedEvidence = claim.evidence.filter((item) => {
+      if (sourceKeys.has(item.sourceKey)) {
+        duplicateEvidenceLinks += 1;
+        return false;
+      }
+      sourceKeys.add(item.sourceKey);
+      return true;
+    });
     if (
       claim.riskLevel !== "high" ||
       claim.verificationState === "verified" ||
       claim.usageGuidance === "do_not_use"
     ) {
-      return claim;
+      return { ...claim, evidence: deduplicatedEvidence };
     }
     quarantined.push(claim.claimKey);
     return {
       ...claim,
+      evidence: deduplicatedEvidence,
       usageGuidance: "do_not_use" as const,
       caveat:
         claim.caveat ?? "Automatically quarantined because this high-risk claim was not verified.",
@@ -238,10 +249,19 @@ function enforceEvidenceSafety(rawEvidence: unknown) {
     ...evidence,
     claims,
     caveats:
-      quarantined.length > 0
+      quarantined.length > 0 || duplicateEvidenceLinks > 0
         ? [
             ...evidence.caveats,
-            `Safety enforcement quarantined ${quarantined.length} unverified high-risk claim(s).`,
+            ...(duplicateEvidenceLinks > 0
+              ? [
+                  `Evidence normalization removed ${duplicateEvidenceLinks} duplicate claim-to-source link(s).`,
+                ]
+              : []),
+            ...(quarantined.length > 0
+              ? [
+                  `Safety enforcement quarantined ${quarantined.length} unverified high-risk claim(s).`,
+                ]
+              : []),
           ]
         : evidence.caveats,
     readyForWriting: evidence.readyForWriting && hasUsableCore,

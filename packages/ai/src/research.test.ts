@@ -261,6 +261,7 @@ describe("bounded research providers", () => {
       verificationState: "partially_supported",
       usageGuidance: "caveat",
       caveat: null,
+      evidence: [evidence.claims[0]!.evidence[0]!, evidence.claims[0]!.evidence[0]!],
     });
     const fetchMock = vi.fn<typeof fetch>(async () => {
       return new Response(JSON.stringify(providerResponse(evidence)), {
@@ -276,6 +277,10 @@ describe("bounded research providers", () => {
       usageGuidance: "do_not_use",
     });
     expect(result.evidencePackage.caveats.join(" ")).toContain("Safety enforcement quarantined");
+    expect(result.evidencePackage.caveats.join(" ")).toContain(
+      "Evidence normalization removed 1 duplicate",
+    );
+    expect(result.evidencePackage.claims[1]?.evidence).toHaveLength(1);
     expect(result.evidencePackage.readyForWriting).toBe(true);
   });
 
