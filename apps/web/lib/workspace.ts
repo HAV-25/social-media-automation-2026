@@ -77,10 +77,7 @@ export const getWorkspaceSnapshot = cache(async function getWorkspaceSnapshot(
   if (process.env.NEXT_PUBLIC_DEMO_MODE !== "false") {
     const fallbackBrand = demoBrands[0];
     if (!fallbackBrand) throw new Error("Demo mode requires at least one brand.");
-    const activeBrand =
-      demoBrands.find((brand) => brand.id === requestedBrandId) ??
-      demoBrands.find((brand) => brand.name === "Business of AI") ??
-      fallbackBrand;
+    const activeBrand = demoBrands.find((brand) => brand.id === requestedBrandId) ?? fallbackBrand;
     const cookieStore = await cookies();
     const submitted = parseDemoContentRecords(cookieStore.get("demo-content-records")?.value)
       .filter((record) => record.brandId === activeBrand.id)
@@ -122,17 +119,14 @@ export const getWorkspaceSnapshot = cache(async function getWorkspaceSnapshot(
     .from("brands")
     .select("id,name,slug")
     .eq("status", "active")
-    .order("name");
+    .order("created_at");
 
   if (brandError) throw new Error(`Unable to load assigned brands: ${brandError.message}`);
   if (!brands?.length) throw new Error("This account has no assigned brands.");
   const fallbackBrand = brands[0];
   if (!fallbackBrand) throw new Error("This account has no assigned brands.");
 
-  const activeBrand =
-    brands.find((brand) => brand.id === requestedBrandId) ??
-    brands.find((brand) => brand.name === "Business of AI") ??
-    fallbackBrand;
+  const activeBrand = brands.find((brand) => brand.id === requestedBrandId) ?? fallbackBrand;
 
   const [
     { data: opportunities, error: opportunityError },

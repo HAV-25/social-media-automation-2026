@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const dashboardPage = readFileSync(resolve(process.cwd(), "app/(dashboard)/page.tsx"), "utf8");
+const workspace = readFileSync(resolve(process.cwd(), "lib/workspace.ts"), "utf8");
 
 describe("live dashboard presentation", () => {
   it("renders runtime metrics instead of prototype operational figures", () => {
@@ -13,5 +14,10 @@ describe("live dashboard presentation", () => {
     expect(dashboardPage).not.toContain('"$0.84", "Research spend"');
     expect(dashboardPage).not.toContain("held 11 duplicate");
     expect(dashboardPage).not.toContain("Thursday, 23 July");
+  });
+
+  it("uses assignment order rather than a hard-coded brand default", () => {
+    expect(workspace).toContain('.order("created_at")');
+    expect(workspace).not.toContain('brand.name === "Business of AI"');
   });
 });

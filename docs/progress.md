@@ -548,3 +548,30 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
 - Repository-wide formatting, lint, strict type-checking, all 187 tests, and
   the optimized production build passed. No paid AI or image-generation call
   was made.
+
+### Klaank pilot dataset
+
+- Replaced Klaank's generic seed assumptions with an editable pilot
+  configuration for a B2B robotics marketplace: defined buyer and supplier
+  audiences, evidence-led positioning, five content pillars, six restricted
+  claim/risk categories, four CTA preferences, a low risk tolerance, complete
+  voice controls, and three output variants.
+- Added three approved style references covering Newsworthy, Educational, and
+  Perspective writing. Each reference avoids unsupported performance, ROI,
+  safety, and market-superlative claims.
+- Added and activated three live RSS routes for Bloomberg Technology,
+  TechCrunch, and IEEE Spectrum Robotics. All endpoints returned HTTP 200 with
+  RSS/XML content during validation on 2026-07-25.
+- Broad feeds route only robotics and commercial-automation keywords; the
+  robotics-specific feed accepts its full topic stream. All use
+  `score_then_research`, a pilot score threshold of 65, and a daily eligibility
+  limit of two items per feed to keep the lean workflow bounded.
+- The live configuration audit confirmed five pillars, six restrictions, four
+  CTA preferences, a complete voice/generation contract, three approved
+  examples, three active feeds, and three correctly bounded brand routes.
+- First-time sessions now select the earliest assigned active brand rather than
+  a hard-coded brand name. With the current assignment order, the pilot opens in
+  Klaank while still honoring an explicit brand-selection cookie.
+- Repository formatting, web lint, strict web type-checking, all 45 web tests,
+  and the optimized production build passed. External feed validation and
+  database configuration made no paid AI or image-generation call.
