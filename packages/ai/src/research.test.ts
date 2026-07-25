@@ -279,6 +279,24 @@ describe("bounded research providers", () => {
     expect(result.evidencePackage.readyForWriting).toBe(true);
   });
 
+  it("recomputes writing readiness from the normalized claims ledger", async () => {
+    const evidence = verifiedEvidence();
+    evidence.readyForWriting = false;
+    const fetchMock = vi.fn<typeof fetch>(async () => {
+      return new Response(JSON.stringify(providerResponse(evidence)), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    });
+
+    const result = await providerWithFetch(fetchMock).research(request());
+
+    expect(result.evidencePackage.readyForWriting).toBe(true);
+    expect(result.evidencePackage.caveats.join(" ")).toContain(
+      "Writing readiness was deterministically recomputed as true",
+    );
+  });
+
   it("handles refusals and bounded-output truncation explicitly", async () => {
     const refusal = providerResponse();
     refusal.output = [

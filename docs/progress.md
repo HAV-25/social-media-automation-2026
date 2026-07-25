@@ -699,3 +699,26 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   links, downgrades claims that lose verified support, recomputes writing
   readiness, and records each intervention in the evidence caveats rather than
   weakening the consulted-source invariant.
+- A later transaction reached the opportunity transition and exposed a text
+  versus `opportunity_status` enum assignment. Fresh-install SQL and a
+  fail-closed live hotfix now cast both research transition branches to the
+  durable enum explicitly.
+- The first successfully persisted real ledger contained multiple verified
+  usable core claims and one quarantined unverified capability claim, while the
+  provider still marked the package not ready. Writing readiness is now
+  recomputed from the normalized ledger: at least one usable core claim is
+  required and any unsupported or disputed core claim blocks writing. A
+  provider's conservative boolean can no longer hide otherwise safe evidence or
+  override the deterministic safety rules.
+- Live WF-06 persisted one real Newsworthy Klaank draft before rejecting a
+  later style with inconsistent provider provenance. The valid draft remains
+  reviewable with its recorded model usage and quality results; the failed
+  orchestration remains visible rather than rolling back valid prior work.
+- WF-07 reached its persistence RPC and exposed a missing service-role grant on
+  the private implementation behind the public verification wrapper. Fresh
+  installs and the live project now grant only that private function to
+  `service_role`; anonymous and authenticated roles remain revoked.
+- The first successful WF-07 evaluation compared the post with its own current
+  version, producing false similarity and hook-reuse scores of 1. Verification
+  and selective regeneration now exclude the current draft while initial
+  generation continues to compare against all genuinely prior brand posts.

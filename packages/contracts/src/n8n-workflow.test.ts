@@ -28,6 +28,9 @@ const workflowPath = fileURLToPath(
 );
 const workflowDirectory = fileURLToPath(new URL("../../../n8n/workflows/", import.meta.url));
 const appDirectory = fileURLToPath(new URL("../../../apps/web/app/", import.meta.url));
+const editorialWorkflowPath = fileURLToPath(
+  new URL("../../../apps/web/lib/editorial-workflows.ts", import.meta.url),
+);
 const publisherPath = fileURLToPath(
   new URL("../../../scripts/publish-n8n-workflows.mjs", import.meta.url),
 );
@@ -243,6 +246,15 @@ describe("Milestone 6 editorial workflows", () => {
     expect(source).toContain("regenerate_base");
     expect(source).toContain("change_template");
     expect(source).toContain("'image_generation'");
+  });
+
+  it("excludes the current draft from verification and regeneration similarity", () => {
+    const source = readFileSync(editorialWorkflowPath, "utf8");
+
+    expect(source).toContain('draftQuery.neq("id", excludePostDraftId)');
+    expect(
+      source.match(/getSimilarityContext\(input\.brandId, input\.postDraftId\)/g),
+    ).toHaveLength(2);
   });
 });
 

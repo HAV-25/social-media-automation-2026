@@ -18,6 +18,15 @@ const countQualificationMigration = readFileSync(
   ),
   "utf8",
 );
+const statusCastMigration = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../../../supabase/migrations/20260725211000_cast_research_opportunity_status.sql",
+      import.meta.url,
+    ),
+  ),
+  "utf8",
+);
 
 describe("research evidence ledger migration", () => {
   it("adds a normalized conflict ledger with immediate RLS", () => {
@@ -67,5 +76,14 @@ describe("research evidence ledger migration", () => {
     );
     expect(countQualificationMigration).toContain("counted_source.research_run_id = research_id");
     expect(countQualificationMigration).toContain("counted_claim.research_run_id = research_id");
+  });
+
+  it("casts research opportunity transitions to the durable enum", () => {
+    expect(sql).toContain("'ready_to_generate'::public.opportunity_status");
+    expect(sql).toContain("'research_pending'::public.opportunity_status");
+    expect(statusCastMigration).toContain(
+      "'private.persist_research_evidence(jsonb)'::regprocedure",
+    );
+    expect(statusCastMigration).toContain("::public.opportunity_status");
   });
 });

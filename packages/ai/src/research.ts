@@ -276,6 +276,11 @@ function enforceEvidenceSafety(
       claim.usageGuidance !== "do_not_use" &&
       !["unsupported", "disputed"].includes(claim.verificationState),
   );
+  const hasBlockedCore = claims.some(
+    (claim) =>
+      claim.importance === "core" && ["unsupported", "disputed"].includes(claim.verificationState),
+  );
+  const readyForWriting = hasUsableCore && !hasBlockedCore;
   return evidencePackageSchema.parse({
     ...evidence,
     sources,
@@ -307,9 +312,19 @@ function enforceEvidenceSafety(
                   `Safety enforcement quarantined ${quarantined.length} unverified high-risk claim(s).`,
                 ]
               : []),
+            ...(readyForWriting !== evidence.readyForWriting
+              ? [
+                  `Writing readiness was deterministically recomputed as ${String(readyForWriting)} from the normalized claims ledger.`,
+                ]
+              : []),
           ]
-        : evidence.caveats,
-    readyForWriting: evidence.readyForWriting && hasUsableCore,
+        : readyForWriting !== evidence.readyForWriting
+          ? [
+              ...evidence.caveats,
+              `Writing readiness was deterministically recomputed as ${String(readyForWriting)} from the normalized claims ledger.`,
+            ]
+          : evidence.caveats,
+    readyForWriting,
   });
 }
 

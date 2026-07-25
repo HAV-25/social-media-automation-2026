@@ -6,6 +6,15 @@ const migrationPath = fileURLToPath(
   new URL("../../../supabase/migrations/20260724111716_verify_editorial_post.sql", import.meta.url),
 );
 const sql = readFileSync(migrationPath, "utf8");
+const grantMigration = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../../../supabase/migrations/20260725211500_grant_private_post_verification.sql",
+      import.meta.url,
+    ),
+  ),
+  "utf8",
+);
 
 describe("editorial verification migration", () => {
   it("checks actor permissions, current version, and evaluation integrity", () => {
@@ -28,6 +37,12 @@ describe("editorial verification migration", () => {
     expect(sql).toContain("Idempotency key was reused with a different request");
     expect(sql).toContain(
       "grant execute on function public.verify_evaluated_post(jsonb) to service_role",
+    );
+    expect(sql).toContain(
+      "grant execute on function private.verify_evaluated_post(jsonb) to service_role",
+    );
+    expect(grantMigration).toContain(
+      "grant execute on function private.verify_evaluated_post(jsonb) to service_role",
     );
     expect(sql).not.toContain(
       "grant execute on function public.verify_evaluated_post(jsonb) to authenticated",

@@ -839,7 +839,10 @@ begin
   where counted_claim.research_run_id = research_id;
 
   update public.opportunities
-  set status = case when is_ready then 'ready_to_generate' else 'research_pending' end
+  set status = case
+    when is_ready then 'ready_to_generate'::public.opportunity_status
+    else 'research_pending'::public.opportunity_status
+  end
   where id = target_opportunity_id;
 
   insert into public.pipeline_events (

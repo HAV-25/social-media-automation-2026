@@ -96,14 +96,16 @@ async function assertWorkflowEditor(input: {
   }
 }
 
-async function getSimilarityContext(brandId: string) {
+async function getSimilarityContext(brandId: string, excludePostDraftId?: string) {
   const supabase = createSupabaseServiceClient();
-  const { data: drafts, error: draftError } = await supabase
+  let draftQuery = supabase
     .from("post_drafts")
-    .select("brand_id,current_version_id")
+    .select("id,brand_id,current_version_id")
     .not("current_version_id", "is", null)
     .order("updated_at", { ascending: false })
     .limit(100);
+  if (excludePostDraftId) draftQuery = draftQuery.neq("id", excludePostDraftId);
+  const { data: drafts, error: draftError } = await draftQuery;
   if (draftError) {
     throw new EditorialWorkflowError(
       "similarity_context_failed",
@@ -358,7 +360,7 @@ export async function verifyWorkflowPost(input: PostVerificationWorkflowRequest)
     brandId: input.brandId,
     organizationId: context.brand.brand.organizationId,
   });
-  const similarity = await getSimilarityContext(input.brandId);
+  const similarity = await getSimilarityContext(input.brandId, input.postDraftId);
   const evaluation = evaluateEditorialDraft({
     content: context.version.content,
     brandContext: context.brand.context,
@@ -443,7 +445,7 @@ export async function regenerateWorkflowPost(input: PostActionWorkflowRequest) {
     brandContext: context.brand.context,
     evidence: context.research.evidencePackage,
     sourceText: context.opportunity.cleanText,
-    ...(await getSimilarityContext(input.brandId)),
+    ...(await getSimilarityContext(input.brandId, input.postDraftId)),
   });
   const requestHash = sha256Hex(
     JSON.stringify({

@@ -269,4 +269,5 @@ $$;
 revoke all on function private.verify_evaluated_post(jsonb) from public;
 revoke all on function public.verify_evaluated_post(jsonb)
   from public, anon, authenticated;
+grant execute on function private.verify_evaluated_post(jsonb) to service_role;
 grant execute on function public.verify_evaluated_post(jsonb) to service_role;
