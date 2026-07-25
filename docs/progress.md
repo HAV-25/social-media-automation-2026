@@ -615,3 +615,30 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
 - Remote execution remains blocked until the self-hosted n8n task runner is
   restarted with `NODE_FUNCTION_ALLOW_BUILTIN=crypto`; this narrowly permits the
   HMAC and UUID functions used by all ten signed workflows.
+
+### Live WF-01 RSS journey
+
+- The self-hosted runtime now has persistent 2 GB swap,
+  `NODE_FUNCTION_ALLOW_BUILTIN=crypto`, the application and webhook base URLs,
+  and the shared workflow HMAC secret. Environment access is temporarily
+  enabled for the controlled pilot workflow editors and must be tightened after
+  credential-backed replacements are configured.
+- All ten workflows are name-stably published and active in the intended n8n
+  project and folder. WF-10 successfully authenticates and records its bounded
+  recovery poll.
+- RSS URL validation now permits public TechCrunch infrastructure while
+  retaining private/reserved-address denial, preserves redirect path/query
+  semantics separately from deduplication canonicalization, and accepts
+  PostgreSQL timestamp offsets at workflow boundaries.
+- Live Supabase migrations allow RSS analysis through the atomic source
+  persistence function and resolve PL/pgSQL output-column ambiguity without
+  exposing a privileged RPC or weakening RLS.
+- WF-01 explicitly downloads and decodes the two POST responses whose data is
+  consumed downstream. This works around n8n 2.21.7 returning Netlify chunked
+  responses as socket objects. Contract checks fail closed before persistence
+  or analysis if decoded JSON has the wrong shape.
+- A signed brand-scoped WF-01 execution completed across all three Klaank feeds
+  on 2026-07-25. Supabase recorded three RSS items, one deduplicated Klaank
+  opportunity, recent WF-01/WF-04 nonce evidence, and a real score of 73.19.
+  Research remained reserved for a reviewer decision; no paid AI or image call
+  was made.

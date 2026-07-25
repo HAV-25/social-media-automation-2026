@@ -370,3 +370,19 @@ clustering, scoring, and the lean research-eligibility gate. It never starts
 research, generation, publishing, or scheduling on the reviewer's behalf. A
 successful dispatch record means n8n accepted the session; item-level workflow
 runs remain the durable evidence of downstream processing.
+
+## ADR-031 — RSS transport is bounded and explicitly decoded in n8n
+
+**Status:** Accepted, 2026-07-25
+
+Each RSS run processes at most one recent item per active feed by default and
+limits copied summaries to 4,000 characters. This bounds one-off demo latency,
+fan-out, memory, and downstream cost without changing durable deduplication or
+allowing research automatically.
+
+n8n 2.21.7 exposes chunked Netlify POST responses as Node response streams even
+when its HTTP Request node is configured for JSON. Any response required by a
+later WF-01 step is therefore downloaded as binary, decoded with the built-in
+Extract From File node, and checked at a small Code-node contract boundary.
+Terminal workflow calls may ignore their response body because durable
+application state, not n8n execution output, is authoritative.

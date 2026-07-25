@@ -46,12 +46,25 @@ describe("WF-01 RSS Intake workflow", () => {
       "Split Feeds",
       "Sign Safe Fetch Request",
       "Fetch and Parse Feed Safely",
+      "Decode RSS JSON",
+      "Validate RSS Fetch Contract",
       "Split Feed Items",
       "Sign Item Intake Request",
       "Persist RSS Intake",
+      "Decode RSS Intake JSON",
+      "Validate RSS Intake Contract",
       "Sign Analysis Request",
       "Normalize Cluster Score and Gate",
     ]);
+    expect(workflow.nodes.find((node) => node.name === "Fetch and Parse Feed Safely")?.type).toBe(
+      "n8n-nodes-base.httpRequest",
+    );
+    expect(workflow.nodes.find((node) => node.name === "Decode RSS JSON")?.type).toBe(
+      "n8n-nodes-base.extractFromFile",
+    );
+    expect(workflow.nodes.find((node) => node.name === "Validate RSS Fetch Contract")?.type).toBe(
+      "n8n-nodes-base.code",
+    );
     expect(source).not.toMatch(/service[_-]?role|credentialId|OPENAI_API_KEY/i);
   });
 
@@ -97,6 +110,43 @@ describe("WF-01 RSS Intake workflow", () => {
 });
 
 describe("Milestone 4 n8n workflow package", () => {
+  it("decodes every non-terminal file response before downstream processing", () => {
+    for (const filename of [
+      "wf-01-rss-intake.json",
+      "wf-02-manual-intake.json",
+      "wf-03-normalize.json",
+      "wf-04-cluster-score.json",
+      "wf-05-research.json",
+      "wf-06-angle-post-generation.json",
+      "wf-07-post-verification.json",
+      "wf-08-image-generation.json",
+      "wf-09-content-actions.json",
+      "wf-10-error-recovery.json",
+    ]) {
+      const workflow = workflowSchema.parse(
+        JSON.parse(readFileSync(`${workflowDirectory}${filename}`, "utf8")),
+      );
+      const nodesByName = new Map(workflow.nodes.map((node) => [node.name, node]));
+
+      for (const node of workflow.nodes.filter(
+        (candidate) => candidate.type === "n8n-nodes-base.httpRequest",
+      )) {
+        const response = node.parameters.options as
+          | { response?: { response?: { responseFormat?: string } } }
+          | undefined;
+        const format = response?.response?.response?.responseFormat;
+        const connection = workflow.connections[node.name] as
+          | { main?: Array<Array<{ node: string }>> }
+          | undefined;
+        const targets = connection?.main?.flat() ?? [];
+
+        if (format === "file" && targets.length) {
+          expect(nodesByName.get(targets[0]!.node)?.type).toBe("n8n-nodes-base.extractFromFile");
+        }
+      }
+    }
+  });
+
   it.each([
     ["wf-02-manual-intake.json", "WF-02 Manual Intake"],
     ["wf-03-normalize.json", "WF-03 Normalize"],
