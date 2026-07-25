@@ -14,5 +14,10 @@ export function createSupabaseServiceClient() {
       detectSessionInUrl: false,
       persistSession: false,
     },
+    global: {
+      headers: {
+        "User-Agent": "appsbrite-social-server/1.0",
+      },
+    },
   });
 }

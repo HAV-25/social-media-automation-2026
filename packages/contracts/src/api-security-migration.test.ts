@@ -11,6 +11,15 @@ const migration = readFileSync(
   ),
   "utf8",
 );
+const secretKeyCompatibilityMigration = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../../../supabase/migrations/20260725150325_support_secret_api_keys_for_rate_limits.sql",
+      import.meta.url,
+    ),
+  ),
+  "utf8",
+);
 const databaseTest = readFileSync(
   fileURLToPath(
     new URL("../../../supabase/tests/database/api_security_controls.test.sql", import.meta.url),
@@ -19,6 +28,14 @@ const databaseTest = readFileSync(
 );
 const workflowAuth = readFileSync(
   fileURLToPath(new URL("../../../apps/web/lib/workflow-auth.ts", import.meta.url)),
+  "utf8",
+);
+const apiRateLimit = readFileSync(
+  fileURLToPath(new URL("../../../apps/web/lib/api-rate-limit.ts", import.meta.url)),
+  "utf8",
+);
+const supabaseServiceClient = readFileSync(
+  fileURLToPath(new URL("../../../apps/web/lib/supabase/service.ts", import.meta.url)),
   "utf8",
 );
 const userApiRoutes = [
@@ -81,12 +98,29 @@ describe("Feature 8.3 API security controls", () => {
     );
   });
 
+  it("supports opaque Supabase secret keys without weakening the service-role boundary", () => {
+    expect(secretKeyCompatibilityMigration).toContain("if current_user <> 'service_role'");
+    expect(secretKeyCompatibilityMigration).not.toContain("current_setting(");
+    expect(secretKeyCompatibilityMigration).toContain(
+      "revoke all on function private.consume_api_rate_limit(text, text, text, integer, integer)",
+    );
+    expect(secretKeyCompatibilityMigration).toContain(
+      "grant execute on function private.consume_api_rate_limit(text, text, text, integer, integer)",
+    );
+  });
+
   it("enforces limits on every user API and through the shared workflow authenticator", () => {
     for (const route of userApiRoutes) {
       expect(route).toContain("enforceUserApiRateLimit");
     }
     expect(workflowAuth).toContain("enforceInternalApiRateLimit");
     expect(workflowAuth).toContain("WORKFLOW_HMAC_PREVIOUS_SECRET");
+  });
+
+  it("keeps opaque secret-key requests server-classified and dependency logs redacted", () => {
+    expect(supabaseServiceClient).toContain('"User-Agent": "appsbrite-social-server/1.0"');
+    expect(apiRateLimit).toContain("sanitizeLogMetadata");
+    expect(apiRateLimit).not.toContain("console.error(error)");
   });
 
   it("accepts active and previous HMAC secrets in every receiving n8n workflow", () => {

@@ -1,6 +1,6 @@
 import "server-only";
 import { serverEnvSchema } from "@content-engine/contracts";
-import { sha256Hex } from "@content-engine/security";
+import { sanitizeLogMetadata, sha256Hex } from "@content-engine/security";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createSupabaseServiceClient } from "./supabase/service";
@@ -103,7 +103,16 @@ export async function consumeApiRateLimit(input: {
     requested_limit: limit,
     requested_window_seconds: windowSeconds,
   });
-  if (error) throw new ApiRateLimitError("rate_limit_unavailable", 503);
+  if (error) {
+    console.error(
+      "Supabase API rate-limit dependency failed.",
+      sanitizeLogMetadata({
+        code: error.code,
+        message: error.message,
+      }),
+    );
+    throw new ApiRateLimitError("rate_limit_unavailable", 503);
+  }
   return rateLimitResultSchema.parse(data);
 }
 
