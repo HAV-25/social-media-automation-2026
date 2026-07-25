@@ -70,6 +70,7 @@ describe("WF-01 RSS Intake workflow", () => {
 
   it("exposes a brand-scoped, signed, durable one-off trigger", () => {
     const route = readFileSync(`${appDirectory}api/rss-intake/run/route.ts`, "utf8");
+    const workflow = readFileSync(`${workflowDirectory}wf-01-rss-intake.json`, "utf8");
     const feedPlan = readFileSync(
       `${appDirectory}api/internal/workflows/rss/feeds/route.ts`,
       "utf8",
@@ -82,6 +83,14 @@ describe("WF-01 RSS Intake workflow", () => {
     expect(route).toContain('"rss.intake.manual_dispatch"');
     expect(feedPlan).toContain("rss_feed_brand_links!inner");
     expect(feedPlan).toContain("rss_feed_brand_links.brand_id");
+    const fetchRoute = readFileSync(
+      `${appDirectory}api/internal/workflows/rss/fetch/route.ts`,
+      "utf8",
+    );
+    expect(fetchRoute).toContain("RSS_ITEMS_PER_FEED_PER_RUN");
+    expect(fetchRoute).toContain(".slice(0, itemLimit)");
+    expect(workflow).toContain('"name": "accept-encoding"');
+    expect(workflow).toContain('"value": "identity"');
     expect(route).not.toMatch(/N8N_API_KEY|service[_-]?role/i);
   });
 });

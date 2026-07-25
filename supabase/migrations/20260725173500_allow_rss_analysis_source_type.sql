@@ -32,6 +32,25 @@ begin
     raise exception 'Expected ingest_manual_input source-type allowlist was not found';
   end if;
 
+  if updated_definition not like E'%#variable_conflict use_column%' then
+    updated_definition := replace(
+      updated_definition,
+      E'AS $function$\r\ndeclare',
+      E'AS $function$\r\n#variable_conflict use_column\r\ndeclare'
+    );
+    if updated_definition not like E'%#variable_conflict use_column%' then
+      updated_definition := replace(
+        updated_definition,
+        E'AS $function$\ndeclare',
+        E'AS $function$\n#variable_conflict use_column\ndeclare'
+      );
+    end if;
+  end if;
+
+  if updated_definition not like E'%#variable_conflict use_column%' then
+    raise exception 'Expected ingest_manual_input function body was not found';
+  end if;
+
   execute updated_definition;
 end;
 $migration$;

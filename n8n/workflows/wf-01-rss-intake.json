@@ -130,6 +130,10 @@
               "value": "application/json"
             },
             {
+              "name": "accept-encoding",
+              "value": "identity"
+            },
+            {
               "name": "x-workflow-name",
               "value": "WF-01 RSS Intake"
             },

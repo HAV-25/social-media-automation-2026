@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { rssFetchRequestSchema, rssFetchResultSchema } from "@content-engine/contracts";
+import {
+  rssFetchRequestSchema,
+  rssFetchResultSchema,
+  serverEnvSchema,
+} from "@content-engine/contracts";
 import { sha256Hex } from "@content-engine/security";
 import {
   fetchBoundedSourceText,
@@ -47,10 +51,13 @@ export async function POST(request: Request) {
     }
 
     const fetched = await fetchBoundedSourceText(feed.feed_url);
-    const items = parseRssFeed(fetched.text).map((item) => ({
-      ...item,
-      contentHash: itemContentHash(item),
-    }));
+    const itemLimit = serverEnvSchema.parse(process.env).RSS_ITEMS_PER_FEED_PER_RUN;
+    const items = parseRssFeed(fetched.text)
+      .slice(0, itemLimit)
+      .map((item) => ({
+        ...item,
+        contentHash: itemContentHash(item),
+      }));
     const fetchedAt = new Date().toISOString();
     const { error: pollError } = await supabase.rpc("record_rss_poll", {
       payload: {

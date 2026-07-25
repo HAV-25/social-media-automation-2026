@@ -1081,6 +1081,7 @@ language plpgsql
 security definer
 set search_path = ''
 as $$
+#variable_conflict use_column
 declare
   actor_id uuid := (payload ->> 'actorId')::uuid;
   target_brand_id uuid := (payload ->> 'brandId')::uuid;

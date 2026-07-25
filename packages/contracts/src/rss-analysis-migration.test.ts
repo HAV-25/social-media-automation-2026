@@ -20,6 +20,7 @@ const compatibilityMigration = readFileSync(
 describe("RSS analysis persistence migration", () => {
   it("permits RSS in fresh ingest_manual_input installations", () => {
     expect(initialMigration).toMatch(/'plain_text',\s+'rss',\s+'url'/);
+    expect(initialMigration).toContain("#variable_conflict use_column");
     expect(initialMigration).toContain(
       "case when (payload ->> 'sourceType') = 'rss' then 'rss_analysis'",
     );
@@ -30,6 +31,7 @@ describe("RSS analysis persistence migration", () => {
       "pg_get_functiondef('private.ingest_manual_input(jsonb)'::regprocedure)",
     );
     expect(compatibilityMigration).toContain("''plain_text'',\\n      ''rss'',\\n      ''url''");
+    expect(compatibilityMigration).toContain("#variable_conflict use_column");
     expect(compatibilityMigration).toContain("if updated_definition = function_definition");
     expect(compatibilityMigration).toContain(
       "Expected ingest_manual_input source-type allowlist was not found",
