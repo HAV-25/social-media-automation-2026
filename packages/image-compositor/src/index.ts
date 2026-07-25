@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
 import {
   imageTemplateSchema,
   imageValidationSchema,
@@ -6,6 +8,15 @@ import {
   type ImageValidation,
 } from "@content-engine/contracts";
 import sharp from "sharp";
+
+const bundledFontRelativePath =
+  "node_modules/@fontsource/inter/files/inter-latin-700-normal.woff2";
+const bundledFontPath = [
+  path.join(process.cwd(), bundledFontRelativePath),
+  path.join(process.cwd(), "../..", bundledFontRelativePath),
+].find((candidate) => existsSync(candidate));
+if (!bundledFontPath) throw new Error("The bundled image-compositor font is unavailable.");
+const bundledFontDataBase64 = readFileSync(bundledFontPath).toString("base64");
 
 export const FACEBOOK_IMAGE_WIDTH = 1200;
 export const FACEBOOK_IMAGE_HEIGHT = 630;
@@ -149,11 +160,11 @@ function templateRules(template: ImageTemplate) {
 }
 
 function fontFace(theme: BrandImageTheme) {
-  if (!theme.fontDataBase64) return "";
-  if (!/^[A-Za-z0-9+/=]+$/.test(theme.fontDataBase64)) {
+  const fontData = theme.fontDataBase64 ?? bundledFontDataBase64;
+  if (!/^[A-Za-z0-9+/=]+$/.test(fontData)) {
     throw new Error("Brand font data must be valid base64.");
   }
-  return `@font-face{font-family:'BrandFont';src:url(data:font/woff2;base64,${theme.fontDataBase64}) format('woff2');}`;
+  return `@font-face{font-family:'BrandFont';src:url(data:font/woff2;base64,${fontData}) format('woff2');}`;
 }
 
 function headlineText(lines: string[], input: { x: number; y: number; lineHeight: number }) {
@@ -183,7 +194,7 @@ function overlaySvg(input: {
   const commonStyle = `
     <style>
       ${fontFace(theme)}
-      text{font-family:'${family}',Arial,sans-serif;fill:${textColor};font-weight:700}
+      text{font-family:'${family}','BrandFont',sans-serif;fill:${textColor};font-weight:700}
       .brand{font-size:24px;letter-spacing:2px;text-transform:uppercase}
       .source{font-size:20px;font-weight:400}
       .headline{font-size:${fontSize}px}

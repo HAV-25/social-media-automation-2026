@@ -742,3 +742,7 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   boundary also strip markup and decode common entities, so hostile feed
   formatting cannot become branded overlay text. Existing base art can be
   recomposed with the corrected overlay at zero provider cost.
+- Visual inspection of the first Netlify composition exposed missing system
+  fonts as square glyphs. The compositor now embeds the open-source Inter font
+  in every SVG overlay and traces that asset into the production server bundle,
+  making typography deterministic across local and serverless environments.
