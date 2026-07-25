@@ -7,16 +7,22 @@ import {
   type ImageTemplate,
   type ImageValidation,
 } from "@content-engine/contracts";
+import * as opentype from "opentype.js";
 import sharp from "sharp";
 
-const bundledFontRelativePath =
-  "node_modules/@fontsource/inter/files/inter-latin-700-normal.woff2";
+const bundledFontRelativePath = "packages/image-compositor/assets/Inter-Bold.ttf";
 const bundledFontPath = [
   path.join(process.cwd(), bundledFontRelativePath),
   path.join(process.cwd(), "../..", bundledFontRelativePath),
 ].find((candidate) => existsSync(candidate));
 if (!bundledFontPath) throw new Error("The bundled image-compositor font is unavailable.");
-const bundledFontDataBase64 = readFileSync(bundledFontPath).toString("base64");
+const bundledFontBuffer = readFileSync(bundledFontPath);
+const bundledFont = opentype.parse(
+  bundledFontBuffer.buffer.slice(
+    bundledFontBuffer.byteOffset,
+    bundledFontBuffer.byteOffset + bundledFontBuffer.byteLength,
+  ),
+);
 
 export const FACEBOOK_IMAGE_WIDTH = 1200;
 export const FACEBOOK_IMAGE_HEIGHT = 630;
@@ -64,22 +70,6 @@ const hexColorPattern = /^#[0-9a-f]{6}$/i;
 function assertHexColor(value: string, label: string) {
   if (!hexColorPattern.test(value)) throw new Error(`${label} must be a six-digit hex color.`);
   return value.toUpperCase();
-}
-
-function escapeXml(value: string) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&apos;");
-}
-
-function sanitizeFontFamily(value: string | undefined) {
-  const fallback = "Arial";
-  if (!value) return fallback;
-  const sanitized = value.replace(/[^a-zA-Z0-9 _-]/g, "").trim();
-  return sanitized || fallback;
 }
 
 function rgb(hex: string) {
@@ -159,19 +149,55 @@ function templateRules(template: ImageTemplate) {
   }
 }
 
-function fontFace(theme: BrandImageTheme) {
-  const fontData = theme.fontDataBase64 ?? bundledFontDataBase64;
-  if (!/^[A-Za-z0-9+/=]+$/.test(fontData)) {
+function fontForTheme(theme: BrandImageTheme) {
+  if (!theme.fontDataBase64) return bundledFont;
+  if (!/^[A-Za-z0-9+/=]+$/.test(theme.fontDataBase64)) {
     throw new Error("Brand font data must be valid base64.");
   }
-  return `@font-face{font-family:'BrandFont';src:url(data:font/woff2;base64,${fontData}) format('woff2');}`;
+  const fontBuffer = Buffer.from(theme.fontDataBase64, "base64");
+  return opentype.parse(
+    fontBuffer.buffer.slice(
+      fontBuffer.byteOffset,
+      fontBuffer.byteOffset + fontBuffer.byteLength,
+    ),
+  );
 }
 
-function headlineText(lines: string[], input: { x: number; y: number; lineHeight: number }) {
+function vectorText(
+  value: string,
+  input: { x: number; y: number; fontSize: number; fill: string; font: opentype.Font },
+) {
+  let cursor = input.x;
+  const paths = Array.from(value).map((character) => {
+    const glyph = input.font.charToGlyph(character);
+    const pathData = glyph.getPath(cursor, input.y, input.fontSize).toPathData(2);
+    cursor += ((glyph.advanceWidth ?? input.font.unitsPerEm) / input.font.unitsPerEm) * input.fontSize;
+    return pathData;
+  });
+  return `<path d="${paths.join(" ")}" fill="${input.fill}"/>`;
+}
+
+function headlineText(
+  lines: string[],
+  input: {
+    x: number;
+    y: number;
+    lineHeight: number;
+    fontSize: number;
+    fill: string;
+    font: opentype.Font;
+  },
+) {
   return lines
     .map(
       (line, index) =>
-        `<text x="${input.x}" y="${input.y + input.lineHeight * index}">${escapeXml(line)}</text>`,
+        vectorText(line, {
+          x: input.x,
+          y: input.y + input.lineHeight * index,
+          fontSize: input.fontSize,
+          fill: input.fill,
+          font: input.font,
+        }),
     )
     .join("");
 }
@@ -190,15 +216,7 @@ function overlaySvg(input: {
   const primary = assertHexColor(theme.primaryColor, "Primary color");
   const secondary = assertHexColor(theme.secondaryColor, "Secondary color");
   const accent = assertHexColor(theme.accentColor, "Accent color");
-  const family = theme.fontDataBase64 ? "BrandFont" : sanitizeFontFamily(theme.fontFamily);
-  const commonStyle = `
-    <style>
-      ${fontFace(theme)}
-      text{font-family:'${family}','BrandFont',sans-serif;fill:${textColor};font-weight:700}
-      .brand{font-size:24px;letter-spacing:2px;text-transform:uppercase}
-      .source{font-size:20px;font-weight:400}
-      .headline{font-size:${fontSize}px}
-    </style>`;
+  const font = fontForTheme(theme);
   let shapes = "";
   let headline = "";
   if (template === "editorial_overlay") {
@@ -207,26 +225,68 @@ function overlaySvg(input: {
       <stop offset="100%" stop-color="${primary}" stop-opacity="0.96"/>
     </linearGradient></defs><rect x="0" y="${height * 0.34}" width="${width}" height="${height * 0.66}" fill="url(#fade)"/>
     <rect x="64" y="${height - 268}" width="92" height="8" rx="4" fill="${accent}"/>`;
-    headline = headlineText(headlineLines, { x: 64, y: height - 196, lineHeight: fontSize * 1.12 });
+    headline = headlineText(headlineLines, {
+      x: 64,
+      y: height - 196,
+      lineHeight: fontSize * 1.12,
+      fontSize,
+      fill: textColor,
+      font,
+    });
   } else if (template === "insight_split") {
     shapes = `<rect x="0" y="0" width="${width * 0.49}" height="${height}" fill="${primary}"/>
       <rect x="${width * 0.49 - 10}" y="0" width="10" height="${height}" fill="${accent}"/>`;
-    headline = headlineText(headlineLines, { x: 58, y: 174, lineHeight: fontSize * 1.08 });
+    headline = headlineText(headlineLines, {
+      x: 58,
+      y: 174,
+      lineHeight: fontSize * 1.08,
+      fontSize,
+      fill: textColor,
+      font,
+    });
   } else if (template === "concept_frame") {
     shapes = `<rect x="26" y="26" width="${width - 52}" height="${height - 52}" rx="20" fill="none" stroke="${accent}" stroke-width="8"/>
       <rect x="44" y="${height - 190}" width="${width - 88}" height="146" rx="14" fill="${primary}" fill-opacity="0.92"/>`;
-    headline = headlineText(headlineLines, { x: 70, y: height - 130, lineHeight: fontSize * 1.05 });
+    headline = headlineText(headlineLines, {
+      x: 70,
+      y: height - 130,
+      lineHeight: fontSize * 1.05,
+      fontSize,
+      fill: textColor,
+      font,
+    });
   } else {
     shapes = `<rect x="0" y="0" width="${width}" height="${height}" fill="${primary}"/>
       <path d="M${width * 0.68} 0 H${width} V${height} H${width * 0.43} Z" fill="${secondary}"/>
       <circle cx="${width - 120}" cy="110" r="58" fill="${accent}"/>`;
-    headline = headlineText(headlineLines, { x: 64, y: 188, lineHeight: fontSize * 1.08 });
+    headline = headlineText(headlineLines, {
+      x: 64,
+      y: 188,
+      lineHeight: fontSize * 1.08,
+      fontSize,
+      fill: textColor,
+      font,
+    });
   }
+  const brand = vectorText(theme.brandName.toLocaleUpperCase("en"), {
+    x: 64,
+    y: 58,
+    fontSize: 24,
+    fill: textColor,
+    font,
+  });
+  const source = vectorText(input.sourceLabel, {
+    x: 64,
+    y: height - 28,
+    fontSize: 20,
+    fill: textColor,
+    font,
+  });
   return Buffer.from(`<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-    ${commonStyle}${shapes}
-    <g class="headline">${headline}</g>
-    <text class="brand" x="64" y="58">${escapeXml(theme.brandName)}</text>
-    <text class="source" x="64" y="${height - 28}">${escapeXml(input.sourceLabel)}</text>
+    ${shapes}
+    <g>${headline}</g>
+    ${brand}
+    ${source}
   </svg>`);
 }
 

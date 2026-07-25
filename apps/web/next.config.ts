@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1"],
   outputFileTracingRoot: path.join(__dirname, "../.."),
   outputFileTracingIncludes: {
-    "/*": ["../../node_modules/@fontsource/inter/files/inter-latin-700-normal.woff2"],
+    "/*": ["../../packages/image-compositor/assets/Inter-Bold.ttf"],
   },
   poweredByHeader: false,
   reactStrictMode: true,
