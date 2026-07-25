@@ -1,5 +1,6 @@
 import {
   evidencePackageSchema,
+  researchSourceSchema,
   researchPlanSchema,
   researchProviderResultSchema,
   validateEvidencePackageIntegrity,
@@ -22,6 +23,17 @@ const optionalHttpUrlSchema = z
     message: "Original source URLs must use HTTP or HTTPS.",
   })
   .optional();
+
+// OpenAI Structured Outputs does not accept JSON Schema's `uri` format. Keep
+// the provider-facing field as a bounded string, then apply the full HTTP(S)
+// URL contract when `evidencePackageSchema` parses the returned value.
+const providerEvidencePackageSchema = evidencePackageSchema.extend({
+  sources: z.array(
+    researchSourceSchema.extend({
+      url: z.string().trim().min(1).max(4_096),
+    }),
+  ),
+});
 
 export const researchRequestSchema = z
   .object({
@@ -349,7 +361,7 @@ END_SOURCE_DATA`,
           parallel_tool_calls: false,
           include: ["web_search_call.action.sources"],
           text: {
-            format: zodTextFormat(evidencePackageSchema, "evidence_package"),
+            format: zodTextFormat(providerEvidencePackageSchema, "evidence_package"),
           },
           max_output_tokens: request.plan.budget.maxOutputTokens,
           store: false,

@@ -665,3 +665,13 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   parent RSS session, pipeline event, and audit evidence.
 - Contract coverage now prevents the route from regressing to an authenticated
   browser-scoped database client.
+
+### Live provider structured-output compatibility
+
+- A real bounded WF-05 invocation reached OpenAI but was rejected before model
+  execution because Structured Outputs does not accept JSON Schema's `uri`
+  format. The provider-facing evidence schema now represents source URLs as
+  bounded strings, while the durable evidence contract still validates every
+  returned value as an HTTP(S) URL before persistence.
+- The regression test inspects the actual OpenAI request body and prevents the
+  unsupported `uri` format from returning.

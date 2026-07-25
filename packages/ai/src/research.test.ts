@@ -204,6 +204,9 @@ describe("bounded research providers", () => {
     expect(result.evidencePackage.readyForWriting).toBe(true);
     expect(result.usage.webSearchCalls).toBe(1);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    const requestBody = String(fetchMock.mock.calls[0]?.[1]?.body);
+    expect(requestBody).toContain('"url"');
+    expect(requestBody).not.toContain('"format":"uri"');
   });
 
   it("replays a sanitized provider response fixture without secrets or personal data", async () => {
