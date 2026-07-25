@@ -171,7 +171,7 @@ export const rssFeedPlanItemSchema = z.object({
   feedId: z.uuid(),
   feedUrl: z.url(),
   name: z.string().min(1),
-  lastPolledAt: z.iso.datetime().nullable(),
+  lastPolledAt: z.iso.datetime({ offset: true }).nullable(),
   brandLinks: z.array(
     z.object({
       brandId: z.uuid(),

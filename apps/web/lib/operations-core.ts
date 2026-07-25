@@ -53,11 +53,11 @@ const rawRunSchema = z
     idempotency_key: z.string().trim().min(1).max(200),
     attempt: z.number().int().positive(),
     status: operationsRunStatusSchema,
-    started_at: z.iso.datetime().nullable(),
-    completed_at: z.iso.datetime().nullable(),
+    started_at: z.iso.datetime({ offset: true }).nullable(),
+    completed_at: z.iso.datetime({ offset: true }).nullable(),
     model_usage: z.unknown(),
     error: z.unknown(),
-    created_at: z.iso.datetime(),
+    created_at: z.iso.datetime({ offset: true }),
   })
   .strict();
 

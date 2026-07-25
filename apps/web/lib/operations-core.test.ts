@@ -74,6 +74,19 @@ describe("operations observability core", () => {
     expect(normalized.costUsd).toBe(0.0042);
   });
 
+  it("accepts Supabase timestamp offsets in live operations rows", () => {
+    const normalized = normalizeOperationsRun(
+      {
+        ...baseRun,
+        started_at: "2026-07-24T10:00:00.000+00:00",
+        created_at: "2026-07-24T10:00:00.000+00:00",
+      },
+      { now: new Date("2026-07-24T10:01:00.000Z") },
+    );
+
+    expect(normalized.durationMs).toBe(60_000);
+  });
+
   it("round-trips signed-shape cursor data and rejects malformed cursors", () => {
     const cursor = encodeOperationsCursor({
       createdAt: "2026-07-24T10:00:00.000Z",

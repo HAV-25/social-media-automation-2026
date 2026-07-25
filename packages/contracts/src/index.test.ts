@@ -11,6 +11,7 @@ import {
   researchPlanSchema,
   rssIntakeContractSchema,
   rssFeedUpsertRequestSchema,
+  rssFeedPlanSchema,
   rssManualRunRequestSchema,
   rssManualRunResultSchema,
   rssGenerationReservationRequestSchema,
@@ -117,6 +118,23 @@ describe("shared contracts", () => {
         status: "accepted",
       }).success,
     ).toBe(true);
+  });
+
+  it("accepts Supabase UTC offsets in a persisted RSS feed plan", () => {
+    const result = rssFeedPlanSchema.parse({
+      contractVersion: "1.0",
+      feeds: [
+        {
+          feedId: "00000000-0000-4000-8000-000000000001",
+          feedUrl: "https://example.test/feed.xml",
+          name: "Example feed",
+          lastPolledAt: "2026-07-25T16:37:20.832+00:00",
+          brandLinks: [],
+        },
+      ],
+    });
+
+    expect(result.feeds[0]?.lastPolledAt).toBe("2026-07-25T16:37:20.832+00:00");
   });
 
   it("validates the plain-text input boundary and its idempotency key", () => {

@@ -255,3 +255,53 @@ describe("Milestone 8 recovery workflow", () => {
     }
   });
 });
+
+describe("n8n 2.21 runtime compatibility", () => {
+  const filenames = [
+    "wf-01-rss-intake.json",
+    "wf-02-manual-intake.json",
+    "wf-03-normalize.json",
+    "wf-04-cluster-score.json",
+    "wf-05-research.json",
+    "wf-06-angle-post-generation.json",
+    "wf-07-post-verification.json",
+    "wf-08-image-generation.json",
+    "wf-09-content-actions.json",
+    "wf-10-error-recovery.json",
+  ];
+  const allowedEnvironment = new Set([
+    "APP_BASE_URL",
+    "N8N_WEBHOOK_BASE_URL",
+    "WORKFLOW_HMAC_PREVIOUS_SECRET",
+    "WORKFLOW_HMAC_SECRET",
+  ]);
+
+  it.each(filenames)("%s uses only the approved builtin and environment allowlists", (filename) => {
+    const source = readFileSync(`${workflowDirectory}${filename}`, "utf8");
+    const requiredModules = [
+      ...new Set([...source.matchAll(/require\('([^']+)'\)/g)].map((match) => match[1]!)),
+    ];
+    const environmentNames = [
+      ...new Set([...source.matchAll(/\$env\.([A-Z0-9_]+)/g)].map((match) => match[1]!)),
+    ];
+
+    expect(requiredModules).toEqual(["crypto"]);
+    expect(environmentNames.every((name) => allowedEnvironment.has(name))).toBe(true);
+    expect(source).not.toContain("process.env");
+  });
+
+  it.each(filenames)("%s bounds every application HTTP request", (filename) => {
+    const workflow = workflowSchema.parse(
+      JSON.parse(readFileSync(`${workflowDirectory}${filename}`, "utf8")),
+    );
+    const requests = workflow.nodes.filter((node) => node.type === "n8n-nodes-base.httpRequest");
+
+    expect(requests.length).toBeGreaterThan(0);
+    for (const request of requests) {
+      const options = z
+        .object({ timeout: z.number().int().min(1_000).max(200_000) })
+        .parse(request.parameters.options);
+      expect(options.timeout).toBeGreaterThanOrEqual(1_000);
+    }
+  });
+});

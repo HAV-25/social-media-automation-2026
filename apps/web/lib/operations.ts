@@ -18,7 +18,7 @@ const eventRowSchema = z.object({
   generation_run_id: z.uuid().nullable(),
   event_type: z.string().min(1),
   to_status: z.string().nullable(),
-  created_at: z.iso.datetime(),
+  created_at: z.iso.datetime({ offset: true }),
 });
 
 const recoveryRowSchema = z.object({
@@ -42,7 +42,7 @@ const recoveryRowSchema = z.object({
   retryable: z.boolean(),
   attempt_count: z.number().int(),
   max_attempts: z.number().int(),
-  next_retry_at: z.iso.datetime().nullable(),
+  next_retry_at: z.iso.datetime({ offset: true }).nullable(),
   manual_requested: z.boolean(),
 });
 
