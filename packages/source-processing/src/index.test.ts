@@ -10,12 +10,20 @@ import {
 } from "./index";
 
 describe("source network boundary", () => {
-  it.each(["127.0.0.1", "10.1.2.3", "169.254.169.254", "192.168.1.10", "::1"])(
-    "blocks non-public address %s",
-    (address) => {
-      expect(isPublicAddress(address)).toBe(false);
-    },
-  );
+  it.each([
+    "127.0.0.1",
+    "10.1.2.3",
+    "169.254.169.254",
+    "192.0.0.8",
+    "192.168.1.10",
+    "::1",
+  ])("blocks non-public address %s", (address) => {
+    expect(isPublicAddress(address)).toBe(false);
+  });
+
+  it("allows public addresses adjacent to the reserved 192.0.0.0/24 range", () => {
+    expect(isPublicAddress("192.0.66.108")).toBe(true);
+  });
 
   it("rejects a public-looking hostname when DNS returns a private address", async () => {
     await expect(
