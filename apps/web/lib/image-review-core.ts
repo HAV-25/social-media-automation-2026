@@ -1,6 +1,7 @@
 import {
   createImageDirection,
   FakeImageProvider,
+  sanitizeImageDisplayText,
   type ImageProviderRequest,
 } from "@content-engine/ai";
 import type { NormalizedBrandContext } from "@content-engine/brand-memory";
@@ -101,8 +102,8 @@ export async function renderReviewImage(input: {
   const composition = await composeBrandedImage({
     baseImage,
     template,
-    headline: concept.headlineOverlay || input.headline,
-    sourceLabel: input.sourceLabel,
+    headline: sanitizeImageDisplayText(concept.headlineOverlay || input.headline, 200),
+    sourceLabel: sanitizeImageDisplayText(input.sourceLabel, 200),
     theme: themeFromBrandContext(input.brandContext),
   });
   return {

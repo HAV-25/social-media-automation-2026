@@ -413,3 +413,17 @@ browser roles intentionally have no direct insert or update grants on those
 operational tables. The privileged client is never exposed to browser code and
 does not replace the route's actor, brand, origin, rate-limit, validation, audit,
 or idempotency checks.
+
+## ADR-034 — RSS markup is removed before editorial and visual use
+
+**Status:** Accepted, 2026-07-25
+
+RSS descriptions are hostile markup-bearing inputs. The RSS analysis boundary
+extracts their human-readable text before hashing, deduplication, scoring, or
+value-nucleus creation. Manual plain-text submissions keep their literal text
+semantics unless the caller explicitly identifies markup.
+
+Image direction and deterministic composition independently sanitize every
+headline and source label. This defense in depth also protects existing records
+and provider-returned structured direction. Selective template recomposition
+reuses validated immutable base art without a second paid provider call.

@@ -1,4 +1,5 @@
 import "server-only";
+import { sanitizeImageDisplayText } from "@content-engine/ai";
 import {
   generatedImageSchema,
   imageDirectionSchema,
@@ -224,8 +225,11 @@ async function reusePersistentBase(input: {
   const composition = await composeBrandedImage({
     baseImage,
     template: input.template,
-    headline: concept.headlineOverlay || input.post.currentVersion.content.hook,
-    sourceLabel: concept.sourceLabel || input.post.sourceTitle,
+    headline: sanitizeImageDisplayText(
+      concept.headlineOverlay || input.post.currentVersion.content.hook,
+      200,
+    ),
+    sourceLabel: sanitizeImageDisplayText(concept.sourceLabel || input.post.sourceTitle, 200),
     theme: themeFromBrandContext(input.brandContext),
   });
   return {

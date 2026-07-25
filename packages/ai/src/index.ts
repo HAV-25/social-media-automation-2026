@@ -68,6 +68,7 @@ export {
   ImageProviderError,
   OpenAIImageDirector,
   OpenAIImageProvider,
+  sanitizeImageDisplayText,
   type ImageDirector,
   type ImageDirectorConfig,
   type ImageDirectionRequest,

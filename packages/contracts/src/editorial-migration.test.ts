@@ -9,6 +9,24 @@ const migrationPath = fileURLToPath(
   ),
 );
 const sql = readFileSync(migrationPath, "utf8");
+const initialSql = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../../../supabase/migrations/20260723125216_initial_tenancy_and_content_schema.sql",
+      import.meta.url,
+    ),
+  ),
+  "utf8",
+);
+const reviewFixSql = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../../../supabase/migrations/20260725212000_qualify_post_review_version_lookup.sql",
+      import.meta.url,
+    ),
+  ),
+  "utf8",
+);
 
 describe("editorial quality and regeneration migration", () => {
   it("enforces readiness arithmetic and claim provenance in PostgreSQL", () => {
@@ -26,6 +44,9 @@ describe("editorial quality and regeneration migration", () => {
     expect(sql).toContain("generation_type = 'selective_regeneration'");
     expect(sql).toContain("post.selective_regeneration");
     expect(sql).toContain("app-selective-regeneration");
+    expect(initialSql).toContain("where version.post_draft_id = target_draft_id");
+    expect(reviewFixSql).toContain("pg_get_functiondef('private.review_post(jsonb)'::regprocedure)");
+    expect(reviewFixSql).toContain("where version.post_draft_id = target_draft_id");
   });
 
   it("keeps evaluated mutations service-only and idempotent", () => {

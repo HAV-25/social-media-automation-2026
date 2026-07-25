@@ -722,3 +722,23 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   version, producing false similarity and hook-reuse scores of 1. Verification
   and selective regeneration now exclude the current draft while initial
   generation continues to compare against all genuinely prior brand posts.
+- Selective hook regeneration now supports an explicit request to use the
+  first verified, usable core ledger claim. A live WF-09 run created immutable
+  Klaank post version 2 and retained the original generated version. The
+  database edit transaction's unqualified `post_draft_id` lookup was corrected
+  for fresh installs and the live project through a service-only hotfix
+  migration.
+- Live WF-07 verification of version 2 passed with evidence 92, brand fit 80,
+  quality 89.25, no unsupported high-risk claims, contradictions, similarity
+  flags, prohibited language, or warnings. The post is writing-ready and
+  remains `ready_for_review`; no approval was automated.
+- Live WF-08 generated and deterministically composed a real Klaank image with
+  `gpt-image-2`. The immutable asset is ready, passed all image validation
+  checks, and recorded 301 input tokens, 158 output tokens, and an estimated
+  cost of $0.005.
+- Post-generation inspection found HTML markup retained in the older RSS value
+  nucleus. RSS analysis now explicitly extracts text from markup before
+  normalization. Image-direction output and every deterministic composition
+  boundary also strip markup and decode common entities, so hostile feed
+  formatting cannot become branded overlay text. Existing base art can be
+  recomposed with the corrected overlay at zero provider cost.

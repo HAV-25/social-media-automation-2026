@@ -2007,8 +2007,8 @@ begin
 
     select coalesce(max(version_number), 0) + 1
     into next_version_number
-    from public.post_versions
-    where post_draft_id = target_draft_id;
+    from public.post_versions version
+    where version.post_draft_id = target_draft_id;
 
     insert into public.post_versions (
       post_draft_id,

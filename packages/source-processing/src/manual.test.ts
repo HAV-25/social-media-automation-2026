@@ -36,6 +36,18 @@ describe("manual input normalization and scoring", () => {
     expect(normalized.cleanText).toBe("Accountability remains visible. Evidence stays readable.");
   });
 
+  it("strips RSS markup when explicitly requested", () => {
+    const normalized = normalizeManualInput({
+      language: "en",
+      title: "Robotics update",
+      text: '<p>Robotics evidence</p><img src="https://untrusted.example/x.png"><br>for buyers.',
+      stripMarkup: true,
+    });
+
+    expect(normalized.cleanText).toBe("Robotics evidence\n\nfor buyers.");
+    expect(normalized.cleanText).not.toContain("<img");
+  });
+
   it("stores transparent arithmetic whose dimensions total the gross score", () => {
     const score = scoreManualOpportunity({
       cleanText:

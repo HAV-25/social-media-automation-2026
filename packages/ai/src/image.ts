@@ -45,6 +45,29 @@ function compact(value: string, maximum: number) {
   return cleaned.length <= maximum ? cleaned : `${cleaned.slice(0, maximum - 1).trimEnd()}…`;
 }
 
+export function sanitizeImageDisplayText(value: string, maximum: number) {
+  const withoutMarkup = value
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code: string) =>
+      String.fromCodePoint(Number.parseInt(code, 16)),
+    )
+    .replace(/&(?:nbsp|amp|quot|apos|lt|gt);/gi, (entity) => {
+      const decoded: Record<string, string> = {
+        "&nbsp;": " ",
+        "&amp;": "&",
+        "&quot;": '"',
+        "&apos;": "'",
+        "&lt;": "<",
+        "&gt;": ">",
+      };
+      return decoded[entity.toLowerCase()] ?? " ";
+    });
+  return compact(withoutMarkup, maximum);
+}
+
 function conceptKey(seed: string) {
   return `concept_${createHash("sha256").update(seed).digest("hex").slice(0, 12)}`;
 }
@@ -58,7 +81,7 @@ function visualPalette(context: NormalizedBrandContext) {
 export function createImageDirection(request: ImageDirectionRequest): ImageDirection {
   const parsed = imageDirectionRequestSchema.parse(request);
   const brandName = compact(parsed.brandContext.identity.name, 80);
-  const nucleus = compact(parsed.valueNucleus, 500);
+  const nucleus = sanitizeImageDisplayText(parsed.valueNucleus, 500);
   const audience = compact(request.brandContext.identity.audience || "the intended audience", 160);
   const palette = visualPalette(parsed.brandContext);
   const preferred = parsed.preferredStyle ?? "editorial_hero";
@@ -237,7 +260,17 @@ END_BRAND_CONTEXT`;
           false,
         );
       }
-      return imageDirectionSchema.parse(response.output_parsed);
+      const direction = imageDirectionSchema.parse(response.output_parsed);
+      return imageDirectionSchema.parse({
+        ...direction,
+        concepts: direction.concepts.map((concept) => ({
+          ...concept,
+          title: sanitizeImageDisplayText(concept.title, 200),
+          visualNucleus: sanitizeImageDisplayText(concept.visualNucleus, 1_500),
+          headlineOverlay: sanitizeImageDisplayText(concept.headlineOverlay, 200),
+          sourceLabel: sanitizeImageDisplayText(concept.sourceLabel, 200),
+        })),
+      });
     } catch (error) {
       if (error instanceof ImageProviderError) throw error;
       if (controller.signal.aborted || error instanceof OpenAI.APIConnectionTimeoutError) {

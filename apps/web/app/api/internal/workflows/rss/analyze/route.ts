@@ -154,6 +154,7 @@ export async function POST(request: NextRequest) {
       title: source.title ?? "Untitled RSS item",
       text: combinedText,
       language: "en",
+      stripMarkup: true,
     });
     const normalizedSource = sourceAdapterNormalizedResultSchema.parse({
       contractVersion: "1.0",

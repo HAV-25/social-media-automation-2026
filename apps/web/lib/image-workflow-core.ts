@@ -1,5 +1,6 @@
 import {
   createImageDirection,
+  sanitizeImageDisplayText,
   type ImageProvider,
   type ImageProviderRequest,
 } from "@content-engine/ai";
@@ -75,8 +76,14 @@ export async function executeImageWorkflow(
           await composeBrandedImage({
             baseImage,
             template: request.template,
-            headline: selected.headlineOverlay || context.post.hook,
-            sourceLabel: selected.sourceLabel || context.post.sourceTitle,
+            headline: sanitizeImageDisplayText(
+              selected.headlineOverlay || context.post.hook,
+              200,
+            ),
+            sourceLabel: sanitizeImageDisplayText(
+              selected.sourceLabel || context.post.sourceTitle,
+              200,
+            ),
             theme: themeFromBrandContext(context.brandContext),
           })
         ).image

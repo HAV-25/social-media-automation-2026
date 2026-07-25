@@ -1,5 +1,6 @@
 import type { OpportunityScoreBreakdown } from "@content-engine/contracts";
 import { createHash } from "node:crypto";
+import { load } from "cheerio";
 
 export type PreliminaryBrandPolicy = {
   audienceDefinition: string;
@@ -65,14 +66,23 @@ function removeUnsafeFormattingCharacters(value: string) {
 
 export function normalizeManualInput({
   language,
+  stripMarkup = false,
   text,
   title,
 }: {
   language: string;
+  stripMarkup?: boolean;
   text: string;
   title: string;
 }): NormalizedManualInput {
-  const cleanText = removeUnsafeFormattingCharacters(text.normalize("NFKC"))
+  let sourceText = text;
+  if (stripMarkup) {
+    const markup = load(text, null, false);
+    markup("br").replaceWith("\n");
+    markup("p,div,li,article,section,h1,h2,h3,h4,h5,h6").append("\n");
+    sourceText = markup.root().text();
+  }
+  const cleanText = removeUnsafeFormattingCharacters(sourceText.normalize("NFKC"))
     .replace(/\r\n?/g, "\n")
     .split("\n")
     .map((line) => line.replace(/[^\S\n]+/g, " ").trim())
