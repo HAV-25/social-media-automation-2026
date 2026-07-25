@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { rssFeedPlanSchema } from "@content-engine/contracts";
+import { z } from "zod";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { authenticateWorkflowRequest, WorkflowAuthError } from "@/lib/workflow-auth";
 
@@ -8,14 +9,26 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   try {
     await authenticateWorkflowRequest(request, "");
+    const requestedBrandId = new URL(request.url).searchParams.get("brandId");
+    const brandId = requestedBrandId ? z.uuid().safeParse(requestedBrandId) : null;
+    if (brandId && !brandId.success) {
+      return NextResponse.json(
+        { error: { code: "invalid_brand_id", message: "The requested brand is invalid." } },
+        { status: 422 },
+      );
+    }
     const supabase = createSupabaseServiceClient();
-    const { data, error } = await supabase
+    let query = supabase
       .from("rss_feeds")
       .select(
-        "id,name,feed_url,last_polled_at,rss_feed_brand_links(brand_id,generation_policy,minimum_score,daily_generation_limit,include_keywords,exclude_keywords)",
+        "id,name,feed_url,last_polled_at,rss_feed_brand_links!inner(brand_id,generation_policy,minimum_score,daily_generation_limit,include_keywords,exclude_keywords)",
       )
       .eq("active", true)
       .order("name");
+    if (brandId?.success) {
+      query = query.eq("rss_feed_brand_links.brand_id", brandId.data);
+    }
+    const { data, error } = await query;
 
     if (error) throw error;
 

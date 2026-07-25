@@ -39,6 +39,8 @@ describe("WF-01 RSS Intake workflow", () => {
 
     expect(workflow.nodes.map((node) => node.name)).toEqual([
       "Every 15 Minutes",
+      "Signed One-off RSS Webhook",
+      "Verify One-off RSS Request",
       "Sign Feed Plan Request",
       "Fetch Active Feed Plan",
       "Split Feeds",
@@ -59,8 +61,28 @@ describe("WF-01 RSS Intake workflow", () => {
     expect(source).toContain("/api/internal/workflows/rss/fetch");
     expect(source).toContain("/api/internal/workflows/rss/intake");
     expect(source).toContain("/api/internal/workflows/rss/analyze");
+    expect(source).toContain("/webhook/rss-intake-run-v1");
+    expect(source).toContain("brandQuery");
+    expect(source).toContain("timingSafeEqual");
     expect(source).toContain("createHmac('sha256'");
     expect(source).toContain("rss-item:");
+  });
+
+  it("exposes a brand-scoped, signed, durable one-off trigger", () => {
+    const route = readFileSync(`${appDirectory}api/rss-intake/run/route.ts`, "utf8");
+    const feedPlan = readFileSync(
+      `${appDirectory}api/internal/workflows/rss/feeds/route.ts`,
+      "utf8",
+    );
+
+    expect(route).toContain("enforceUserApiRateLimit");
+    expect(route).toContain("getBrandConfiguration");
+    expect(route).toContain("signWorkflowRequest");
+    expect(route).toContain('run_type: "rss_intake_dispatch"');
+    expect(route).toContain('"rss.intake.manual_dispatch"');
+    expect(feedPlan).toContain("rss_feed_brand_links!inner");
+    expect(feedPlan).toContain("rss_feed_brand_links.brand_id");
+    expect(route).not.toMatch(/N8N_API_KEY|service[_-]?role/i);
   });
 });
 

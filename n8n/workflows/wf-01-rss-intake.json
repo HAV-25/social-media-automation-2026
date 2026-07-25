@@ -20,7 +20,33 @@
     },
     {
       "parameters": {
-        "jsCode": "const crypto = require('crypto');\nconst path = '/api/internal/workflows/rss/feeds';\nconst timestamp = String(Math.floor(Date.now() / 1000));\nconst nonce = crypto.randomUUID();\nconst body = '';\nconst bodyDigest = crypto.createHash('sha256').update(body, 'utf8').digest('hex');\nconst canonical = [timestamp, nonce, 'GET', path, bodyDigest].join('\\n');\nconst secret = $env.WORKFLOW_HMAC_SECRET;\nconst baseUrl = $env.APP_BASE_URL;\nif (!secret || !baseUrl) throw new Error('Required workflow environment is not configured');\nconst signature = `sha256=${crypto.createHmac('sha256', secret).update(canonical, 'utf8').digest('hex')}`;\nreturn [{ json: { url: `${baseUrl}${path}`, timestamp, nonce, signature } }];"
+        "httpMethod": "POST",
+        "path": "rss-intake-run-v1",
+        "responseMode": "onReceived",
+        "options": {
+          "responseCode": 202
+        }
+      },
+      "id": "71f9b4e0-30b9-45e1-a275-acde65873213",
+      "name": "Signed One-off RSS Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-940, 300],
+      "webhookId": "4cff8ed0-d651-42db-a9f8-acde65873214"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst headers = $json.headers || {};\nconst payload = $json.body || {};\nconst timestamp = String(headers['x-workflow-timestamp'] || '');\nconst nonce = String(headers['x-workflow-nonce'] || '');\nconst received = String(headers['x-workflow-signature'] || '');\nconst path = '/webhook/rss-intake-run-v1';\nconst body = JSON.stringify(payload);\nconst digest = crypto.createHash('sha256').update(body, 'utf8').digest('hex');\nconst canonical = [timestamp, nonce, 'POST', path, digest].join('\\n');\nconst secret = $env.WORKFLOW_HMAC_SECRET;\nconst previousSecret = $env.WORKFLOW_HMAC_PREVIOUS_SECRET;\nif (!secret || !timestamp || !nonce || !received) throw new Error('Workflow signature is missing');\nconst authentic = [secret, previousSecret].filter(Boolean).some((candidate) => {\n  const expected = `sha256=${crypto.createHmac('sha256', candidate).update(canonical, 'utf8').digest('hex')}`;\n  return received.length === expected.length && crypto.timingSafeEqual(Buffer.from(received), Buffer.from(expected));\n});\nif (!authentic) throw new Error('Workflow signature is invalid');\nif (Math.abs(Math.floor(Date.now() / 1000) - Number(timestamp)) > 300) throw new Error('Workflow signature expired');\nif (payload.contractVersion !== '1.0' || !payload.actorId || !payload.brandId || !payload.correlationId || !payload.idempotencyKey || !payload.requestedAt) throw new Error('One-off RSS intake contract is invalid');\nreturn [{ json: payload }];"
+      },
+      "id": "f4914a2a-bd43-4a4a-88f7-acde65873215",
+      "name": "Verify One-off RSS Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-720, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst path = '/api/internal/workflows/rss/feeds';\nconst timestamp = String(Math.floor(Date.now() / 1000));\nconst nonce = crypto.randomUUID();\nconst body = '';\nconst bodyDigest = crypto.createHash('sha256').update(body, 'utf8').digest('hex');\nconst canonical = [timestamp, nonce, 'GET', path, bodyDigest].join('\\n');\nconst secret = $env.WORKFLOW_HMAC_SECRET;\nconst baseUrl = $env.APP_BASE_URL;\nif (!secret || !baseUrl) throw new Error('Required workflow environment is not configured');\nconst signature = `sha256=${crypto.createHmac('sha256', secret).update(canonical, 'utf8').digest('hex')}`;\nconst brandQuery = $json.brandId ? `?brandId=${encodeURIComponent($json.brandId)}` : '';\nreturn [{ json: { url: `${baseUrl}${path}${brandQuery}`, timestamp, nonce, signature } }];"
       },
       "id": "d7b40737-a4f6-4fde-af91-acde65873202",
       "name": "Sign Feed Plan Request",
@@ -279,6 +305,12 @@
   "pinData": {},
   "connections": {
     "Every 15 Minutes": {
+      "main": [[{ "node": "Sign Feed Plan Request", "type": "main", "index": 0 }]]
+    },
+    "Signed One-off RSS Webhook": {
+      "main": [[{ "node": "Verify One-off RSS Request", "type": "main", "index": 0 }]]
+    },
+    "Verify One-off RSS Request": {
       "main": [[{ "node": "Sign Feed Plan Request", "type": "main", "index": 0 }]]
     },
     "Sign Feed Plan Request": {

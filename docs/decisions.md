@@ -354,3 +354,19 @@ caller's RLS, rejects invalid windows, and is not executable by anonymous
 users. Recorded research cost is derived from immutable generation-run usage
 provenance; the daily limit comes from validated server configuration. Empty
 brands therefore render zero rather than seeded activity.
+
+## ADR-030 — Manual RSS demos dispatch a selected-brand workflow session
+
+**Status:** Accepted, 2026-07-25
+
+Runs & errors exposes a reviewer-controlled one-off RSS trigger for the active
+brand. The application reauthorizes the actor, enforces the user API limit,
+persists an idempotent dispatch run, signs an HMAC-authenticated n8n webhook,
+and records pipeline and audit evidence. WF-01 filters its feed plan to routes
+for that brand while the scheduled trigger retains its organization-wide plan.
+
+The control stops at deterministic intake, normalization, deduplication,
+clustering, scoring, and the lean research-eligibility gate. It never starts
+research, generation, publishing, or scheduling on the reviewer's behalf. A
+successful dispatch record means n8n accepted the session; item-level workflow
+runs remain the durable evidence of downstream processing.

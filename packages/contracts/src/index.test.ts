@@ -11,6 +11,8 @@ import {
   researchPlanSchema,
   rssIntakeContractSchema,
   rssFeedUpsertRequestSchema,
+  rssManualRunRequestSchema,
+  rssManualRunResultSchema,
   rssGenerationReservationRequestSchema,
   rssSourceAnalysisRequestSchema,
   sourceAdapterResultSchema,
@@ -92,6 +94,29 @@ describe("shared contracts", () => {
     });
 
     expect(result.contentHash).toHaveLength(64);
+  });
+
+  it("binds one-off RSS intake to an actor, brand, and idempotency key", () => {
+    const request = {
+      contractVersion: "1.0",
+      correlationId: "00000000-0000-4000-8000-000000000001",
+      idempotencyKey: "rss-manual-run-request-0001",
+      actorId: "00000000-0000-4000-8000-000000000002",
+      brandId: "00000000-0000-4000-8000-000000000003",
+      requestedAt: "2026-07-25T10:00:00.000Z",
+    };
+    expect(rssManualRunRequestSchema.safeParse(request).success).toBe(true);
+    expect(rssManualRunRequestSchema.safeParse({ ...request, brandId: "Klaank" }).success).toBe(
+      false,
+    );
+    expect(
+      rssManualRunResultSchema.safeParse({
+        contractVersion: "1.0",
+        generationRunId: "00000000-0000-4000-8000-000000000004",
+        duplicate: false,
+        status: "accepted",
+      }).success,
+    ).toBe(true);
   });
 
   it("validates the plain-text input boundary and its idempotency key", () => {

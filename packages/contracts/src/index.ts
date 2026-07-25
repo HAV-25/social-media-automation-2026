@@ -217,6 +217,23 @@ export const rssFeedMutationResultSchema = z.object({
   active: z.boolean(),
 });
 
+export const rssManualRunRequestSchema = z.object({
+  contractVersion: z.literal("1.0"),
+  correlationId: z.uuid(),
+  idempotencyKey: z.string().trim().min(16).max(200),
+  actorId: z.uuid(),
+  brandId: z.uuid(),
+  requestedAt: z.iso.datetime(),
+});
+
+export const rssManualRunResultSchema = z.object({
+  contractVersion: z.literal("1.0"),
+  generationRunId: z.uuid(),
+  duplicate: z.boolean(),
+  status: z.enum(["accepted", "failed"]),
+});
+export type RssManualRunResult = z.infer<typeof rssManualRunResultSchema>;
+
 export const rssGenerationReservationRequestSchema = z.object({
   contractVersion: z.literal("1.0"),
   correlationId: z.uuid(),

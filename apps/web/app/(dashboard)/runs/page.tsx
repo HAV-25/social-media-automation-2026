@@ -16,6 +16,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { parseDemoRecoveredRuns } from "@/lib/demo-recovery-store";
 import { getOperationsPage } from "@/lib/operations";
 import { getWorkspaceSnapshot } from "@/lib/workspace";
+import { RssRunTrigger } from "@/components/rss-run-trigger";
 import { requestManualRecovery } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -135,6 +136,10 @@ export default async function RunsPage({ searchParams }: { searchParams: Promise
               <p className="mt-2 text-xs font-semibold text-[var(--muted)]">{label}</p>
             </div>
           ))}
+        </div>
+
+        <div className="mt-6">
+          <RssRunTrigger brandId={snapshot.activeBrand.id} brandName={snapshot.activeBrand.name} />
         </div>
 
         <form

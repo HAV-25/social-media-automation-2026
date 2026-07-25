@@ -593,3 +593,25 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   `WORKFLOW_HMAC_SECRET`. Netlify's Supabase server key and the shared HMAC
   secret remain unapplied pending explicit product-owner authorization; no
   credential value was displayed or transferred.
+
+### Selected-brand one-off RSS intake
+
+- Runs & errors now includes a brand-scoped `Run RSS intake now` control. It
+  states explicitly that intake, normalization, deduplication, clustering, and
+  scoring run automatically while research and generation remain human
+  decisions.
+- The authenticated route enforces same-origin submission, editor-level brand
+  authority, the Feature 8.3 user rate limit, strict request validation, and
+  durable idempotency through a unique generation-run dispatch record.
+- The application signs a dedicated WF-01 webhook. WF-01 verifies the active or
+  previous workflow key, validates the actor/brand envelope, and requests only
+  feed routes linked to the selected brand. The scheduled path remains capable
+  of polling the complete active feed plan.
+- Accepted dispatches write a generation run, pipeline event, and audit event.
+  Failed n8n handoffs retain only a safe classified error code.
+- Contract and workflow coverage now includes the signed one-off trigger,
+  brand-filtered feed plan, durable dispatch, authorization, rate limiting, and
+  absence of embedded service or n8n API credentials.
+- Remote execution remains blocked until the self-hosted n8n task runner is
+  restarted with `NODE_FUNCTION_ALLOW_BUILTIN=crypto`; this narrowly permits the
+  HMAC and UUID functions used by all ten signed workflows.
