@@ -120,6 +120,7 @@ describe("Feature 8.3 API security controls", () => {
   it("keeps opaque secret-key requests server-classified and dependency logs redacted", () => {
     expect(supabaseServiceClient).toContain('"User-Agent": "appsbrite-social-server/1.0"');
     expect(apiRateLimit).toContain("sanitizeLogMetadata");
+    expect(apiRateLimit).toContain("z.iso.datetime({ offset: true })");
     expect(apiRateLimit).not.toContain("console.error(error)");
   });
 

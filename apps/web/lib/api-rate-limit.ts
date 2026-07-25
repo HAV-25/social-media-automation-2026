@@ -10,7 +10,7 @@ const rateLimitResultSchema = z
     allowed: z.boolean(),
     limit: z.number().int().positive(),
     remaining: z.number().int().nonnegative(),
-    resetAt: z.iso.datetime(),
+    resetAt: z.iso.datetime({ offset: true }),
   })
   .strict();
 
