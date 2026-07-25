@@ -13,7 +13,6 @@ import {
 import { ZodError } from "zod";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { authenticateWorkflowRequest, WorkflowAuthError } from "@/lib/workflow-auth";
-import { workflowJsonResponse } from "@/lib/workflow-response";
 
 export const dynamic = "force-dynamic";
 
@@ -70,7 +69,7 @@ export async function POST(request: Request) {
     });
     if (pollError) throw pollError;
 
-    return workflowJsonResponse(
+    return NextResponse.json(
       rssFetchResultSchema.parse({
         contractVersion: "1.0",
         feedId: payload.feedId,
@@ -78,6 +77,7 @@ export async function POST(request: Request) {
         finalUrl: fetched.finalUrl,
         items,
       }),
+      { headers: { "Cache-Control": "private, no-store" } },
     );
   } catch (error) {
     if (error instanceof WorkflowAuthError) {
