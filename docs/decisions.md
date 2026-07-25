@@ -314,3 +314,9 @@ comes exclusively from administrator-created `organization_members` and
 `brand_members` rows; user metadata is display-only and is never an
 authorization input. This keeps public identity proof separate from internal
 workspace approval.
+
+For the controlled pilot, Supabase email confirmation may be disabled by the
+product owner. The application detects the session returned by an auto-confirmed
+signup and proceeds directly to `pending_access`; when confirmation is enabled,
+the same build retains the token/link verification path. Auto-confirmation does
+not weaken the independent organization and brand membership gate.

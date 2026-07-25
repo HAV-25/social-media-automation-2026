@@ -496,6 +496,8 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
 - [x] A verified user without organization membership receives a dedicated,
       locked pending-access screen instead of being mistaken for a signed-out
       user or receiving demo data.
+- [x] Auto-confirmed pilot signups skip the unused code screen, while the same
+      build retains code/link verification when confirmation is re-enabled.
 - [x] Dashboard access still requires durable organization membership, and all
       existing brand RLS remains authoritative.
 - [ ] Configure the deployed Site URL/redirect allowlist and email delivery in

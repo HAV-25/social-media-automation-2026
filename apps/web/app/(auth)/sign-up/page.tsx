@@ -22,8 +22,8 @@ export default async function SignUpPage({
         </p>
         <h1 className="serif mt-3 text-4xl tracking-[-0.035em]">Create your account.</h1>
         <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
-          Verify your work email first. Brand access remains locked until an administrator approves
-          your account.
+          If email confirmation is enabled, Supabase will request verification first. Brand access
+          remains locked until an administrator approves your account.
         </p>
 
         {params.error ? (

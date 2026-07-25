@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { getAuthCallbackUrl, signUpInputSchema } from "@/lib/auth-contracts";
+import { getAuthCallbackUrl, getPostSignUpPath, signUpInputSchema } from "@/lib/auth-contracts";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function signUp(formData: FormData) {
@@ -18,7 +18,7 @@ export async function signUp(formData: FormData) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const { displayName, email, password } = parsed.data;
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
@@ -28,5 +28,5 @@ export async function signUp(formData: FormData) {
   });
 
   if (error) redirect("/sign-up?error=unavailable");
-  redirect(`/verify-email?email=${encodeURIComponent(email)}&sent=1`);
+  redirect(getPostSignUpPath(email, Boolean(data.session)));
 }

@@ -44,3 +44,9 @@ export function getAuthCallbackUrl(appUrl: string) {
   const url = new URL("/auth/confirm", appUrl);
   return url.toString();
 }
+
+export function getPostSignUpPath(email: string, sessionCreated: boolean) {
+  return sessionCreated
+    ? "/pending-access"
+    : `/verify-email?email=${encodeURIComponent(email)}&sent=1`;
+}

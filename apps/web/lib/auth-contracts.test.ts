@@ -3,6 +3,7 @@ import {
   authEmailInputSchema,
   emailOtpInputSchema,
   getAuthCallbackUrl,
+  getPostSignUpPath,
   signInInputSchema,
   signUpInputSchema,
 } from "./auth-contracts";
@@ -57,6 +58,13 @@ describe("authentication contracts", () => {
   it("builds a fixed same-application confirmation endpoint", () => {
     expect(getAuthCallbackUrl("https://editorial.example.com")).toBe(
       "https://editorial.example.com/auth/confirm",
+    );
+  });
+
+  it("routes auto-confirmed signups directly to the membership gate", () => {
+    expect(getPostSignUpPath("reviewer@example.com", true)).toBe("/pending-access");
+    expect(getPostSignUpPath("reviewer+pilot@example.com", false)).toBe(
+      "/verify-email?email=reviewer%2Bpilot%40example.com&sent=1",
     );
   });
 });
