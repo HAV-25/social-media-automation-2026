@@ -1,0 +1,34 @@
+{
+  "name": "@content-engine/ai",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./prompts/facebook-writer.v1": "./src/prompts/facebook-writer.v1.ts",
+    "./prompts/source-analyst.v1": "./src/prompts/source-analyst.v1.ts",
+    "./prompts/opportunity-analyst.v1": "./src/prompts/opportunity-analyst.v1.ts",
+    "./prompts/research-planner.v1": "./src/prompts/research-planner.v1.ts",
+    "./prompts/evidence-synthesizer.v1": "./src/prompts/evidence-synthesizer.v1.ts",
+    "./prompts/image-director.v1": "./src/prompts/image-director.v1.ts",
+    "./prompts/registry": "./src/prompts/registry.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@content-engine/brand-memory": "workspace:*",
+    "@content-engine/contracts": "workspace:*",
+    "@content-engine/image-compositor": "workspace:*",
+    "openai": "6.48.0",
+    "zod": "4.0.17"
+  },
+  "devDependencies": {
+    "@types/node": "24.1.0",
+    "typescript": "5.8.3",
+    "vitest": "3.2.4"
+  }
+}

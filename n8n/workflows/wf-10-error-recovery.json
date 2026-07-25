@@ -1,0 +1,123 @@
+{
+  "name": "WF-10 Error and Recovery",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "ce10f001-6a77-4a0f-8d1c-000000000001",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [-520, -100]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst execution = $json.execution || {};\nconst workflow = $json.workflow || {};\nconst raw = String(execution.error?.message || $json.trigger?.error?.message || '').toLowerCase();\nlet errorCode = 'workflow_execution_failed';\nlet category = 'permanent';\nlet retryable = false;\nif (/rate.?limit|429/.test(raw)) { errorCode = 'provider_rate_limit'; category = 'provider'; retryable = true; }\nelse if (/timeout|timed out/.test(raw)) { errorCode = 'provider_timeout'; category = 'provider'; retryable = true; }\nelse if (/network|connection|unavailable|econn/.test(raw)) { errorCode = 'dependency_unavailable'; category = 'transient'; retryable = true; }\nelse if (/signature|nonce|auth|forbidden|permission/.test(raw)) { errorCode = 'workflow_security_rejection'; category = 'security'; }\nelse if (/budget|quota|cost/.test(raw)) { errorCode = 'workflow_budget_rejection'; category = 'budget'; }\nelse if (/validation|schema|invalid|malformed/.test(raw)) { errorCode = 'workflow_validation_rejection'; category = 'validation'; }\nconst workflowExecutionId = String(execution.id || '');\nif (!workflowExecutionId) throw new Error('Failed execution ID is unavailable');\nconst path = '/api/internal/workflows/recovery/failures';\nconst payload = {\n  contractVersion: '1.0',\n  workflowExecutionId,\n  retryOfExecutionId: execution.retryOf ? String(execution.retryOf) : null,\n  workflowName: String(workflow.name || 'Unknown workflow').slice(0, 160),\n  errorCode,\n  category,\n  retryable,\n  occurredAt: new Date().toISOString(),\n};\nconst body = JSON.stringify(payload);\nconst timestamp = String(Math.floor(Date.now() / 1000));\nconst nonce = crypto.randomUUID();\nconst digest = crypto.createHash('sha256').update(body, 'utf8').digest('hex');\nconst canonical = [timestamp, nonce, 'POST', path, digest].join('\\n');\nconst secret = $env.WORKFLOW_HMAC_SECRET;\nconst baseUrl = $env.APP_BASE_URL;\nif (!secret || !baseUrl) throw new Error('Recovery workflow environment is not configured');\nconst signature = `sha256=${crypto.createHmac('sha256', secret).update(canonical, 'utf8').digest('hex')}`;\nreturn [{ json: { body, nonce, signature, timestamp, url: `${baseUrl}${path}` } }];"
+      },
+      "id": "ce10f001-6a77-4a0f-8d1c-000000000002",
+      "name": "Classify and Sign Failure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-280, -100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "content-type", "value": "application/json" },
+            { "name": "x-workflow-name", "value": "WF-10 Error and Recovery" },
+            { "name": "x-workflow-timestamp", "value": "={{ $json.timestamp }}" },
+            { "name": "x-workflow-nonce", "value": "={{ $json.nonce }}" },
+            { "name": "x-workflow-signature", "value": "={{ $json.signature }}" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.body }}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "ce10f001-6a77-4a0f-8d1c-000000000003",
+      "name": "Persist Redacted Failure",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-40, -100]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "minutes", "minutesInterval": 1 }]
+        }
+      },
+      "id": "ce10f001-6a77-4a0f-8d1c-000000000004",
+      "name": "Every Minute",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-520, 160]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst path = '/api/internal/workflows/recovery/dispatch';\nconst payload = { contractVersion: '1.0', requestedAt: new Date().toISOString(), limit: 5 };\nconst body = JSON.stringify(payload);\nconst timestamp = String(Math.floor(Date.now() / 1000));\nconst nonce = crypto.randomUUID();\nconst digest = crypto.createHash('sha256').update(body, 'utf8').digest('hex');\nconst canonical = [timestamp, nonce, 'POST', path, digest].join('\\n');\nconst secret = $env.WORKFLOW_HMAC_SECRET;\nconst baseUrl = $env.APP_BASE_URL;\nif (!secret || !baseUrl) throw new Error('Recovery workflow environment is not configured');\nconst signature = `sha256=${crypto.createHmac('sha256', secret).update(canonical, 'utf8').digest('hex')}`;\nreturn [{ json: { body, nonce, signature, timestamp, url: `${baseUrl}${path}` } }];"
+      },
+      "id": "ce10f001-6a77-4a0f-8d1c-000000000005",
+      "name": "Sign Due Recovery Poll",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-280, 160]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "content-type", "value": "application/json" },
+            { "name": "x-workflow-name", "value": "WF-10 Error and Recovery" },
+            { "name": "x-workflow-timestamp", "value": "={{ $json.timestamp }}" },
+            { "name": "x-workflow-nonce", "value": "={{ $json.nonce }}" },
+            { "name": "x-workflow-signature", "value": "={{ $json.signature }}" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.body }}",
+        "options": { "timeout": 90000 }
+      },
+      "id": "ce10f001-6a77-4a0f-8d1c-000000000006",
+      "name": "Dispatch Due Recoveries",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-40, 160]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Error Trigger": {
+      "main": [[{ "node": "Classify and Sign Failure", "type": "main", "index": 0 }]]
+    },
+    "Classify and Sign Failure": {
+      "main": [[{ "node": "Persist Redacted Failure", "type": "main", "index": 0 }]]
+    },
+    "Every Minute": {
+      "main": [[{ "node": "Sign Due Recovery Poll", "type": "main", "index": 0 }]]
+    },
+    "Sign Due Recovery Poll": {
+      "main": [[{ "node": "Dispatch Due Recoveries", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": true,
+    "executionTimeout": 180
+  },
+  "versionId": "ce10f001-6a77-4a0f-8d1c-000000000010",
+  "meta": { "templateCredsSetupCompleted": false },
+  "tags": []
+}

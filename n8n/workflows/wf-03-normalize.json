@@ -1,0 +1,110 @@
+{
+  "name": "WF-03 Normalize",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "source-normalize-v1",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "378162cd-d153-48de-812e-acde65873401",
+      "name": "Signed Normalize Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-460, 100],
+      "webhookId": "f054cdad-c140-4d47-abd4-acde65873402"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst headers = $json.headers || {};\nconst payload = $json.body || {};\nconst timestamp = String(headers['x-workflow-timestamp'] || '');\nconst nonce = String(headers['x-workflow-nonce'] || '');\nconst received = String(headers['x-workflow-signature'] || '');\nconst sourcePath = '/webhook/source-normalize-v1';\nconst body = JSON.stringify(payload);\nconst digest = crypto.createHash('sha256').update(body, 'utf8').digest('hex');\nconst canonical = [timestamp, nonce, 'POST', sourcePath, digest].join('\\n');\nconst secret = $env.WORKFLOW_HMAC_SECRET;\nconst previousSecret = $env.WORKFLOW_HMAC_PREVIOUS_SECRET;\nif (!secret || !timestamp || !nonce || !received) throw new Error('Workflow signature is missing');\nconst authentic = [secret, previousSecret].filter(Boolean).some((candidate) => {\n  const expected = `sha256=${crypto.createHmac('sha256', candidate).update(canonical, 'utf8').digest('hex')}`;\n  return received.length === expected.length && crypto.timingSafeEqual(Buffer.from(received), Buffer.from(expected));\n});\nif (!authentic) throw new Error('Workflow signature is invalid');\nif (Math.abs(Math.floor(Date.now() / 1000) - Number(timestamp)) > 300) throw new Error('Workflow signature expired');\nif (payload.contractVersion !== '1.0' || !payload.sourceDocumentId || !payload.correlationId || !payload.idempotencyKey) throw new Error('Normalize contract is invalid');\nconst targetPath = '/webhook/cluster-score-v1';\nconst nextTimestamp = String(Math.floor(Date.now() / 1000));\nconst nextNonce = crypto.randomUUID();\nconst nextDigest = crypto.createHash('sha256').update(body, 'utf8').digest('hex');\nconst nextCanonical = [nextTimestamp, nextNonce, 'POST', targetPath, nextDigest].join('\\n');\nconst signature = `sha256=${crypto.createHmac('sha256', secret).update(nextCanonical, 'utf8').digest('hex')}`;\nreturn [{ json: { body, nonce: nextNonce, signature, timestamp: nextTimestamp, url: `${$env.N8N_WEBHOOK_BASE_URL}${targetPath}` } }];"
+      },
+      "id": "0a2fe744-d37f-4453-95f4-acde65873403",
+      "name": "Verify and Sign Cluster Handoff",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-220, 100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-workflow-name",
+              "value": "WF-03 Normalize"
+            },
+            {
+              "name": "x-workflow-timestamp",
+              "value": "={{ $json.timestamp }}"
+            },
+            {
+              "name": "x-workflow-nonce",
+              "value": "={{ $json.nonce }}"
+            },
+            {
+              "name": "x-workflow-signature",
+              "value": "={{ $json.signature }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.body }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "76c35527-d793-4b85-b62f-acde65873404",
+      "name": "Start Cluster and Score Workflow",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [20, 100]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Signed Normalize Webhook": {
+      "main": [
+        [
+          {
+            "node": "Verify and Sign Cluster Handoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify and Sign Cluster Handoff": {
+      "main": [
+        [
+          {
+            "node": "Start Cluster and Score Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": true,
+    "executionTimeout": 300
+  },
+  "versionId": "d28a79ac-9663-40d8-8fdb-acde65873405",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

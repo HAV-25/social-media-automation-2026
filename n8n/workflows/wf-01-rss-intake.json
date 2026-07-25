@@ -1,0 +1,325 @@
+{
+  "name": "WF-01 RSS Intake",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "5a8e2607-d565-4b8e-a187-acde65873201",
+      "name": "Every 15 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-940, 120]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst path = '/api/internal/workflows/rss/feeds';\nconst timestamp = String(Math.floor(Date.now() / 1000));\nconst nonce = crypto.randomUUID();\nconst body = '';\nconst bodyDigest = crypto.createHash('sha256').update(body, 'utf8').digest('hex');\nconst canonical = [timestamp, nonce, 'GET', path, bodyDigest].join('\\n');\nconst secret = $env.WORKFLOW_HMAC_SECRET;\nconst baseUrl = $env.APP_BASE_URL;\nif (!secret || !baseUrl) throw new Error('Required workflow environment is not configured');\nconst signature = `sha256=${crypto.createHmac('sha256', secret).update(canonical, 'utf8').digest('hex')}`;\nreturn [{ json: { url: `${baseUrl}${path}`, timestamp, nonce, signature } }];"
+      },
+      "id": "d7b40737-a4f6-4fde-af91-acde65873202",
+      "name": "Sign Feed Plan Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-720, 120]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-workflow-name",
+              "value": "WF-01 RSS Intake"
+            },
+            {
+              "name": "x-workflow-timestamp",
+              "value": "={{ $json.timestamp }}"
+            },
+            {
+              "name": "x-workflow-nonce",
+              "value": "={{ $json.nonce }}"
+            },
+            {
+              "name": "x-workflow-signature",
+              "value": "={{ $json.signature }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": false,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "2ae641dc-fddb-477c-819e-acde65873203",
+      "name": "Fetch Active Feed Plan",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-500, 120]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "feeds",
+        "options": {
+          "destinationFieldName": "feed"
+        }
+      },
+      "id": "ac10e43f-67a1-4a5c-a50c-acde65873204",
+      "name": "Split Feeds",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [-280, 120]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const crypto = require('crypto');\nconst feed = $json.feed;\nconst path = '/api/internal/workflows/rss/fetch';\nconst timestamp = String(Math.floor(Date.now() / 1000));\nconst nonce = crypto.randomUUID();\nconst correlationId = crypto.randomUUID();\nconst payload = {\n  contractVersion: '1.0',\n  correlationId,\n  feedId: feed.feedId,\n  idempotencyKey: `rss-fetch:${feed.feedId}:${timestamp}`,\n  requestedAt: new Date().toISOString(),\n};\nconst body = JSON.stringify(payload);\nconst bodyDigest = crypto.createHash('sha256').update(body, 'utf8').digest('hex');\nconst canonical = [timestamp, nonce, 'POST', path, bodyDigest].join('\\n');\nconst secret = $env.WORKFLOW_HMAC_SECRET;\nconst baseUrl = $env.APP_BASE_URL;\nif (!secret || !baseUrl) throw new Error('Required workflow environment is not configured');\nconst signature = `sha256=${crypto.createHmac('sha256', secret).update(canonical, 'utf8').digest('hex')}`;\nreturn { json: { body, correlationId, nonce, signature, timestamp, url: `${baseUrl}${path}` } };"
+      },
+      "id": "54fc9ad7-5366-4370-beba-acde65873205",
+      "name": "Sign Safe Fetch Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-60, 120]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-workflow-name",
+              "value": "WF-01 RSS Intake"
+            },
+            {
+              "name": "x-workflow-timestamp",
+              "value": "={{ $json.timestamp }}"
+            },
+            {
+              "name": "x-workflow-nonce",
+              "value": "={{ $json.nonce }}"
+            },
+            {
+              "name": "x-workflow-signature",
+              "value": "={{ $json.signature }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.body }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": false,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "391520c7-2a9b-4311-8cd7-acde65873206",
+      "name": "Fetch and Parse Feed Safely",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [180, 120]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "items",
+        "include": "allOtherFields",
+        "options": {
+          "destinationFieldName": "item"
+        }
+      },
+      "id": "b2965109-5563-4fab-b11e-acde65873207",
+      "name": "Split Feed Items",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [420, 120]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const crypto = require('crypto');\nconst item = $json.item;\nconst path = '/api/internal/workflows/rss/intake';\nconst timestamp = String(Math.floor(Date.now() / 1000));\nconst nonce = crypto.randomUUID();\nconst correlationId = crypto.randomUUID();\nconst stableGuidHash = crypto.createHash('sha256').update(item.guid, 'utf8').digest('hex');\nconst payload = {\n  contractVersion: '1.0',\n  correlationId,\n  idempotencyKey: `rss-item:${$json.feedId}:${stableGuidHash}`,\n  feedId: $json.feedId,\n  guid: item.guid,\n  title: item.title,\n  contentHash: item.contentHash,\n  requestedAt: new Date().toISOString(),\n};\nif (item.canonicalUrl) payload.canonicalUrl = item.canonicalUrl;\nif (item.author) payload.author = item.author;\nif (item.publishedAt) payload.publishedAt = item.publishedAt;\nif (item.summary) payload.summary = item.summary;\nconst body = JSON.stringify(payload);\nconst bodyDigest = crypto.createHash('sha256').update(body, 'utf8').digest('hex');\nconst canonical = [timestamp, nonce, 'POST', path, bodyDigest].join('\\n');\nconst secret = $env.WORKFLOW_HMAC_SECRET;\nconst baseUrl = $env.APP_BASE_URL;\nif (!secret || !baseUrl) throw new Error('Required workflow environment is not configured');\nconst signature = `sha256=${crypto.createHmac('sha256', secret).update(canonical, 'utf8').digest('hex')}`;\nreturn { json: { body, nonce, signature, timestamp, url: `${baseUrl}${path}` } };"
+      },
+      "id": "bdc4ee7c-1766-4925-90f9-acde65873208",
+      "name": "Sign Item Intake Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 120]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-workflow-name",
+              "value": "WF-01 RSS Intake"
+            },
+            {
+              "name": "x-workflow-timestamp",
+              "value": "={{ $json.timestamp }}"
+            },
+            {
+              "name": "x-workflow-nonce",
+              "value": "={{ $json.nonce }}"
+            },
+            {
+              "name": "x-workflow-signature",
+              "value": "={{ $json.signature }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.body }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": false,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "1b2ab508-bcc9-44d8-a544-acde65873209",
+      "name": "Persist RSS Intake",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 120]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const crypto = require('crypto');\nconst path = '/api/internal/workflows/rss/analyze';\nconst timestamp = String(Math.floor(Date.now() / 1000));\nconst nonce = crypto.randomUUID();\nconst payload = {\n  contractVersion: '1.0',\n  correlationId: crypto.randomUUID(),\n  idempotencyKey: `rss-analysis:${$json.sourceDocumentId}`,\n  feedId: $json.feedId,\n  sourceDocumentId: $json.sourceDocumentId,\n  requestedAt: new Date().toISOString(),\n};\nconst body = JSON.stringify(payload);\nconst bodyDigest = crypto.createHash('sha256').update(body, 'utf8').digest('hex');\nconst canonical = [timestamp, nonce, 'POST', path, bodyDigest].join('\\n');\nconst secret = $env.WORKFLOW_HMAC_SECRET;\nconst baseUrl = $env.APP_BASE_URL;\nif (!secret || !baseUrl) throw new Error('Required workflow environment is not configured');\nconst signature = `sha256=${crypto.createHmac('sha256', secret).update(canonical, 'utf8').digest('hex')}`;\nreturn { json: { body, nonce, signature, timestamp, url: `${baseUrl}${path}` } };"
+      },
+      "id": "9d124a07-3a3c-42f9-a060-acde65873211",
+      "name": "Sign Analysis Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1140, 120]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-workflow-name",
+              "value": "WF-04 Cluster and Score"
+            },
+            {
+              "name": "x-workflow-timestamp",
+              "value": "={{ $json.timestamp }}"
+            },
+            {
+              "name": "x-workflow-nonce",
+              "value": "={{ $json.nonce }}"
+            },
+            {
+              "name": "x-workflow-signature",
+              "value": "={{ $json.signature }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.body }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": false,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "168fa91e-4e74-43d1-8fd6-acde65873212",
+      "name": "Normalize Cluster Score and Gate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1380, 120]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every 15 Minutes": {
+      "main": [[{ "node": "Sign Feed Plan Request", "type": "main", "index": 0 }]]
+    },
+    "Sign Feed Plan Request": {
+      "main": [[{ "node": "Fetch Active Feed Plan", "type": "main", "index": 0 }]]
+    },
+    "Fetch Active Feed Plan": {
+      "main": [[{ "node": "Split Feeds", "type": "main", "index": 0 }]]
+    },
+    "Split Feeds": {
+      "main": [[{ "node": "Sign Safe Fetch Request", "type": "main", "index": 0 }]]
+    },
+    "Sign Safe Fetch Request": {
+      "main": [[{ "node": "Fetch and Parse Feed Safely", "type": "main", "index": 0 }]]
+    },
+    "Fetch and Parse Feed Safely": {
+      "main": [[{ "node": "Split Feed Items", "type": "main", "index": 0 }]]
+    },
+    "Split Feed Items": {
+      "main": [[{ "node": "Sign Item Intake Request", "type": "main", "index": 0 }]]
+    },
+    "Sign Item Intake Request": {
+      "main": [[{ "node": "Persist RSS Intake", "type": "main", "index": 0 }]]
+    },
+    "Persist RSS Intake": {
+      "main": [[{ "node": "Sign Analysis Request", "type": "main", "index": 0 }]]
+    },
+    "Sign Analysis Request": {
+      "main": [[{ "node": "Normalize Cluster Score and Gate", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": true,
+    "executionTimeout": 300
+  },
+  "versionId": "8e619a3a-d5d3-46f7-a6d9-acde65873210",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

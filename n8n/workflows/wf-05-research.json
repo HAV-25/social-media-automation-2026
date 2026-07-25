@@ -1,0 +1,110 @@
+{
+  "name": "WF-05 Research",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "research-v1",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "7a33b1e5-0a26-4f18-a148-765a33aab501",
+      "name": "Signed Research Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-460, 100],
+      "webhookId": "7a33b1e5-0a26-4f18-a148-765a33aab502"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst headers = $json.headers || {};\nconst payload = $json.body || {};\nconst timestamp = String(headers['x-workflow-timestamp'] || '');\nconst nonce = String(headers['x-workflow-nonce'] || '');\nconst received = String(headers['x-workflow-signature'] || '');\nconst sourcePath = '/webhook/research-v1';\nconst body = JSON.stringify(payload);\nconst digest = crypto.createHash('sha256').update(body, 'utf8').digest('hex');\nconst canonical = [timestamp, nonce, 'POST', sourcePath, digest].join('\\n');\nconst secret = $env.WORKFLOW_HMAC_SECRET;\nconst previousSecret = $env.WORKFLOW_HMAC_PREVIOUS_SECRET;\nif (!secret || !timestamp || !nonce || !received) throw new Error('Workflow signature is missing');\nconst authentic = [secret, previousSecret].filter(Boolean).some((candidate) => {\n  const expected = `sha256=${crypto.createHmac('sha256', candidate).update(canonical, 'utf8').digest('hex')}`;\n  return received.length === expected.length && crypto.timingSafeEqual(Buffer.from(received), Buffer.from(expected));\n});\nif (!authentic) throw new Error('Workflow signature is invalid');\nif (Math.abs(Math.floor(Date.now() / 1000) - Number(timestamp)) > 300) throw new Error('Workflow signature expired');\nif (payload.contractVersion !== '1.0' || !payload.correlationId || !payload.idempotencyKey || !payload.actorId || !payload.brandId || !payload.opportunityId || !payload.requestedAt) throw new Error('Research contract is invalid');\nconst targetPath = '/api/internal/workflows/recovery/execute';\nconst recoveryPayload = {\n  contractVersion: '1.0',\n  workflowExecutionId: String($execution.id),\n  workflowName: 'WF-05 Research',\n  target: 'research',\n  requestPayload: payload,\n};\nconst recoveryBody = JSON.stringify(recoveryPayload);\nconst nextTimestamp = String(Math.floor(Date.now() / 1000));\nconst nextNonce = crypto.randomUUID();\nconst nextDigest = crypto.createHash('sha256').update(recoveryBody, 'utf8').digest('hex');\nconst nextCanonical = [nextTimestamp, nextNonce, 'POST', targetPath, nextDigest].join('\\n');\nconst signature = `sha256=${crypto.createHmac('sha256', secret).update(nextCanonical, 'utf8').digest('hex')}`;\nreturn [{ json: { body: recoveryBody, nonce: nextNonce, signature, timestamp: nextTimestamp, url: `${$env.APP_BASE_URL}${targetPath}` } }];"
+      },
+      "id": "7a33b1e5-0a26-4f18-a148-765a33aab503",
+      "name": "Verify and Sign Research Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-220, 100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-workflow-name",
+              "value": "WF-05 Research"
+            },
+            {
+              "name": "x-workflow-timestamp",
+              "value": "={{ $json.timestamp }}"
+            },
+            {
+              "name": "x-workflow-nonce",
+              "value": "={{ $json.nonce }}"
+            },
+            {
+              "name": "x-workflow-signature",
+              "value": "={{ $json.signature }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.body }}",
+        "options": {
+          "timeout": 200000
+        }
+      },
+      "id": "7a33b1e5-0a26-4f18-a148-765a33aab504",
+      "name": "Run and Persist Bounded Research",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [20, 100]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Signed Research Webhook": {
+      "main": [
+        [
+          {
+            "node": "Verify and Sign Research Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify and Sign Research Request": {
+      "main": [
+        [
+          {
+            "node": "Run and Persist Bounded Research",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": true,
+    "executionTimeout": 300
+  },
+  "versionId": "7a33b1e5-0a26-4f18-a148-765a33aab505",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

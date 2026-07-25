@@ -1,0 +1,52 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
+
+const migrationPath = fileURLToPath(
+  new URL(
+    "../../../supabase/migrations/20260723201500_research_evidence_ledger.sql",
+    import.meta.url,
+  ),
+);
+const sql = readFileSync(migrationPath, "utf8");
+
+describe("research evidence ledger migration", () => {
+  it("adds a normalized conflict ledger with immediate RLS", () => {
+    expect(sql).toContain("create table public.claim_conflicts");
+    expect(sql).toContain("create table public.claim_conflict_members");
+    expect(sql).toContain("alter table public.claim_conflicts enable row level security");
+    expect(sql).toContain("alter table public.claim_conflict_members enable row level security");
+    expect(sql).toContain("create policy claim_conflicts_update");
+    expect(sql).toContain("with check");
+  });
+
+  it("keeps atomic evidence persistence private and service-only", () => {
+    expect(sql).toContain("create or replace function private.reserve_research_budget");
+    expect(sql).toContain("create or replace function private.persist_research_evidence");
+    expect(sql).toContain("create or replace function private.fail_research_run");
+    expect(sql).toContain("security definer");
+    expect(sql).toContain("set search_path = ''");
+    expect(sql).toContain(
+      "grant execute on function public.persist_research_evidence(jsonb) to service_role",
+    );
+    expect(sql).not.toContain(
+      "grant execute on function public.persist_research_evidence(jsonb) to authenticated",
+    );
+    expect(sql).toContain(
+      "grant execute on function public.reserve_research_budget(jsonb) to service_role",
+    );
+  });
+
+  it("defends provenance, risk, readiness, and idempotency in the database transaction", () => {
+    expect(sql).toContain("Research evidence integrity check failed");
+    expect(sql).toContain("evidence.value ->> 'sourceKey'");
+    expect(sql).toContain("claim.value ->> 'verificationState' = 'verified'");
+    expect(sql).toContain("claim.value ->> 'usageGuidance' <> 'do_not_use'");
+    expect(sql).toContain("is_ready and jsonb_array_length(package -> 'claims') = 0");
+    expect(sql).toContain("scope = 'research_evidence'");
+    expect(sql).toContain("pg_catalog.pg_advisory_xact_lock");
+    expect(sql).toContain("Daily AI research budget exhausted");
+    expect(sql).toContain("research.evidence_persisted");
+    expect(sql).toContain("provider_response_id");
+  });
+});

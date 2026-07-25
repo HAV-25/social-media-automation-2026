@@ -1,0 +1,72 @@
+{
+  "id": "resp_sanitized_research_1",
+  "object": "response",
+  "created_at": 1785000000,
+  "status": "completed",
+  "error": null,
+  "incomplete_details": null,
+  "instructions": null,
+  "max_output_tokens": 1500,
+  "model": "gpt-5.6-terra",
+  "output": [
+    {
+      "id": "ws_sanitized_1",
+      "type": "web_search_call",
+      "status": "completed",
+      "action": {
+        "type": "search",
+        "queries": ["bounded research opportunity official source"],
+        "sources": [
+          {
+            "type": "url",
+            "url": "https://authority.example.test/report"
+          }
+        ]
+      }
+    },
+    {
+      "id": "msg_sanitized_1",
+      "type": "message",
+      "status": "completed",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "{\"contractVersion\":\"1.0\",\"opportunityId\":\"00000000-0000-4000-8000-000000000001\",\"summary\":\"An authoritative primary document supports the core claim without a material conflict.\",\"sources\":[{\"sourceKey\":\"source_primary1\",\"url\":\"https://authority.example.test/report\",\"title\":\"Authoritative report\",\"publisher\":\"Authority\",\"publishedAt\":\"2026-07-22T10:00:00.000Z\",\"retrievedAt\":\"2026-07-23T12:00:00.000Z\",\"sourceType\":\"primary_document\",\"authorityScore\":95,\"relevantExcerpt\":\"The material operating decision changed.\"}],\"claims\":[{\"claimKey\":\"claim_primary1\",\"text\":\"The material operating decision changed.\",\"claimType\":\"factual\",\"importance\":\"core\",\"riskLevel\":\"low\",\"verificationState\":\"verified\",\"confidence\":0.94,\"evidence\":[{\"sourceKey\":\"source_primary1\",\"supportType\":\"supports\",\"excerpt\":\"The material operating decision changed.\",\"locator\":\"Section 2\"}],\"usageGuidance\":\"safe\",\"caveat\":null}],\"conflicts\":[],\"caveats\":[],\"readyForWriting\":true}",
+          "annotations": [],
+          "logprobs": []
+        }
+      ]
+    }
+  ],
+  "parallel_tool_calls": false,
+  "previous_response_id": null,
+  "reasoning": {
+    "effort": "low",
+    "summary": null
+  },
+  "store": false,
+  "temperature": 1,
+  "text": {
+    "format": {
+      "type": "json_schema"
+    }
+  },
+  "tool_choice": "required",
+  "tools": [],
+  "top_p": 1,
+  "truncation": "disabled",
+  "usage": {
+    "input_tokens": 800,
+    "input_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 0
+    },
+    "output_tokens": 400,
+    "output_tokens_details": {
+      "reasoning_tokens": 20
+    },
+    "total_tokens": 1200
+  },
+  "metadata": {}
+}

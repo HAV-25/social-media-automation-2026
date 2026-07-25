@@ -1,0 +1,11 @@
+.next
+.pnpm-store
+coverage
+dist
+node_modules
+outputs
+pnpm-lock.yaml
+AI_Social_Content_Engine_Codex_Implementation_Plan.md
+AI_Social_Content_Engine_Phase_1_Blueprint.md
+docs/implementation-plan.md
+docs/product-blueprint.md

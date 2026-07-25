@@ -1,0 +1,19 @@
+.env
+.env.local
+.env.n8n.local
+.next/
+.pnpm-store/
+.turbo/
+coverage/
+dist/
+node_modules/
+outputs/
+playwright-report/
+test-results/
+supabase/.branches/
+supabase/.temp/
+*.log
+
+# Product-owner source copies; canonical versions are committed under docs/.
+/AI_Social_Content_Engine_Codex_Implementation_Plan.md
+/AI_Social_Content_Engine_Phase_1_Blueprint.md
