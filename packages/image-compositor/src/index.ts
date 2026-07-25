@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 import {
   imageTemplateSchema,
@@ -7,9 +8,10 @@ import {
   type ImageTemplate,
   type ImageValidation,
 } from "@content-engine/contracts";
-import * as opentype from "opentype.js";
+import type { Font } from "opentype.js";
 import sharp from "sharp";
 
+const opentypeRuntime = createRequire(import.meta.url)("opentype.js") as typeof import("opentype.js");
 const bundledFontRelativePath = "packages/image-compositor/assets/Inter-Bold.ttf";
 const bundledFontPath = [
   path.join(process.cwd(), bundledFontRelativePath),
@@ -17,7 +19,7 @@ const bundledFontPath = [
 ].find((candidate) => existsSync(candidate));
 if (!bundledFontPath) throw new Error("The bundled image-compositor font is unavailable.");
 const bundledFontBuffer = readFileSync(bundledFontPath);
-const bundledFont = opentype.parse(
+const bundledFont = opentypeRuntime.parse(
   bundledFontBuffer.buffer.slice(
     bundledFontBuffer.byteOffset,
     bundledFontBuffer.byteOffset + bundledFontBuffer.byteLength,
@@ -155,7 +157,7 @@ function fontForTheme(theme: BrandImageTheme) {
     throw new Error("Brand font data must be valid base64.");
   }
   const fontBuffer = Buffer.from(theme.fontDataBase64, "base64");
-  return opentype.parse(
+  return opentypeRuntime.parse(
     fontBuffer.buffer.slice(
       fontBuffer.byteOffset,
       fontBuffer.byteOffset + fontBuffer.byteLength,
@@ -165,7 +167,7 @@ function fontForTheme(theme: BrandImageTheme) {
 
 function vectorText(
   value: string,
-  input: { x: number; y: number; fontSize: number; fill: string; font: opentype.Font },
+  input: { x: number; y: number; fontSize: number; fill: string; font: Font },
 ) {
   let cursor = input.x;
   const paths = Array.from(value).map((character) => {
@@ -185,7 +187,7 @@ function headlineText(
     lineHeight: number;
     fontSize: number;
     fill: string;
-    font: opentype.Font;
+    font: Font;
   },
 ) {
   return lines
