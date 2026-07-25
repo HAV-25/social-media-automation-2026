@@ -139,10 +139,11 @@ export async function POST(request: NextRequest) {
       requiresManualReview: false,
       reviewReasons: [],
       provenance: {
-        sourceUrl: source.canonical_url ?? undefined,
+        submittedBy: feed.created_by,
+        originalUrl: source.canonical_url ?? undefined,
         author: source.author ?? undefined,
         publisher: source.publisher ?? undefined,
-        publishedAt: source.published_at ?? undefined,
+        publishedAt: source.published_at ? new Date(source.published_at).toISOString() : undefined,
         receivedAt: payload.requestedAt,
       },
     });

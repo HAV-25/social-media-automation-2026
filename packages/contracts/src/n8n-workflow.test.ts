@@ -108,10 +108,17 @@ describe("Milestone 4 n8n workflow package", () => {
     const manual = readFileSync(`${workflowDirectory}wf-02-manual-intake.json`, "utf8");
     const normalize = readFileSync(`${workflowDirectory}wf-03-normalize.json`, "utf8");
     const score = readFileSync(`${workflowDirectory}wf-04-cluster-score.json`, "utf8");
+    const rssAnalyze = readFileSync(
+      `${appDirectory}api/internal/workflows/rss/analyze/route.ts`,
+      "utf8",
+    );
 
     expect(manual).toContain("/webhook/source-normalize-v1");
     expect(normalize).toContain("/webhook/cluster-score-v1");
     expect(score).toContain("/api/internal/workflows/rss/analyze");
+    expect(rssAnalyze).toContain("submittedBy: feed.created_by");
+    expect(rssAnalyze).toContain("originalUrl: source.canonical_url");
+    expect(rssAnalyze).toContain("new Date(source.published_at).toISOString()");
   });
 });
 
