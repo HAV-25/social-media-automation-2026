@@ -20,6 +20,15 @@ const secretKeyCompatibilityMigration = readFileSync(
   ),
   "utf8",
 );
+const workflowSecretKeyCompatibilityMigration = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../../../supabase/migrations/20260725152241_support_secret_api_keys_for_workflows.sql",
+      import.meta.url,
+    ),
+  ),
+  "utf8",
+);
 const databaseTest = readFileSync(
   fileURLToPath(
     new URL("../../../supabase/tests/database/api_security_controls.test.sql", import.meta.url),
@@ -107,6 +116,16 @@ describe("Feature 8.3 API security controls", () => {
     expect(secretKeyCompatibilityMigration).toContain(
       "grant execute on function private.consume_api_rate_limit(text, text, text, integer, integer)",
     );
+  });
+
+  it("updates every private workflow guard to the opaque-key claims contract", () => {
+    expect(workflowSecretKeyCompatibilityMigration).toContain("n.nspname = 'private'");
+    expect(workflowSecretKeyCompatibilityMigration).toContain("p.prokind = 'f'");
+    expect(workflowSecretKeyCompatibilityMigration).toContain(
+      "current_setting(''request.jwt.claims'', true)",
+    );
+    expect(workflowSecretKeyCompatibilityMigration).toContain("if updated_count <> 24");
+    expect(workflowSecretKeyCompatibilityMigration).toContain("execute updated_definition");
   });
 
   it("enforces limits on every user API and through the shared workflow authenticator", () => {
