@@ -91,6 +91,7 @@ describe("WF-01 RSS Intake workflow", () => {
 
     expect(route).toContain("enforceUserApiRateLimit");
     expect(route).toContain("getBrandConfiguration");
+    expect(route).toContain("createSupabaseServiceClient");
     expect(route).toContain("signWorkflowRequest");
     expect(route).toContain('run_type: "rss_intake_dispatch"');
     expect(route).toContain('"rss.intake.manual_dispatch"');

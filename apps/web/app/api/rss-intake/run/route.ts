@@ -11,7 +11,7 @@ import { enforceUserApiRateLimit } from "@/lib/api-rate-limit";
 import { getBrandConfiguration } from "@/lib/brand-configuration";
 import { canManageBrand } from "@/lib/permissions";
 import { isSameOriginRequest } from "@/lib/request-origin";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 export const runtime = "nodejs";
 
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     return failure(404, "brand_not_found", "Brand not found or not assigned.");
   }
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabaseServiceClient();
   const { data: createdRun, error: createError } = await supabase
     .from("generation_runs")
     .insert({

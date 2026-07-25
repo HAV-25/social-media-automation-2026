@@ -401,3 +401,15 @@ limits, and strict payload validation remain independently required.
 The policy is implemented once and shared by RSS dispatch/feed changes, source
 submission/upload, research, generation, regeneration, and image actions so a
 deployment-host mismatch cannot fail each feature separately.
+
+## ADR-033 — Authorized server mutations use the server-only database client
+
+**Status:** Accepted, 2026-07-25
+
+Application routes first authenticate the user and deterministically authorize
+their organization role and selected-brand assignment. Mutations that create
+workflow orchestration records then use the server-only Supabase client because
+browser roles intentionally have no direct insert or update grants on those
+operational tables. The privileged client is never exposed to browser code and
+does not replace the route's actor, brand, origin, rate-limit, validation, audit,
+or idempotency checks.

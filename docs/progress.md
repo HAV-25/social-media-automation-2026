@@ -655,3 +655,13 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
 - Five origin-policy regressions cover direct, Netlify-forwarded, configured,
   hostile/malformed, and non-browser requests. Web lint, strict type-checking,
   all 52 web tests, and the optimized production build passed.
+
+### Manual RSS dispatch persistence
+
+- Corrected the authenticated manual-dispatch route to use the server-only
+  Supabase client after its user, role, selected-brand, origin, payload, and
+  rate-limit checks. This preserves the intended denial of direct workflow-table
+  writes to browser roles while allowing the application server to record the
+  parent RSS session, pipeline event, and audit evidence.
+- Contract coverage now prevents the route from regressing to an authenticated
+  browser-scoped database client.
