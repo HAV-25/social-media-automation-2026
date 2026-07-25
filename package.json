@@ -17,6 +17,7 @@
     "typecheck": "turbo run typecheck",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm test:e2e",
     "sheet:build": "node scripts/build-team-input-register.mjs",
+    "runtime:preflight": "node scripts/check-runtime-bridge.mjs --remote",
     "n8n:plan": "node scripts/publish-n8n-workflows.mjs",
     "n8n:publish": "node scripts/publish-n8n-workflows.mjs --apply --publish"
   },

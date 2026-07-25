@@ -575,3 +575,21 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
 - Repository formatting, web lint, strict web type-checking, all 45 web tests,
   and the optimized production build passed. External feed validation and
   database configuration made no paid AI or image-generation call.
+
+### Signed runtime bridge status
+
+- Added `pnpm runtime:preflight`, a read-only bridge check that validates local
+  key presence and HMAC length, exact remote WF-01 through WF-10 inventory,
+  duplicate names, and active states without printing credential values or
+  changing n8n.
+- Contract coverage prevents the preflight from activating or mutating remote
+  workflows and asserts that app and publisher secret values are never logged.
+  All 75 contract tests, contract lint, and strict contract type-checking pass.
+- The live n8n inventory contains exactly one of every WF-01 through WF-10.
+  WF-02 through WF-10 are active; WF-01 remains intentionally inactive until
+  the signed runtime bridge passes.
+- The ignored local app environment now has the production application URL.
+  Preflight fails on exactly one remaining local item:
+  `WORKFLOW_HMAC_SECRET`. Netlify's Supabase server key and the shared HMAC
+  secret remain unapplied pending explicit product-owner authorization; no
+  credential value was displayed or transferred.

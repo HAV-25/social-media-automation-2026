@@ -85,3 +85,9 @@ SHA-256(raw body)
 The server rejects stale signatures and consumes every nonce once. Each feed
 item also carries a stable idempotency key, so retries cannot create duplicate
 source documents.
+
+Run `pnpm runtime:preflight` before activating WF-01. It verifies required local
+key names and lengths, exact remote workflow inventory, duplicates, and active
+states without printing credential values or mutating n8n. The n8n public API
+cannot attest server environment values, so the operator must still confirm the
+four required n8n runtime keys above after any container restart.
