@@ -26,18 +26,39 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "content-type", "value": "application/json" },
-            { "name": "x-workflow-name", "value": "WF-10 Error and Recovery" },
-            { "name": "x-workflow-timestamp", "value": "={{ $json.timestamp }}" },
-            { "name": "x-workflow-nonce", "value": "={{ $json.nonce }}" },
-            { "name": "x-workflow-signature", "value": "={{ $json.signature }}" }
+            {
+              "name": "accept-encoding",
+              "value": "identity"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-workflow-name",
+              "value": "WF-10 Error and Recovery"
+            },
+            {
+              "name": "x-workflow-timestamp",
+              "value": "={{ $json.timestamp }}"
+            },
+            {
+              "name": "x-workflow-nonce",
+              "value": "={{ $json.nonce }}"
+            },
+            {
+              "name": "x-workflow-signature",
+              "value": "={{ $json.signature }}"
+            }
           ]
         },
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
         "body": "={{ $json.body }}",
-        "options": { "timeout": 30000 }
+        "options": {
+          "timeout": 30000
+        }
       },
       "id": "ce10f001-6a77-4a0f-8d1c-000000000003",
       "name": "Persist Redacted Failure",
@@ -48,7 +69,12 @@
     {
       "parameters": {
         "rule": {
-          "interval": [{ "field": "minutes", "minutesInterval": 1 }]
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
         }
       },
       "id": "ce10f001-6a77-4a0f-8d1c-000000000004",
@@ -74,18 +100,39 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "content-type", "value": "application/json" },
-            { "name": "x-workflow-name", "value": "WF-10 Error and Recovery" },
-            { "name": "x-workflow-timestamp", "value": "={{ $json.timestamp }}" },
-            { "name": "x-workflow-nonce", "value": "={{ $json.nonce }}" },
-            { "name": "x-workflow-signature", "value": "={{ $json.signature }}" }
+            {
+              "name": "accept-encoding",
+              "value": "identity"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-workflow-name",
+              "value": "WF-10 Error and Recovery"
+            },
+            {
+              "name": "x-workflow-timestamp",
+              "value": "={{ $json.timestamp }}"
+            },
+            {
+              "name": "x-workflow-nonce",
+              "value": "={{ $json.nonce }}"
+            },
+            {
+              "name": "x-workflow-signature",
+              "value": "={{ $json.signature }}"
+            }
           ]
         },
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
         "body": "={{ $json.body }}",
-        "options": { "timeout": 90000 }
+        "options": {
+          "timeout": 90000
+        }
       },
       "id": "ce10f001-6a77-4a0f-8d1c-000000000006",
       "name": "Dispatch Due Recoveries",
@@ -97,16 +144,48 @@
   "pinData": {},
   "connections": {
     "Error Trigger": {
-      "main": [[{ "node": "Classify and Sign Failure", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Classify and Sign Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Classify and Sign Failure": {
-      "main": [[{ "node": "Persist Redacted Failure", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Persist Redacted Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Every Minute": {
-      "main": [[{ "node": "Sign Due Recovery Poll", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Sign Due Recovery Poll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Sign Due Recovery Poll": {
-      "main": [[{ "node": "Dispatch Due Recoveries", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Dispatch Due Recoveries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
@@ -118,6 +197,8 @@
     "executionTimeout": 180
   },
   "versionId": "ce10f001-6a77-4a0f-8d1c-000000000010",
-  "meta": { "templateCredsSetupCompleted": false },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
   "tags": []
 }

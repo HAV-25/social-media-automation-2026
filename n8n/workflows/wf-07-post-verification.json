@@ -33,6 +33,10 @@
         "headerParameters": {
           "parameters": [
             {
+              "name": "accept-encoding",
+              "value": "identity"
+            },
+            {
               "name": "content-type",
               "value": "application/json"
             },

@@ -61,6 +61,10 @@
         "headerParameters": {
           "parameters": [
             {
+              "name": "accept-encoding",
+              "value": "identity"
+            },
+            {
               "name": "x-workflow-name",
               "value": "WF-01 RSS Intake"
             },
@@ -204,6 +208,10 @@
         "headerParameters": {
           "parameters": [
             {
+              "name": "accept-encoding",
+              "value": "identity"
+            },
+            {
               "name": "content-type",
               "value": "application/json"
             },
@@ -264,6 +272,10 @@
         "headerParameters": {
           "parameters": [
             {
+              "name": "accept-encoding",
+              "value": "identity"
+            },
+            {
               "name": "content-type",
               "value": "application/json"
             },
@@ -309,40 +321,136 @@
   "pinData": {},
   "connections": {
     "Every 15 Minutes": {
-      "main": [[{ "node": "Sign Feed Plan Request", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Sign Feed Plan Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Signed One-off RSS Webhook": {
-      "main": [[{ "node": "Verify One-off RSS Request", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Verify One-off RSS Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Verify One-off RSS Request": {
-      "main": [[{ "node": "Sign Feed Plan Request", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Sign Feed Plan Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Sign Feed Plan Request": {
-      "main": [[{ "node": "Fetch Active Feed Plan", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Fetch Active Feed Plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Fetch Active Feed Plan": {
-      "main": [[{ "node": "Split Feeds", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Split Feeds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Split Feeds": {
-      "main": [[{ "node": "Sign Safe Fetch Request", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Sign Safe Fetch Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Sign Safe Fetch Request": {
-      "main": [[{ "node": "Fetch and Parse Feed Safely", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Fetch and Parse Feed Safely",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Fetch and Parse Feed Safely": {
-      "main": [[{ "node": "Split Feed Items", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Split Feed Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Split Feed Items": {
-      "main": [[{ "node": "Sign Item Intake Request", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Sign Item Intake Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Sign Item Intake Request": {
-      "main": [[{ "node": "Persist RSS Intake", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Persist RSS Intake",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Persist RSS Intake": {
-      "main": [[{ "node": "Sign Analysis Request", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Sign Analysis Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Sign Analysis Request": {
-      "main": [[{ "node": "Normalize Cluster Score and Gate", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Normalize Cluster Score and Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,

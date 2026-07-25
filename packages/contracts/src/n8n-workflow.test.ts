@@ -321,7 +321,18 @@ describe("n8n 2.21 runtime compatibility", () => {
       const options = z
         .object({ timeout: z.number().int().min(1_000).max(200_000) })
         .parse(request.parameters.options);
+      const headers = z
+        .object({
+          parameters: z.array(z.object({ name: z.string(), value: z.string() })),
+        })
+        .parse(request.parameters.headerParameters);
       expect(options.timeout).toBeGreaterThanOrEqual(1_000);
+      expect(
+        headers.parameters.some(
+          (header) =>
+            header.name.toLowerCase() === "accept-encoding" && header.value === "identity",
+        ),
+      ).toBe(true);
     }
   });
 });
