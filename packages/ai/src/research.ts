@@ -209,6 +209,45 @@ function assertEvidenceIntegrity(
   }
 }
 
+function enforceEvidenceSafety(rawEvidence: unknown) {
+  const evidence = evidencePackageSchema.parse(rawEvidence);
+  const quarantined: string[] = [];
+  const claims = evidence.claims.map((claim) => {
+    if (
+      claim.riskLevel !== "high" ||
+      claim.verificationState === "verified" ||
+      claim.usageGuidance === "do_not_use"
+    ) {
+      return claim;
+    }
+    quarantined.push(claim.claimKey);
+    return {
+      ...claim,
+      usageGuidance: "do_not_use" as const,
+      caveat:
+        claim.caveat ?? "Automatically quarantined because this high-risk claim was not verified.",
+    };
+  });
+  const hasUsableCore = claims.some(
+    (claim) =>
+      claim.importance === "core" &&
+      claim.usageGuidance !== "do_not_use" &&
+      !["unsupported", "disputed"].includes(claim.verificationState),
+  );
+  return evidencePackageSchema.parse({
+    ...evidence,
+    claims,
+    caveats:
+      quarantined.length > 0
+        ? [
+            ...evidence.caveats,
+            `Safety enforcement quarantined ${quarantined.length} unverified high-risk claim(s).`,
+          ]
+        : evidence.caveats,
+    readyForWriting: evidence.readyForWriting && hasUsableCore,
+  });
+}
+
 export class FakeResearchProvider implements ResearchProvider {
   async research(rawRequest: ResearchRequest): Promise<ResearchProviderResult> {
     const request = researchRequestSchema.parse(rawRequest);
@@ -404,7 +443,7 @@ END_SOURCE_DATA`,
         );
       }
 
-      const evidencePackage = evidencePackageSchema.parse(response.output_parsed);
+      const evidencePackage = enforceEvidenceSafety(response.output_parsed);
       if (details.calls > request.plan.budget.maxQueries) {
         throw new ResearchProviderError(
           "budget_exceeded",

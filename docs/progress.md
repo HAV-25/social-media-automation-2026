@@ -675,3 +675,12 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   returned value as an HTTP(S) URL before persistence.
 - The regression test inspects the actual OpenAI request body and prevents the
   unsupported `uri` format from returning.
+- Live WF-05 then recorded a real `gpt-5.6-terra` research response (17,553
+  input tokens, 2,778 output tokens, one web search, $0.095552 estimated cost)
+  but correctly rejected two unverified high-risk claims that the provider had
+  not marked `do_not_use`.
+- The provider boundary now deterministically quarantines any such claim,
+  records the enforcement in the evidence caveats, and clears
+  `readyForWriting` when no usable core claim remains. The claims ledger
+  therefore preserves the research while preventing unsafe material from
+  entering post generation.

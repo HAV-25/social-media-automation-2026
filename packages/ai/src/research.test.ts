@@ -251,6 +251,34 @@ describe("bounded research providers", () => {
     } satisfies Partial<ResearchProviderError>);
   });
 
+  it("deterministically quarantines unverified high-risk claims", async () => {
+    const evidence = verifiedEvidence();
+    evidence.claims.push({
+      ...evidence.claims[0]!,
+      claimKey: "claim_risky001",
+      importance: "supporting",
+      riskLevel: "high",
+      verificationState: "partially_supported",
+      usageGuidance: "caveat",
+      caveat: null,
+    });
+    const fetchMock = vi.fn<typeof fetch>(async () => {
+      return new Response(JSON.stringify(providerResponse(evidence)), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    });
+
+    const result = await providerWithFetch(fetchMock).research(request());
+
+    expect(result.evidencePackage.claims[1]).toMatchObject({
+      claimKey: "claim_risky001",
+      usageGuidance: "do_not_use",
+    });
+    expect(result.evidencePackage.caveats.join(" ")).toContain("Safety enforcement quarantined");
+    expect(result.evidencePackage.readyForWriting).toBe(true);
+  });
+
   it("handles refusals and bounded-output truncation explicitly", async () => {
     const refusal = providerResponse();
     refusal.output = [
