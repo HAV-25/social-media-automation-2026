@@ -2,11 +2,18 @@ import { cookies } from "next/headers";
 import { demoUser } from "./demo-data";
 import { createSupabaseServerClient } from "./supabase/server";
 
-export async function getCurrentUser() {
+export type AuthState =
+  | { kind: "signed_out" }
+  | { kind: "pending_access"; identity: { id: string; email: string; displayName: string } }
+  | { kind: "authorized"; user: typeof demoUser };
+
+export async function getAuthState(): Promise<AuthState> {
   const demoMode = process.env.NEXT_PUBLIC_DEMO_MODE !== "false";
   if (demoMode) {
     const cookieStore = await cookies();
-    return cookieStore.get("content-engine-demo-session")?.value === "signed-in" ? demoUser : null;
+    return cookieStore.get("content-engine-demo-session")?.value === "signed-in"
+      ? { kind: "authorized", user: demoUser }
+      : { kind: "signed_out" };
   }
 
   const supabase = await createSupabaseServerClient();
@@ -15,7 +22,7 @@ export async function getCurrentUser() {
     error,
   } = await supabase.auth.getUser();
 
-  if (error || !user) return null;
+  if (error || !user) return { kind: "signed_out" };
 
   const [{ data: profile }, { data: memberships }, { data: brandMemberships }] = await Promise.all([
     supabase.from("profiles").select("display_name").eq("user_id", user.id).maybeSingle(),
@@ -27,7 +34,21 @@ export async function getCurrentUser() {
     supabase.from("brand_members").select("role").eq("user_id", user.id),
   ]);
   const membership = memberships?.[0];
-  if (!membership) return null;
+  const displayName =
+    profile?.display_name ??
+    (typeof user.user_metadata.name === "string" ? user.user_metadata.name : undefined) ??
+    user.email ??
+    "Verified user";
+  if (!membership) {
+    return {
+      kind: "pending_access",
+      identity: {
+        id: user.id,
+        email: user.email ?? "",
+        displayName,
+      },
+    };
+  }
   const roleOrder = ["viewer", "reviewer", "editor", "administrator"] as const;
   const role = [membership.role, ...(brandMemberships ?? []).map((item) => item.role)].reduce(
     (highest, candidate) =>
@@ -36,12 +57,19 @@ export async function getCurrentUser() {
   );
 
   return {
-    id: user.id,
-    organizationId: membership.organization_id,
-    organizationRole: membership.role,
-    email: user.email ?? "",
-    displayName:
-      profile?.display_name ?? user.user_metadata.name ?? user.email ?? "Authorized user",
-    role,
+    kind: "authorized",
+    user: {
+      id: user.id,
+      organizationId: membership.organization_id,
+      organizationRole: membership.role,
+      email: user.email ?? "",
+      displayName,
+      role,
+    },
   };
+}
+
+export async function getCurrentUser() {
+  const state = await getAuthState();
+  return state.kind === "authorized" ? state.user : null;
 }

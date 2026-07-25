@@ -480,3 +480,25 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   control-character regex style violation; the implementation was corrected
   with Unicode category handling and lint then passed. No paid AI or image call
   was made.
+
+## Pilot authentication and deployment readiness
+
+- [x] The initial application source was secret-scanned, committed, and pushed
+      to private GitHub repository `HAV-25/social-media-automation-2026` on
+      branch `main` at commit `818bb60`.
+- [x] Netlify monorepo build settings are committed for package directory
+      `apps/web`; project import and environment wiring remain external.
+- [x] Email/password registration uses strict bounded inputs, a minimum
+      12-character password, Supabase email verification, and PKCE-compatible
+      server cookies.
+- [x] Six-digit email verification and default confirmation-link exchange are
+      both supported without exposing tokens or provider errors.
+- [x] A verified user without organization membership receives a dedicated,
+      locked pending-access screen instead of being mistaken for a signed-out
+      user or receiving demo data.
+- [x] Dashboard access still requires durable organization membership, and all
+      existing brand RLS remains authoritative.
+- [ ] Configure the deployed Site URL/redirect allowlist and email delivery in
+      Supabase after Netlify provides the stable application URL.
+- [ ] Register the two reviewers and assign administrator/editor/reviewer
+      membership across all five brands.

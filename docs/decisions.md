@@ -295,3 +295,22 @@ removes the old value. Credentials remain environment-only.
 Operational data is allowlisted rather than dumping requests or exceptions.
 The shared redactor removes credential-shaped values and recursively sensitive
 source, prompt, token, and provider-response fields before failure persistence.
+
+## ADR-027 — Self-registration verifies identity but never grants workspace access
+
+**Status:** Accepted, 2026-07-25
+
+Phase 1 permits email/password self-registration so the two pilot reviewers can
+create their own credentials without sharing passwords. Email verification
+supports both a six-digit Supabase email token and the hosted service's default
+PKCE confirmation link. The callback accepts only signup/email token types,
+uses a fixed application-owned destination, and never honors a user-controlled
+post-authentication redirect.
+
+A verified `auth.users` identity with no organization membership is a distinct
+`pending_access` state. It receives a session but cannot enter the dashboard,
+select a brand, or query protected content. Organization and brand access still
+comes exclusively from administrator-created `organization_members` and
+`brand_members` rows; user metadata is display-only and is never an
+authorization input. This keeps public identity proof separate from internal
+workspace approval.

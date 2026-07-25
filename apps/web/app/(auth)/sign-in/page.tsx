@@ -1,10 +1,11 @@
 import { ArrowRight, CheckCircle2, ShieldCheck } from "lucide-react";
+import Link from "next/link";
 import { signIn } from "./actions";
 
 export default async function SignInPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; verified?: string }>;
 }) {
   const params = await searchParams;
   const demoMode = process.env.NEXT_PUBLIC_DEMO_MODE !== "false";
@@ -55,6 +56,11 @@ export default async function SignInPage({
               The email or password was not accepted.
             </p>
           ) : null}
+          {params.verified === "1" ? (
+            <p className="mt-5 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">
+              Your email is verified. Sign in to continue.
+            </p>
+          ) : null}
 
           <form action={signIn} className="mt-8 space-y-5">
             <label className="block text-sm font-semibold">
@@ -81,6 +87,15 @@ export default async function SignInPage({
               Enter Editorial Desk <ArrowRight size={18} />
             </button>
           </form>
+
+          {!demoMode ? (
+            <p className="mt-6 text-center text-sm text-[var(--muted)]">
+              Need an internal account?{" "}
+              <Link className="font-semibold text-[var(--sage)] underline" href="/sign-up">
+                Create one
+              </Link>
+            </p>
+          ) : null}
 
           {demoMode ? (
             <p className="mt-5 rounded-xl bg-[var(--pale,theme(colors.stone.100))] p-3 text-xs leading-5 text-[var(--muted)]">

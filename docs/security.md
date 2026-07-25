@@ -2,6 +2,12 @@
 
 - Application authorization comes from `organization_members` and
   `brand_members`, never user-editable profile or JWT user metadata.
+- Email/password signup proves control of an email address but creates no
+  organization or brand authorization. Verified identities without membership
+  remain in a locked `pending_access` state until administrator assignment.
+- Signup callbacks accept only email/signup verification types and fixed local
+  destinations. Both six-digit token and PKCE confirmation-link flows terminate
+  in the same membership gate.
 - All exposed tables enable RLS and use explicit grants.
 - Service credentials remain server-only and are forbidden in workflow exports.
 - Signed workflow requests include timestamp, nonce, method, path, body digest,

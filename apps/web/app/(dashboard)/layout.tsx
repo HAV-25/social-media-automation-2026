@@ -1,13 +1,15 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/sidebar";
-import { getCurrentUser } from "@/lib/auth";
+import { getAuthState } from "@/lib/auth";
 import { getWorkspaceSnapshot } from "@/lib/workspace";
 import { signOut, switchBrand } from "./actions";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const user = await getCurrentUser();
-  if (!user) redirect("/sign-in");
+  const authState = await getAuthState();
+  if (authState.kind === "signed_out") redirect("/sign-in");
+  if (authState.kind === "pending_access") redirect("/pending-access");
+  const user = authState.user;
   const cookieStore = await cookies();
   const snapshot = await getWorkspaceSnapshot(cookieStore.get("active-brand")?.value);
 
