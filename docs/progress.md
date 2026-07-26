@@ -940,3 +940,13 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   broad-solution claims and explicitly preserved the caveat. Verification now
   blocks only when a draft maps to a claim participating in the material
   conflict, while retaining an inspectable warning when the draft avoids it.
+- Production validation after deploying `b0a6da7` passed the corrected WF-07
+  path. The real Newsworthy and Educational SceneSmith drafts now pass
+  deterministic review readiness with zero contradictions; Perspective remains
+  correctly held because its 64.26 brand-fit score is below the 65 gate.
+- One bounded WF-08 production call generated and persisted a real
+  `gpt-image-2` editorial-hero asset. Supabase records immutable base and
+  deterministically composed final PNG paths, ready status, successful
+  provenance, and exactly $0.005 cost. The Newsworthy draft is now a complete
+  Ready Posts review item; approval and package download remain deliberate
+  authenticated human actions.
