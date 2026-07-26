@@ -122,4 +122,14 @@ describe("operations observability core", () => {
       "The operations cursor is invalid.",
     );
   });
+
+  it("creates pagination cursors from Supabase timestamp offsets", () => {
+    const createdAt = "2026-07-25T19:12:08.162978+00:00";
+    const cursor = encodeOperationsCursor({
+      createdAt,
+      id: "81000000-0000-4000-8000-000000000001",
+    });
+
+    expect(decodeOperationsCursor(cursor).createdAt).toBe(createdAt);
+  });
 });

@@ -8,7 +8,7 @@ import { z } from "zod";
 
 const cursorPayloadSchema = z
   .object({
-    createdAt: z.iso.datetime(),
+    createdAt: z.iso.datetime({ offset: true }),
     id: z.uuid(),
   })
   .strict();

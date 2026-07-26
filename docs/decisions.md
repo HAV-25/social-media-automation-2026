@@ -458,3 +458,18 @@ query failures render a safe temporary-unavailability state.
 This tolerance applies only to the read-only observability presentation.
 Workflow mutations, state transitions, signatures, permissions, and durable
 writes remain strict and fail closed.
+
+## ADR-037 — The daily RSS view accounts for every configured feed
+
+**Status:** Accepted, 2026-07-26
+
+The reviewer dashboard shows every RSS item seen in the current UTC day and
+retains the latest known item for any configured feed that has not contributed
+a new article today. This prevents a quiet feed from disappearing and makes the
+brand-routing outcome explainable across all configured sources.
+
+Each item is labeled as scored, filtered, duplicate, or pending. Scored items
+also show their deterministic score and brand-wide selection outcome:
+selected, below threshold, daily maximum reached, scoring only, or awaiting
+selection. Selection visibility is derived from durable reservation runs and
+the active brand policy; it does not start research or generation.

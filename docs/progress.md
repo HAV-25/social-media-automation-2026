@@ -799,3 +799,21 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
 - Added the exact live queued `rss_opportunity_reservation` shape as a
   regression fixture. The web suite passes 55 tests, strict type-checking
   passes, and the optimized production build completes.
+- Authenticated production tracing then isolated the remaining warning to
+  pagination: after the brand exceeded 20 runs, cursor creation rejected
+  Supabase's valid `+00:00` timestamp offset. The cursor contract now accepts
+  ISO offsets and has a direct regression test using the live timestamp shape.
+
+### Complete RSS opportunity visibility
+
+- Added a selected-brand daily opportunity feed that lists every current-day
+  RSS item across all routed feeds and retains the latest known item for a feed
+  with no new article today.
+- Each row now shows the feed, article, observed time, deterministic score when
+  available, routing/scoring explanation, and a direct score-review link.
+- Post-preparation selection is explicit: selected, below the brand threshold,
+  daily maximum reached, scoring only, awaiting selection, filtered, duplicate,
+  or pending.
+- The policy summary shows the active minimum score, daily maximum, and durable
+  reservation count for the current UTC day. Selection logic is covered by two
+  focused regression tests; the web suite now passes 57 tests.

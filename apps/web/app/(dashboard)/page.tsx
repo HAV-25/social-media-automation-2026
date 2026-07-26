@@ -20,7 +20,7 @@ export default async function DashboardPage() {
   const { activeBrand, dashboardMetrics, opportunities } = await getWorkspaceSnapshot(
     cookieStore.get("active-brand")?.value,
   );
-  const rssDecisions = await getRssDailyDecisions(activeBrand.id, dashboardMetrics.since);
+  const rssOverview = await getRssDailyDecisions(activeBrand.id, dashboardMetrics.since);
   const today = new Intl.DateTimeFormat("en-GB", {
     dateStyle: "long",
     timeZone: "UTC",
@@ -123,7 +123,7 @@ export default async function DashboardPage() {
           </button>
         </div>
 
-        {rssDecisions.length ? (
+        {rssOverview.feeds.length ? (
           <section className="mt-7 rounded-3xl border border-[var(--line)] bg-white/65 p-5 lg:p-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
@@ -144,7 +144,7 @@ export default async function DashboardPage() {
               </a>
             </div>
             <div className="mt-5 grid gap-3 xl:grid-cols-3">
-              {rssDecisions.map((decision) => (
+              {rssOverview.feeds.map((decision) => (
                 <article
                   key={decision.feedId}
                   className="rounded-2xl border border-[var(--line)] bg-white p-4"
@@ -211,6 +211,101 @@ export default async function DashboardPage() {
                   )}
                 </article>
               ))}
+            </div>
+          </section>
+        ) : null}
+
+        {rssOverview.items.length ? (
+          <section className="mt-5 overflow-hidden rounded-3xl border border-[var(--line)] bg-white/70">
+            <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[var(--line)] p-5 lg:p-6">
+              <div>
+                <p className="text-xs font-bold tracking-[0.16em] text-[var(--sage)] uppercase">
+                  Daily opportunity feed
+                </p>
+                <h2 className="serif mt-1 text-2xl">Every RSS item and its decision</h2>
+                <p className="mt-2 max-w-3xl text-xs leading-5 text-[var(--muted)]">
+                  This includes today’s scored opportunities, brand-filtered articles, duplicates,
+                  and items still processing. If a feed has no new article today, its latest known
+                  item remains visible for context.
+                </p>
+              </div>
+              <div className="rounded-2xl bg-[var(--sage-soft)] px-4 py-3 text-xs text-[var(--sage)]">
+                <strong>{rssOverview.policy.selectedToday}</strong> selected today · score{" "}
+                <strong>≥ {rssOverview.policy.minimumScore}</strong> · daily maximum{" "}
+                <strong>{rssOverview.policy.dailyLimit}</strong>
+              </div>
+            </div>
+            <div className="divide-y divide-[var(--line)]">
+              {rssOverview.items.map((item) => {
+                const selectionLabels = {
+                  selected: "Selected for preparation",
+                  below_threshold: "Below score threshold",
+                  daily_limit: "Daily maximum reached",
+                  ingest_only: "Scoring only",
+                  awaiting_selection: "Awaiting selection",
+                  not_applicable: item.state.replaceAll("_", " "),
+                } as const;
+                return (
+                  <article
+                    key={item.itemId}
+                    className="grid gap-3 p-4 sm:grid-cols-[minmax(0,1fr)_110px_190px_auto] sm:items-center lg:px-6"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 text-[10px] font-bold tracking-wide text-[var(--muted)] uppercase">
+                        <span className="text-[var(--sage)]">{item.feedName}</span>
+                        <span>·</span>
+                        <span>
+                          {new Date(item.firstSeenAt).toLocaleString([], {
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                        {!item.inCurrentWindow ? (
+                          <>
+                            <span>·</span>
+                            <span>Latest feed item</span>
+                          </>
+                        ) : null}
+                      </div>
+                      <h3 className="mt-1 text-sm font-bold leading-5">{item.title}</h3>
+                      <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
+                        {item.explanation}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-bold tracking-wide text-[var(--muted)] uppercase">
+                        Score
+                      </p>
+                      <p className="serif mt-1 text-xl font-bold">
+                        {item.score === null ? "—" : `${item.score.toFixed(0)}/100`}
+                      </p>
+                    </div>
+                    <span
+                      className={`w-fit rounded-full px-3 py-1.5 text-[10px] font-bold ${
+                        item.selection === "selected"
+                          ? "bg-emerald-50 text-emerald-800"
+                          : item.selection === "below_threshold" || item.selection === "daily_limit"
+                            ? "bg-amber-50 text-amber-800"
+                            : "bg-stone-100 text-stone-700"
+                      }`}
+                    >
+                      {selectionLabels[item.selection]}
+                    </span>
+                    {item.opportunityId ? (
+                      <a
+                        href={`/opportunities/${item.opportunityId}`}
+                        className="w-fit rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-xs font-bold"
+                      >
+                        Review score
+                      </a>
+                    ) : (
+                      <span className="text-xs text-[var(--muted)]">No post candidate</span>
+                    )}
+                  </article>
+                );
+              })}
             </div>
           </section>
         ) : null}
