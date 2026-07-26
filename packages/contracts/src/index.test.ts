@@ -28,6 +28,8 @@ describe("shared contracts", () => {
   it("uses a bounded three-item RSS catch-up window by default", () => {
     expect(serverEnvSchema.parse({}).RSS_ITEMS_PER_FEED_PER_RUN).toBe(3);
     expect(serverEnvSchema.safeParse({ RSS_ITEMS_PER_FEED_PER_RUN: 21 }).success).toBe(false);
+    expect(serverEnvSchema.parse({}).AI_WRITE_REASONING_EFFORT).toBe("none");
+    expect(serverEnvSchema.parse({}).AI_WRITE_MAX_OUTPUT_TOKENS).toBe(2_500);
   });
 
   it("accepts every Phase 1 role and content style", () => {

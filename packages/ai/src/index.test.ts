@@ -5,6 +5,7 @@ import type OpenAI from "openai";
 import {
   FakeEditorialProvider,
   FACEBOOK_WRITER_SYSTEM_PROMPT,
+  generateEditorialDraftBatch,
   getProductionPrompt,
   OpenAIEditorialProvider,
   PRODUCTION_PROMPTS,
@@ -95,6 +96,45 @@ const evidence = evidencePackageSchema.parse({
 });
 
 describe("fake editorial provider", () => {
+  it("runs the bounded style batch concurrently while preserving request order", async () => {
+    const fake = new FakeEditorialProvider();
+    let active = 0;
+    let maximumActive = 0;
+    const provider = {
+      generateDraft: async (request: Parameters<typeof fake.generateDraft>[0]) => {
+        active += 1;
+        maximumActive = Math.max(maximumActive, active);
+        await new Promise<void>((resolve) => setTimeout(resolve, 1));
+        try {
+          return await fake.generateDraft(request);
+        } finally {
+          active -= 1;
+        }
+      },
+    };
+    const styles = [
+      "newsworthy_authority",
+      "educational_breakdown",
+      "perspective_conversation",
+    ] as const;
+    const drafts = await generateEditorialDraftBatch(
+      provider,
+      styles.map((contentStyle) => ({
+        opportunityId: "opportunity-a",
+        sourceTitle: "AI adoption note",
+        valueNucleus: "Teams gain more when they redesign decisions.",
+        contentStyle,
+        tone: "thoughtful" as const,
+        brandContext: context,
+        evidencePackage: evidence,
+        sourceText: "Teams gain more when they redesign decisions.",
+      })),
+    );
+
+    expect(maximumActive).toBe(3);
+    expect(drafts.map((draft) => draft.contentStyle)).toEqual(styles);
+  });
+
   it("registers unique, versioned prompts with hostile-data boundaries", () => {
     expect(new Set(PRODUCTION_PROMPTS.map((prompt) => prompt.task)).size).toBe(
       PRODUCTION_PROMPTS.length,

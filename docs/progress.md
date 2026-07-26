@@ -876,3 +876,8 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   statement cannot veto separately verified usable core claims. The statement
   remains durable and unavailable to writers; non-quarantined unsupported or
   disputed core claims continue to block.
+- Corrected the live writing-path latency defect exposed by the SceneSmith run:
+  one-to-three independently bounded style calls now run concurrently and use
+  the no-reasoning structured-writing default with a 2,500-token ceiling.
+  Validation, per-style budgets, deterministic persistence order, and human
+  review remain unchanged.

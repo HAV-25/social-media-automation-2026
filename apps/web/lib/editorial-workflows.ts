@@ -4,6 +4,7 @@ import {
   FakeEditorialProvider,
   OpenAIEditorialProvider,
   evaluateEditorialDraft,
+  generateEditorialDraftBatch,
   selectivelyRegeneratePost,
 } from "@content-engine/ai";
 import {
@@ -206,10 +207,11 @@ export async function generateWorkflowDrafts(input: EditorialWorkflowRequest) {
   const supabase = createSupabaseServiceClient();
   const drafts = [];
 
-  for (const contentStyle of input.contentStyles) {
-    let output;
-    try {
-      output = await provider.generateDraft({
+  let generatedDrafts;
+  try {
+    const outputs = await generateEditorialDraftBatch(
+      provider,
+      input.contentStyles.map((contentStyle) => ({
         opportunityId: input.opportunityId,
         sourceTitle: opportunity.title,
         valueNucleus: opportunity.valueNucleus,
@@ -219,17 +221,24 @@ export async function generateWorkflowDrafts(input: EditorialWorkflowRequest) {
         evidencePackage: research.evidencePackage,
         sourceText: opportunity.cleanText,
         ...similarity,
-      });
-    } catch (error) {
-      if (error instanceof EditorialProviderError) {
-        throw new EditorialWorkflowError(
-          error.code,
-          error.message,
-          error.code === "budget_exceeded" ? 422 : error.retryable ? 503 : 502,
-        );
-      }
-      throw error;
+      })),
+    );
+    generatedDrafts = outputs.map((output, index) => ({
+      contentStyle: input.contentStyles[index]!,
+      output,
+    }));
+  } catch (error) {
+    if (error instanceof EditorialProviderError) {
+      throw new EditorialWorkflowError(
+        error.code,
+        error.message,
+        error.code === "budget_exceeded" ? 422 : error.retryable ? 503 : 502,
+      );
     }
+    throw error;
+  }
+
+  for (const { contentStyle, output } of generatedDrafts) {
     const styleIdempotencyKey = sha256Hex(`${input.idempotencyKey}:${contentStyle}`);
     const requestHash = sha256Hex(
       JSON.stringify({

@@ -100,6 +100,13 @@ export interface EditorialProvider {
   generateDraft(request: DraftRequest): Promise<FakeDraftOutput>;
 }
 
+export async function generateEditorialDraftBatch(
+  provider: EditorialProvider,
+  requests: DraftRequest[],
+) {
+  return Promise.all(requests.map((request) => provider.generateDraft(request)));
+}
+
 export const editorialProviderConfigSchema = z
   .object({
     apiKey: z.string().min(1),

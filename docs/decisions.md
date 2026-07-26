@@ -568,3 +568,18 @@ This distinction prevents a provider-generated warning such as “do not claim
 that this solves the whole problem” from blocking a carefully bounded post
 about independently supported facts. Removing the `do_not_use` quarantine would
 make the claim blocking again; no unsupported claim becomes writable.
+
+## ADR-044 — Bounded style generation is concurrent
+
+**Status:** Accepted, 2026-07-26
+
+The one-to-three requested editorial styles are independent provider calls and
+run concurrently within one workflow request. Each retains its own style-bound
+idempotency key, structured-output validation, evaluation, provenance record,
+and per-run budget. Persistence remains ordered by the request so the response
+and reviewer presentation are deterministic.
+
+Structured Facebook writing uses no additional model reasoning by default and a
+2,500-token output ceiling. Research remains the reasoning-heavy stage. This
+keeps the synchronous application bridge within its hosting limit without
+weakening evidence or review gates.
