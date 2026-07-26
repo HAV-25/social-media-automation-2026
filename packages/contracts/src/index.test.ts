@@ -9,6 +9,7 @@ import {
   postActionWorkflowRequestSchema,
   postVerificationWorkflowRequestSchema,
   researchPlanSchema,
+  serverEnvSchema,
   rssIntakeContractSchema,
   rssFeedUpsertRequestSchema,
   rssFeedPlanSchema,
@@ -24,6 +25,11 @@ import {
 } from "./index";
 
 describe("shared contracts", () => {
+  it("uses a bounded three-item RSS catch-up window by default", () => {
+    expect(serverEnvSchema.parse({}).RSS_ITEMS_PER_FEED_PER_RUN).toBe(3);
+    expect(serverEnvSchema.safeParse({ RSS_ITEMS_PER_FEED_PER_RUN: 21 }).success).toBe(false);
+  });
+
   it("accepts every Phase 1 role and content style", () => {
     expect(organizationRoleSchema.parse("reviewer")).toBe("reviewer");
     expect(contentStyleSchema.parse("perspective_conversation")).toBe("perspective_conversation");

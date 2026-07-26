@@ -853,3 +853,14 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   decoded envelope explicitly and fail closed on a malformed contract. Direct
   regression assertions cover the opportunity, research, draft-set, and
   verification consumers; the contract suite passes 117 tests.
+- A real automatic research run completed for the selected IEEE opportunity at
+  $0.082107. Its five-claim evidence package correctly stopped before writing:
+  the promotional robot capabilities and headline implication were not
+  independently verified.
+- Added The Robot Report through the durable feed-upsert transaction and
+  ingested its current lead article. The deterministic opportunity score was
+  40.33, so the brand's threshold of 72 rejected it without research spend.
+- Raised the bounded default catch-up window from one to three newest items per
+  feed. This prevents a weak lead article from hiding stronger adjacent
+  opportunities while the brand-wide daily maximum remains the hard paid-work
+  control.

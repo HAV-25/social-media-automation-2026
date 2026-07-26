@@ -526,3 +526,17 @@ checking only that a decoder node exists is insufficient.
 
 The application response contracts remain unchanged. A missing or malformed
 envelope fails closed before the next signed workflow handoff.
+
+## ADR-041 — RSS polls use a bounded three-item catch-up window
+
+**Status:** Accepted, 2026-07-26
+
+Each feed poll inspects up to three newest items by default instead of only the
+single latest item. A low-information or off-topic lead item must not conceal a
+stronger article immediately behind it. The limit remains environment
+configurable from one to twenty and every item still passes deterministic
+deduplication, routing, scoring, and brand-wide reservation.
+
+This catch-up bound does not increase the brand's daily preparation allowance.
+The locked brand policy remains the authoritative control for the number of
+research and draft branches allowed per UTC day.
