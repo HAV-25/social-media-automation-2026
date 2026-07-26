@@ -840,3 +840,8 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   migration and still read the legacy JWT-only role setting. A narrowly scoped
   follow-up migration applies the supported gateway claims guard while
   preserving service-role-only grants.
+- The same probe then reached the transaction and exposed an older reservation
+  hash that included the mutable derived opportunity score. Reservation
+  identity now uses the stable feed, brand, source, and opportunity tuple, and
+  existing hashes are migrated so improved scoring cannot turn a safe replay
+  into an idempotency conflict.

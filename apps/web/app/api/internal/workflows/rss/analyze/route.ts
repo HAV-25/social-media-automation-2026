@@ -222,13 +222,12 @@ export async function POST(request: NextRequest) {
         requestedAt: payload.requestedAt,
       };
       const reservationRequestHash = sha256Hex(
-        JSON.stringify({
-          feedId: reservationPayload.feedId,
-          brandId: reservationPayload.brandId,
-          sourceDocumentId: reservationPayload.sourceDocumentId,
-          opportunityId: reservationPayload.opportunityId,
-          opportunityScore: reservationPayload.opportunityScore,
-        }),
+        [
+          reservationPayload.feedId,
+          reservationPayload.brandId,
+          reservationPayload.sourceDocumentId,
+          reservationPayload.opportunityId,
+        ].join(":"),
       );
       const { data: rawReservation, error: reservationError } = await supabase
         .rpc("reserve_rss_generation", {

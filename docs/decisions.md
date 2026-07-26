@@ -487,6 +487,17 @@ general secret-key compatibility migration must therefore use the JSON claims
 guard. Execution remains restricted independently through explicit
 `service_role` grants and revocation from `PUBLIC`, `anon`, and `authenticated`.
 
+## ADR-039 — RSS reservation identity excludes derived scores
+
+**Status:** Accepted, 2026-07-26
+
+The idempotency identity for an automatic RSS reservation is the feed, brand,
+source document, and opportunity. Opportunity score is deterministic derived
+data, but it may legitimately change when normalization or scoring versions are
+corrected. Including the score caused the same article to conflict instead of
+reusing its existing reservation. Existing reservation hashes are migrated to
+the stable identity; score and threshold remain preserved in run provenance.
+
 ## ADR-037 — The daily RSS view accounts for every configured feed
 
 **Status:** Accepted, 2026-07-26

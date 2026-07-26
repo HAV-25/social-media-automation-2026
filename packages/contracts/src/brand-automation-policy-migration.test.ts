@@ -18,6 +18,15 @@ const secretKeyCompatibilitySql = readFileSync(
   ),
   "utf8",
 );
+const stableIdentitySql = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../../../supabase/migrations/20260726141000_stable_rss_reservation_identity.sql",
+      import.meta.url,
+    ),
+  ),
+  "utf8",
+);
 
 describe("brand-wide opportunity selection migration", () => {
   it("adds bounded policy columns to the existing RLS-protected brand profile", () => {
@@ -57,5 +66,13 @@ describe("brand-wide opportunity selection migration", () => {
     expect(secretKeyCompatibilitySql).not.toContain(
       "grant execute on function public.reserve_rss_generation(jsonb)\n  to authenticated",
     );
+  });
+
+  it("migrates reservation hashes to stable source-opportunity identity", () => {
+    expect(stableIdentitySql).toContain("idempotency.scope = 'rss_generation_reservation'");
+    expect(stableIdentitySql).toContain("run.model_usage ->> 'rssFeedId'");
+    expect(stableIdentitySql).toContain("run.model_usage ->> 'sourceDocumentId'");
+    expect(stableIdentitySql).toContain("run.entity_id");
+    expect(stableIdentitySql).not.toContain("opportunityScore");
   });
 });
