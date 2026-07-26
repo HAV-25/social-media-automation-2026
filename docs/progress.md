@@ -904,3 +904,23 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   reservation; summary-only content remained manual even when its deterministic
   score exceeded 75. Corrected WF-01's final n8n 2.21 data-envelope read and
   made workflow publication refresh active webhook registrations after updates.
+
+### Cost-safe automatic editorial continuation
+
+- WF-05 now emits one signed generation request per Newsworthy, Educational,
+  and Perspective style and rejoins the three decoded durable results before
+  verification. Each request has a style-bound idempotency identity, keeping
+  individual provider calls within the application request window.
+- Editorial generation now checks Supabase for an existing review-ready
+  opportunity/style/tone draft and its successful generation-run provenance
+  before constructing the provider. Safe retries therefore reuse the durable
+  post and make no duplicate paid writing call.
+- Existing terminal, non-review-ready, or provenance-incomplete drafts fail
+  closed rather than being overwritten or regenerated automatically. Reused and
+  new results retain the requested deterministic style order.
+- Exact boundary coverage confirms Klaank's live policy remains automatic at
+  75 or higher, Review from 60 through 74, and stored-only below 60. The stale
+  no-data fallback was aligned to 75 without triggering a Netlify deployment.
+- Repository-wide formatting, lint, strict type-checking, all 269 automated
+  tests, valid WF-05 JSON parsing, and the optimized production build passed.
+  No paid AI, image, or Netlify build call was made.

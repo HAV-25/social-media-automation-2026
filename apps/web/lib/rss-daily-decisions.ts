@@ -1,7 +1,11 @@
 import "server-only";
 import { z } from "zod";
 import { explainRssRouteFilter } from "./rss-routing-visibility";
-import { deriveRssSelectionVisibility, RSS_REVIEW_MINIMUM_SCORE } from "./rss-selection-visibility";
+import {
+  deriveRssSelectionVisibility,
+  RSS_AUTOMATIC_MINIMUM_SCORE,
+  RSS_REVIEW_MINIMUM_SCORE,
+} from "./rss-selection-visibility";
 import { createSupabaseServerClient } from "./supabase/server";
 
 const routeRowSchema = z.object({
@@ -124,7 +128,7 @@ export async function getRssDailyDecisions(
 ): Promise<RssDailyOverview> {
   const emptyPolicy = {
     automaticSelection: false,
-    minimumScore: 72,
+    minimumScore: RSS_AUTOMATIC_MINIMUM_SCORE,
     dailyLimit: 0,
     selectedToday: 0,
     reviewMinimumScore: RSS_REVIEW_MINIMUM_SCORE,

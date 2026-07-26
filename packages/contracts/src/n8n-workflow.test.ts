@@ -238,13 +238,35 @@ describe("Milestone 5 research workflow", () => {
     );
 
     expect(codeByNode.get("Sign Three-style Draft Request")).toContain(
-      "const research = $json.data;",
+      "const research = $input.first().json.data;",
     );
     expect(codeByNode.get("Sign Draft Verification Requests")).toContain(
-      "const draftSet = $json.data;",
+      "const draftSets = $input.all().map((input) => input.json.data);",
     );
     expect(codeByNode.get("Sign Ready Draft Image Requests")).toContain(
       "const verification = input.json.data;",
+    );
+  });
+
+  it("isolates each paid style call and rejoins its durable results for verification", () => {
+    const workflow = workflowSchema.parse(
+      JSON.parse(readFileSync(`${workflowDirectory}wf-05-research.json`, "utf8")),
+    );
+    const codeByNode = new Map(
+      workflow.nodes
+        .filter((node) => node.type === "n8n-nodes-base.code")
+        .map((node) => [node.name, z.object({ jsCode: z.string() }).parse(node.parameters).jsCode]),
+    );
+    const generation = codeByNode.get("Sign Three-style Draft Request");
+    const verification = codeByNode.get("Sign Draft Verification Requests");
+
+    expect(generation).toContain("return styles.map((contentStyle) =>");
+    expect(generation).toContain("contentStyles: [contentStyle]");
+    expect(generation).toContain(
+      "idempotencyKey: `rss-auto-drafts:${request.opportunityId}:${contentStyle}`",
+    );
+    expect(verification).toContain(
+      "draftSets.flatMap((draftSet) => draftSet.drafts).map((draft) =>",
     );
   });
 });

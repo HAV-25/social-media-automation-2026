@@ -603,3 +603,20 @@ preserving the opportunity identity, workflow state, and audit history.
 Reservation idempotency includes the server-owned brand-policy version. A
 policy edit therefore creates a new bounded decision without allowing score
 text or user-controlled metadata to redefine request identity.
+
+## ADR-046 — Editorial retries reuse durable drafts before provider work
+
+**Status:** Accepted, 2026-07-26
+
+Automatic editorial preparation dispatches each requested content style as an
+independent signed workflow item. Every item contains one style-bound
+idempotency key, so a slow or failed style cannot make the other styles exceed
+the synchronous application request window.
+
+Before constructing an AI provider, the application checks the durable
+opportunity/style/tone draft identity and its successful generation-run
+provenance. A review-ready match is returned as a duplicate without another
+model call. Existing terminal, non-review-ready, or provenance-incomplete
+drafts fail closed for human attention instead of incurring new spend or
+overwriting editorial work. Newly generated and reused results are returned in
+the original requested style order.

@@ -21,6 +21,7 @@ import {
 import { sha256Hex } from "@content-engine/security";
 import { z } from "zod";
 import { getBrandConfigurationForWorkflow } from "./brand-configuration";
+import { buildDraftReusePlan, orderDraftResults } from "./editorial-draft-reuse";
 import { getOpportunityForWorkflow, getResearchEvidenceForWorkflow } from "./research";
 import { createSupabaseServiceClient } from "./supabase/service";
 
@@ -170,6 +171,57 @@ function createEditorialProvider() {
   });
 }
 
+async function loadDraftReusePlan(input: EditorialWorkflowRequest) {
+  const supabase = createSupabaseServiceClient();
+  const { data: rawDrafts, error: draftError } = await supabase
+    .from("post_drafts")
+    .select("id,current_version_id,content_style,tone,status")
+    .eq("brand_id", input.brandId)
+    .eq("opportunity_id", input.opportunityId)
+    .eq("tone", input.tone)
+    .in("content_style", input.contentStyles)
+    .not("current_version_id", "is", null);
+  if (draftError) {
+    throw new EditorialWorkflowError(
+      "draft_reuse_lookup_failed",
+      "Existing editorial drafts could not be checked.",
+      500,
+    );
+  }
+  const draftIds = (rawDrafts ?? []).map((draft) => draft.id);
+  const { data: rawRuns, error: runError } = draftIds.length
+    ? await supabase
+        .from("generation_runs")
+        .select("id,entity_id,created_at")
+        .eq("brand_id", input.brandId)
+        .eq("run_type", "post_generation")
+        .eq("entity_type", "post_draft")
+        .eq("status", "succeeded")
+        .in("entity_id", draftIds)
+        .order("created_at", { ascending: false })
+    : { data: [], error: null };
+  if (runError) {
+    throw new EditorialWorkflowError(
+      "draft_reuse_lookup_failed",
+      "Existing editorial provenance could not be checked.",
+      500,
+    );
+  }
+  const plan = buildDraftReusePlan({
+    requestedStyles: input.contentStyles,
+    rawDrafts: rawDrafts ?? [],
+    rawRuns: rawRuns ?? [],
+  });
+  if (plan.blockedStyles.length) {
+    throw new EditorialWorkflowError(
+      "existing_draft_not_reusable",
+      "An existing editorial draft requires human review and cannot be regenerated automatically.",
+      409,
+    );
+  }
+  return plan;
+}
+
 export async function generateWorkflowDrafts(input: EditorialWorkflowRequest) {
   const [opportunity, brand, research] = await Promise.all([
     getOpportunityForWorkflow(input.opportunityId),
@@ -202,16 +254,28 @@ export async function generateWorkflowDrafts(input: EditorialWorkflowRequest) {
       409,
     );
   }
+  const reusePlan = await loadDraftReusePlan(input);
+  if (!reusePlan.missingStyles.length) {
+    return editorialWorkflowResultSchema.parse({
+      contractVersion: "1.0",
+      opportunityId: input.opportunityId,
+      drafts: orderDraftResults({
+        requestedStyles: input.contentStyles,
+        reused: reusePlan.reused,
+        generated: [],
+      }),
+    });
+  }
   const similarity = await getSimilarityContext(input.brandId);
   const provider = createEditorialProvider();
   const supabase = createSupabaseServiceClient();
-  const drafts = [];
+  const generatedResults = [];
 
   let generatedDrafts;
   try {
     const outputs = await generateEditorialDraftBatch(
       provider,
-      input.contentStyles.map((contentStyle) => ({
+      reusePlan.missingStyles.map((contentStyle) => ({
         opportunityId: input.opportunityId,
         sourceTitle: opportunity.title,
         valueNucleus: opportunity.valueNucleus,
@@ -224,7 +288,7 @@ export async function generateWorkflowDrafts(input: EditorialWorkflowRequest) {
       })),
     );
     generatedDrafts = outputs.map((output, index) => ({
-      contentStyle: input.contentStyles[index]!,
+      contentStyle: reusePlan.missingStyles[index]!,
       output,
     }));
   } catch (error) {
@@ -288,8 +352,9 @@ export async function generateWorkflowDrafts(input: EditorialWorkflowRequest) {
       );
     }
     const row = draftRpcRowSchema.parse(data);
-    drafts.push(
-      draftGenerationResultSchema.parse({
+    generatedResults.push({
+      contentStyle,
+      result: draftGenerationResultSchema.parse({
         contractVersion: "1.0",
         postDraftId: row.post_draft_id,
         postVersionId: row.post_version_id,
@@ -297,12 +362,16 @@ export async function generateWorkflowDrafts(input: EditorialWorkflowRequest) {
         status: "ready_for_review",
         duplicate: row.duplicate,
       }),
-    );
+    });
   }
   return editorialWorkflowResultSchema.parse({
     contractVersion: "1.0",
     opportunityId: input.opportunityId,
-    drafts,
+    drafts: orderDraftResults({
+      requestedStyles: input.contentStyles,
+      reused: reusePlan.reused,
+      generated: generatedResults,
+    }),
   });
 }
 

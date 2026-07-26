@@ -15,6 +15,8 @@ const base = {
 describe("RSS selection visibility", () => {
   it("distinguishes selected, review, stored-only, capped, and awaiting opportunities", () => {
     expect(deriveRssSelectionVisibility({ ...base, selected: true })).toBe("selected");
+    expect(deriveRssSelectionVisibility({ ...base, score: 75 })).toBe("awaiting_selection");
+    expect(deriveRssSelectionVisibility({ ...base, score: 60 })).toBe("review");
     expect(deriveRssSelectionVisibility({ ...base, score: 74.99 })).toBe("review");
     expect(deriveRssSelectionVisibility({ ...base, score: 59.99 })).toBe("stored_only");
     expect(

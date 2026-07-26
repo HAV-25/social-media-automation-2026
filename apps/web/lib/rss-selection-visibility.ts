@@ -8,6 +8,7 @@ export type RssSelectionVisibility =
   | "awaiting_selection";
 
 export const RSS_REVIEW_MINIMUM_SCORE = 60;
+export const RSS_AUTOMATIC_MINIMUM_SCORE = 75;
 
 export function deriveRssSelectionVisibility(input: {
   selected: boolean;
