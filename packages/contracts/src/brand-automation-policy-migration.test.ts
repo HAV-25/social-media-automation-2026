@@ -1,0 +1,36 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
+
+const migrationPath = fileURLToPath(
+  new URL(
+    "../../../supabase/migrations/20260726102001_brand_automation_policy.sql",
+    import.meta.url,
+  ),
+);
+const sql = readFileSync(migrationPath, "utf8");
+
+describe("brand-wide opportunity selection migration", () => {
+  it("adds bounded policy columns to the existing RLS-protected brand profile", () => {
+    expect(sql).toContain("automatic_opportunity_selection boolean not null default true");
+    expect(sql).toContain("minimum_opportunity_score between 0 and 100");
+    expect(sql).toContain("daily_draft_limit between 0 and 20");
+  });
+
+  it("serializes and counts reservations across all feeds for one brand", () => {
+    expect(sql).toContain("for update of profile");
+    expect(sql).toContain("run.run_type = 'rss_opportunity_reservation'");
+    expect(sql).toContain("'selectionPolicy', 'brand_wide'");
+    expect(sql).not.toContain("run.model_usage ->> 'rssFeedId' = link_record.rss_feed_id::text");
+    expect(sql).not.toContain("link_record.minimum_score");
+    expect(sql).not.toContain("link_record.daily_generation_limit");
+  });
+
+  it("retains service-only and idempotent reservation behavior", () => {
+    expect(sql).toContain("current_setting('request.jwt.claim.role', true)");
+    expect(sql).toContain("scope = 'rss_generation_reservation'");
+    expect(sql).toContain("Idempotency key was reused with a different request");
+    expect(sql).toContain("security definer");
+    expect(sql).toContain("set search_path = ''");
+  });
+});

@@ -43,6 +43,14 @@ describe("initial Supabase migration security contract", () => {
     expect(sql).not.toContain("auth.role()");
   });
 
+  it("pairs immutable post-version RLS with reviewer read access", () => {
+    const authenticatedSelectGrant = sql.match(/grant select on([\s\S]*?)to authenticated;/i)?.[1];
+
+    expect(authenticatedSelectGrant).toContain("public.post_versions");
+    expect(sql).toContain("create policy post_versions_select");
+    expect(sql).toContain("public.can_read_brand(post_drafts.brand_id)");
+  });
+
   it("models shared RSS feeds and replay-safe atomic intake", () => {
     expect(sql).toContain("create table public.rss_feed_brand_links");
     expect(sql).toContain("create table private.workflow_nonces");

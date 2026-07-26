@@ -1,0 +1,189 @@
+import "server-only";
+import { z } from "zod";
+import { explainRssRouteFilter } from "./rss-routing-visibility";
+import { createSupabaseServerClient } from "./supabase/server";
+
+const routeRowSchema = z.object({
+  rss_feed_id: z.uuid(),
+  include_keywords: z.array(z.string()),
+  exclude_keywords: z.array(z.string()),
+  rss_feeds: z
+    .object({
+      name: z.string(),
+      last_polled_at: z.string().nullable(),
+      last_success_at: z.string().nullable(),
+      last_error: z.string().nullable(),
+    })
+    .nullable(),
+});
+
+const itemRowSchema = z.object({
+  id: z.uuid(),
+  rss_feed_id: z.uuid(),
+  title: z.string(),
+  first_seen_at: z.string(),
+  source_document_id: z.uuid().nullable(),
+  source_documents: z
+    .object({
+      raw_text: z.string().nullable(),
+      status: z.string(),
+      duplicate_of_source_id: z.uuid().nullable(),
+    })
+    .nullable(),
+});
+
+const sourceLinkRowSchema = z.object({
+  source_document_id: z.uuid(),
+});
+
+const opportunityRowSchema = z.object({
+  id: z.uuid(),
+  source_document_id: z.uuid(),
+  opportunity_score: z.union([z.number(), z.string()]),
+  status: z.string(),
+});
+
+export type RssDailyDecision = {
+  feedId: string;
+  feedName: string;
+  lastPolledAt: string | null;
+  lastSuccessAt: string | null;
+  lastError: string | null;
+  itemsSeen: number;
+  scored: number;
+  filtered: number;
+  pending: number;
+  latestItem: {
+    title: string;
+    state: "scored" | "filtered" | "duplicate" | "pending";
+    explanation: string;
+    score: number | null;
+    opportunityId: string | null;
+  } | null;
+};
+
+export async function getRssDailyDecisions(
+  brandId: string,
+  since: string,
+): Promise<RssDailyDecision[]> {
+  if (process.env.NEXT_PUBLIC_DEMO_MODE !== "false") return [];
+  const supabase = await createSupabaseServerClient();
+  const { data: rawRoutes, error: routeError } = await supabase
+    .from("rss_feed_brand_links")
+    .select(
+      "rss_feed_id,include_keywords,exclude_keywords,rss_feeds(name,last_polled_at,last_success_at,last_error)",
+    )
+    .eq("brand_id", brandId);
+  if (routeError) throw new Error(`Unable to load RSS route decisions: ${routeError.message}`);
+  const routes = z.array(routeRowSchema).parse(rawRoutes ?? []);
+  if (!routes.length) return [];
+
+  const feedIds = routes.map((route) => route.rss_feed_id);
+  const { data: rawItems, error: itemError } = await supabase
+    .from("rss_feed_items")
+    .select(
+      "id,rss_feed_id,title,first_seen_at,source_document_id,source_documents(raw_text,status,duplicate_of_source_id)",
+    )
+    .in("rss_feed_id", feedIds)
+    .gte("first_seen_at", since)
+    .order("first_seen_at", { ascending: false })
+    .limit(100);
+  if (itemError) throw new Error(`Unable to load today's RSS items: ${itemError.message}`);
+  const items = z.array(itemRowSchema).parse(rawItems ?? []);
+  const sourceIds = items
+    .map((item) => item.source_document_id)
+    .filter((id): id is string => Boolean(id));
+
+  const [sourceLinksResult, opportunitiesResult] = sourceIds.length
+    ? await Promise.all([
+        supabase
+          .from("source_brand_links")
+          .select("source_document_id")
+          .eq("brand_id", brandId)
+          .in("source_document_id", sourceIds),
+        supabase
+          .from("opportunities")
+          .select("id,source_document_id,opportunity_score,status")
+          .eq("brand_id", brandId)
+          .in("source_document_id", sourceIds),
+      ])
+    : [
+        { data: [], error: null },
+        { data: [], error: null },
+      ];
+  if (sourceLinksResult.error || opportunitiesResult.error) {
+    throw new Error("Unable to load today's RSS routing and scoring decisions.");
+  }
+  const routedSourceIds = new Set(
+    z
+      .array(sourceLinkRowSchema)
+      .parse(sourceLinksResult.data ?? [])
+      .map((link) => link.source_document_id),
+  );
+  const opportunities = z.array(opportunityRowSchema).parse(opportunitiesResult.data ?? []);
+  const opportunitiesBySource = new Map(
+    opportunities.map((opportunity) => [opportunity.source_document_id, opportunity]),
+  );
+
+  return routes
+    .map((route) => {
+      const routeItems = items.filter((item) => item.rss_feed_id === route.rss_feed_id);
+      const decisions = routeItems.map((item) => {
+        const sourceId = item.source_document_id;
+        const opportunity = sourceId ? opportunitiesBySource.get(sourceId) : null;
+        if (opportunity) {
+          return {
+            title: item.title,
+            state: "scored" as const,
+            explanation: `Opportunity ${opportunity.status.replaceAll("_", " ")}`,
+            score: Number(opportunity.opportunity_score),
+            opportunityId: opportunity.id,
+          };
+        }
+        if (item.source_documents?.duplicate_of_source_id) {
+          return {
+            title: item.title,
+            state: "duplicate" as const,
+            explanation: "Duplicate content; the existing source was retained",
+            score: null,
+            opportunityId: null,
+          };
+        }
+        if (sourceId && routedSourceIds.has(sourceId)) {
+          return {
+            title: item.title,
+            state: "pending" as const,
+            explanation: "Matched the brand and is awaiting scoring",
+            score: null,
+            opportunityId: null,
+          };
+        }
+        return {
+          title: item.title,
+          state: "filtered" as const,
+          explanation: explainRssRouteFilter({
+            title: item.title,
+            rawText: item.source_documents?.raw_text ?? null,
+            includeKeywords: route.include_keywords,
+            excludeKeywords: route.exclude_keywords,
+          }),
+          score: null,
+          opportunityId: null,
+        };
+      });
+
+      return {
+        feedId: route.rss_feed_id,
+        feedName: route.rss_feeds?.name ?? "RSS feed",
+        lastPolledAt: route.rss_feeds?.last_polled_at ?? null,
+        lastSuccessAt: route.rss_feeds?.last_success_at ?? null,
+        lastError: route.rss_feeds?.last_error ?? null,
+        itemsSeen: decisions.length,
+        scored: decisions.filter((decision) => decision.state === "scored").length,
+        filtered: decisions.filter((decision) => decision.state === "filtered").length,
+        pending: decisions.filter((decision) => decision.state === "pending").length,
+        latestItem: decisions[0] ?? null,
+      } satisfies RssDailyDecision;
+    })
+    .sort((left, right) => left.feedName.localeCompare(right.feedName));
+}

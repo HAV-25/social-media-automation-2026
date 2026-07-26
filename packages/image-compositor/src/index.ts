@@ -11,7 +11,9 @@ import {
 import type { Font } from "opentype.js";
 import sharp from "sharp";
 
-const opentypeRuntime = createRequire(import.meta.url)("opentype.js") as typeof import("opentype.js");
+const opentypeRuntime = createRequire(import.meta.url)(
+  "opentype.js",
+) as typeof import("opentype.js");
 const bundledFontRelativePath = "packages/image-compositor/assets/Inter-Bold.ttf";
 const bundledFontPath = [
   path.join(process.cwd(), bundledFontRelativePath),
@@ -158,10 +160,7 @@ function fontForTheme(theme: BrandImageTheme) {
   }
   const fontBuffer = Buffer.from(theme.fontDataBase64, "base64");
   return opentypeRuntime.parse(
-    fontBuffer.buffer.slice(
-      fontBuffer.byteOffset,
-      fontBuffer.byteOffset + fontBuffer.byteLength,
-    ),
+    fontBuffer.buffer.slice(fontBuffer.byteOffset, fontBuffer.byteOffset + fontBuffer.byteLength),
   );
 }
 
@@ -173,7 +172,8 @@ function vectorText(
   const paths = Array.from(value).map((character) => {
     const glyph = input.font.charToGlyph(character);
     const pathData = glyph.getPath(cursor, input.y, input.fontSize).toPathData(2);
-    cursor += ((glyph.advanceWidth ?? input.font.unitsPerEm) / input.font.unitsPerEm) * input.fontSize;
+    cursor +=
+      ((glyph.advanceWidth ?? input.font.unitsPerEm) / input.font.unitsPerEm) * input.fontSize;
     return pathData;
   });
   return `<path d="${paths.join(" ")}" fill="${input.fill}"/>`;
@@ -191,15 +191,14 @@ function headlineText(
   },
 ) {
   return lines
-    .map(
-      (line, index) =>
-        vectorText(line, {
-          x: input.x,
-          y: input.y + input.lineHeight * index,
-          fontSize: input.fontSize,
-          fill: input.fill,
-          font: input.font,
-        }),
+    .map((line, index) =>
+      vectorText(line, {
+        x: input.x,
+        y: input.y + input.lineHeight * index,
+        fontSize: input.fontSize,
+        fill: input.fill,
+        font: input.font,
+      }),
     )
     .join("");
 }

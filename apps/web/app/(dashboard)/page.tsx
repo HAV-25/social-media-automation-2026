@@ -1,6 +1,16 @@
-import { ArrowRight, CircleDollarSign, FilePlus2, Filter, Search, Sparkles } from "lucide-react";
+import {
+  ArrowRight,
+  CheckCircle2,
+  CircleDollarSign,
+  FilePlus2,
+  Filter,
+  Radio,
+  Search,
+  Sparkles,
+} from "lucide-react";
 import { cookies } from "next/headers";
 import { OpportunityCard } from "@/components/opportunity-card";
+import { getRssDailyDecisions } from "@/lib/rss-daily-decisions";
 import { getWorkspaceSnapshot } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +20,7 @@ export default async function DashboardPage() {
   const { activeBrand, dashboardMetrics, opportunities } = await getWorkspaceSnapshot(
     cookieStore.get("active-brand")?.value,
   );
+  const rssDecisions = await getRssDailyDecisions(activeBrand.id, dashboardMetrics.since);
   const today = new Intl.DateTimeFormat("en-GB", {
     dateStyle: "long",
     timeZone: "UTC",
@@ -111,6 +122,98 @@ export default async function DashboardPage() {
             <Filter size={16} /> Filters
           </button>
         </div>
+
+        {rssDecisions.length ? (
+          <section className="mt-7 rounded-3xl border border-[var(--line)] bg-white/65 p-5 lg:p-6">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold tracking-[0.16em] text-[var(--sage)] uppercase">
+                  Today’s RSS scan
+                </p>
+                <h2 className="serif mt-1 text-2xl">What each feed contributed</h2>
+                <p className="mt-2 max-w-3xl text-xs leading-5 text-[var(--muted)]">
+                  Every feed is polled, but only brand-relevant items become scored opportunities.
+                  Filtered items remain visible here so a missing opportunity is explainable.
+                </p>
+              </div>
+              <a
+                href="/sources"
+                className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-xs font-bold"
+              >
+                Manage feeds <ArrowRight size={14} />
+              </a>
+            </div>
+            <div className="mt-5 grid gap-3 xl:grid-cols-3">
+              {rssDecisions.map((decision) => (
+                <article
+                  key={decision.feedId}
+                  className="rounded-2xl border border-[var(--line)] bg-white p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-bold">{decision.feedName}</h3>
+                      <p className="mt-1 text-[10px] text-[var(--muted)]">
+                        {decision.lastSuccessAt
+                          ? `Polled ${new Date(decision.lastSuccessAt).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}`
+                          : "Not successfully polled yet"}
+                      </p>
+                    </div>
+                    {decision.lastError ? (
+                      <span className="rounded-full bg-red-50 px-2 py-1 text-[9px] font-bold text-red-700">
+                        Error
+                      </span>
+                    ) : (
+                      <CheckCircle2 size={17} className="text-emerald-700" />
+                    )}
+                  </div>
+                  <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                    <div className="rounded-xl bg-stone-50 p-2">
+                      <strong>{decision.itemsSeen}</strong>
+                      <p className="text-[9px] text-[var(--muted)] uppercase">New</p>
+                    </div>
+                    <div className="rounded-xl bg-[var(--sage-soft)] p-2">
+                      <strong>{decision.scored}</strong>
+                      <p className="text-[9px] text-[var(--sage)] uppercase">Scored</p>
+                    </div>
+                    <div className="rounded-xl bg-stone-50 p-2">
+                      <strong>{decision.filtered}</strong>
+                      <p className="text-[9px] text-[var(--muted)] uppercase">Filtered</p>
+                    </div>
+                  </div>
+                  {decision.latestItem ? (
+                    <div className="mt-4 border-t border-[var(--line)] pt-3">
+                      <p className="line-clamp-2 text-xs font-semibold leading-5">
+                        {decision.latestItem.title}
+                      </p>
+                      <p className="mt-1.5 flex items-center gap-1.5 text-[10px] leading-4 text-[var(--muted)]">
+                        <Radio size={11} />
+                        {decision.latestItem.explanation}
+                        {decision.latestItem.score !== null
+                          ? ` · ${decision.latestItem.score.toFixed(0)}/100`
+                          : ""}
+                      </p>
+                      {decision.latestItem.opportunityId ? (
+                        <a
+                          href={`/opportunities/${decision.latestItem.opportunityId}`}
+                          className="mt-2 inline-flex text-xs font-bold text-[var(--sage)]"
+                        >
+                          Inspect score →
+                        </a>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p className="mt-4 border-t border-[var(--line)] pt-3 text-xs text-[var(--muted)]">
+                      No new item since 00:00 UTC.
+                    </p>
+                  )}
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_290px]">
           <div className="space-y-4">

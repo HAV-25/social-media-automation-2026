@@ -99,9 +99,7 @@ describe("image direction and providers", () => {
         'Humanoid robotics <img src="https://untrusted.example/image.png"> &amp; deployment evidence.',
     });
     expect(direction.concepts[0]?.visualNucleus).not.toContain("<img");
-    expect(direction.concepts[0]?.headlineOverlay).toBe(
-      "Humanoid robotics & deployment evidence.",
-    );
+    expect(direction.concepts[0]?.headlineOverlay).toBe("Humanoid robotics & deployment evidence.");
   });
 
   it("removes a markup tag truncated before its closing bracket", () => {

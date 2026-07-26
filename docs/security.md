@@ -25,8 +25,9 @@
   limits. Production stores only hashed subjects and normalized operations in
   an RLS-enabled private table; authenticated/anonymous roles have no grants.
 - RSS feed mutations and research reservations execute through service-only
-  database functions. Poll-health increments and daily-limit reservations lock
-  their target rows to remain correct under concurrent workers.
+  database functions. Poll-health increments lock their feed rows; automatic
+  opportunity reservations lock the shared brand profile so the daily limit
+  remains correct across concurrent workers and multiple feeds.
 - Source inputs are hostile data. URL ingestion blocks private/link-local
   networks and revalidates every redirect. Uploads are size- and content-MIME
   checked.

@@ -3,11 +3,14 @@ import {
   brandAssetMetadataSchema,
   buildNormalizedBrandContext,
   defaultGenerationSettings,
+  defaultOpportunitySelectionPolicy,
   defaultVoiceSettings,
   generationDefaultsSchema,
+  opportunitySelectionPolicySchema,
   voiceSettingsSchema,
   type BrandContextInput,
   type BrandProfileInput,
+  type OpportunitySelectionPolicy,
   type StoredBrandAsset,
   type StoredBrandExample,
 } from "@content-engine/brand-memory";
@@ -30,6 +33,7 @@ export type BrandConfiguration = {
     status: "active" | "archived";
   };
   profile: BrandProfileInput;
+  opportunityPolicy: OpportunitySelectionPolicy;
   examples: StoredBrandExample[];
   assets: Array<StoredBrandAsset & { previewUrl?: string }>;
   context: ReturnType<typeof buildNormalizedBrandContext>;
@@ -64,11 +68,17 @@ async function getDemoBrandConfiguration(brandId: string): Promise<BrandConfigur
   const cookieStore = await cookies();
   const overrideValue = cookieStore.get(`brand-memory-demo-${brandId}`)?.value;
   let profile = record.profile;
+  let opportunityPolicy = defaultOpportunitySelectionPolicy;
   if (overrideValue) {
     try {
-      const override = JSON.parse(overrideValue) as { profile?: unknown };
+      const override = JSON.parse(overrideValue) as {
+        opportunityPolicy?: unknown;
+        profile?: unknown;
+      };
       const parsed = brandProfileInputSchema.safeParse(override.profile);
       if (parsed.success) profile = parsed.data;
+      const parsedPolicy = opportunitySelectionPolicySchema.safeParse(override.opportunityPolicy);
+      if (parsedPolicy.success) opportunityPolicy = parsedPolicy.data;
     } catch {
       // Invalid demo cookies are ignored; production state is never cookie-backed.
     }
@@ -85,6 +95,7 @@ async function getDemoBrandConfiguration(brandId: string): Promise<BrandConfigur
       status: record.brand.status,
     },
     profile,
+    opportunityPolicy,
     examples: record.examples,
     assets: record.assets,
   };
@@ -127,6 +138,15 @@ async function getPersistentBrandConfiguration(
   const generationDefaults = generationDefaultsSchema.parse(
     profile?.generation_defaults ?? defaultGenerationSettings,
   );
+  const opportunityPolicy = opportunitySelectionPolicySchema.parse({
+    automaticSelection:
+      profile?.automatic_opportunity_selection ??
+      defaultOpportunitySelectionPolicy.automaticSelection,
+    minimumScore:
+      profile?.minimum_opportunity_score ?? defaultOpportunitySelectionPolicy.minimumScore,
+    dailyDraftLimit:
+      profile?.daily_draft_limit ?? defaultOpportunitySelectionPolicy.dailyDraftLimit,
+  });
   const mappedExamples: StoredBrandExample[] = (examples ?? []).map((example) => ({
     id: example.id,
     brandId: example.brand_id,
@@ -198,6 +218,7 @@ async function getPersistentBrandConfiguration(
       voiceSettings,
       generationDefaults,
     } satisfies BrandProfileInput,
+    opportunityPolicy,
     examples: mappedExamples,
     assets: assetsWithPreviews,
   };

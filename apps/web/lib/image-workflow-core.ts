@@ -76,10 +76,7 @@ export async function executeImageWorkflow(
           await composeBrandedImage({
             baseImage,
             template: request.template,
-            headline: sanitizeImageDisplayText(
-              selected.headlineOverlay || context.post.hook,
-              200,
-            ),
+            headline: sanitizeImageDisplayText(selected.headlineOverlay || context.post.hook, 200),
             sourceLabel: sanitizeImageDisplayText(
               selected.sourceLabel || context.post.sourceTitle,
               200,

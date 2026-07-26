@@ -3,7 +3,6 @@
 import {
   Archive,
   BookOpenText,
-  Building2,
   FilePlus2,
   LayoutDashboard,
   Radio,
@@ -16,12 +15,11 @@ const available = [
   { label: "Content inbox", icon: LayoutDashboard, href: "/" },
   { label: "Add source", icon: FilePlus2, href: "/inputs/new" },
   { label: "Sources", icon: Radio, href: "/sources" },
-  { label: "Brands", icon: Building2, href: "/brands" },
   { label: "Runs & errors", icon: TriangleAlert, href: "/runs" },
+  { label: "Ready posts", icon: Sparkles, href: "/posts" },
 ];
 
 const upcoming = [
-  { label: "Ready posts", icon: Sparkles },
   { label: "Styles", icon: BookOpenText },
   { label: "Archive", icon: Archive },
 ];

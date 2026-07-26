@@ -6,6 +6,7 @@ import {
   brandAssetMetadataSchema,
   brandExampleInputSchema,
   brandProfileInputSchema,
+  opportunitySelectionPolicySchema,
   validateBrandAssetBytes,
 } from "@content-engine/brand-memory";
 import { randomUUID } from "node:crypto";
@@ -128,10 +129,21 @@ export async function saveBrandProfile(brandId: string, formData: FormData) {
   const user = await requireAuthorizedBrand(brandId);
   const parsed = profileFromForm(formData);
   if (!parsed.success) formError(brandId, parsed.error.issues[0]?.message ?? "Invalid settings.");
+  const policy = opportunitySelectionPolicySchema.safeParse({
+    automaticSelection: formData.get("automaticOpportunitySelection") === "on",
+    minimumScore: numberValue(formData.get("minimumOpportunityScore")),
+    dailyDraftLimit: numberValue(formData.get("dailyDraftLimit")),
+  });
+  if (!policy.success) {
+    formError(brandId, policy.error.issues[0]?.message ?? "Invalid opportunity policy.");
+  }
 
   if (process.env.NEXT_PUBLIC_DEMO_MODE !== "false") {
     const cookieStore = await cookies();
-    const serialized = JSON.stringify({ profile: parsed.data });
+    const serialized = JSON.stringify({
+      opportunityPolicy: policy.data,
+      profile: parsed.data,
+    });
     if (serialized.length > 3_500) {
       formError(brandId, "Demo settings are too large to persist. Connect Supabase to save them.");
     }
@@ -169,6 +181,9 @@ export async function saveBrandProfile(brandId: string, formData: FormData) {
       risk_tolerance: parsed.data.riskTolerance,
       voice_settings: parsed.data.voiceSettings,
       generation_defaults: parsed.data.generationDefaults,
+      automatic_opportunity_selection: policy.data.automaticSelection,
+      minimum_opportunity_score: policy.data.minimumScore,
+      daily_draft_limit: policy.data.dailyDraftLimit,
     }),
   ]);
   const mutationError = brandError ?? profileError;
@@ -178,7 +193,10 @@ export async function saveBrandProfile(brandId: string, formData: FormData) {
     brandId,
     entityId: brandId,
     entityType: "brand",
-    metadata: { fields: Object.keys(parsed.data) },
+    metadata: {
+      fields: [...Object.keys(parsed.data), "opportunityPolicy"],
+      opportunityPolicy: policy.data,
+    },
     organizationId: user.organizationId,
     userId: user.id,
   });

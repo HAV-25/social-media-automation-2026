@@ -60,7 +60,10 @@ insert into public.brand_profiles (
   geographic_focus,
   risk_tolerance,
   voice_settings,
-  generation_defaults
+  generation_defaults,
+  automatic_opportunity_selection,
+  minimum_opportunity_score,
+  daily_draft_limit
 )
 values
   (
@@ -73,7 +76,10 @@ values
     array['Global'],
     'low',
     '{"formality":65,"warmth":55,"boldness":55,"humor":15,"evidenceDensity":80,"sentenceStyle":"balanced","preferredVocabulary":["operating model","human judgment"],"avoidVocabulary":["disruption for disruption''s sake"],"bannedPhrases":["guaranteed viral"]}'::jsonb,
-    '{"targetLength":"medium","emojiPolicy":"never","hashtagPolicy":"none","ctaStyle":"question","defaultVariantCount":3}'::jsonb
+    '{"targetLength":"medium","emojiPolicy":"never","hashtagPolicy":"none","ctaStyle":"question","defaultVariantCount":3}'::jsonb,
+    true,
+    72,
+    3
   ),
   (
     '20000000-0000-4000-8000-000000000002',
@@ -85,7 +91,10 @@ values
     array['Global'],
     'medium',
     '{"formality":35,"warmth":85,"boldness":65,"humor":35,"evidenceDensity":65,"sentenceStyle":"balanced","preferredVocabulary":["spark","possibility","momentum"],"avoidVocabulary":["hustle harder"],"bannedPhrases":["guaranteed viral"]}'::jsonb,
-    '{"targetLength":"medium","emojiPolicy":"natural","hashtagPolicy":"none","ctaStyle":"question","defaultVariantCount":3}'::jsonb
+    '{"targetLength":"medium","emojiPolicy":"natural","hashtagPolicy":"none","ctaStyle":"question","defaultVariantCount":3}'::jsonb,
+    true,
+    72,
+    3
   ),
   (
     '20000000-0000-4000-8000-000000000003',
@@ -97,7 +106,10 @@ values
     array['Global'],
     'low',
     '{"formality":80,"warmth":35,"boldness":50,"humor":10,"evidenceDensity":95,"sentenceStyle":"expansive","preferredVocabulary":["institutional capacity","public value","resilience"],"avoidVocabulary":["inevitable outcome"],"bannedPhrases":["guaranteed viral"]}'::jsonb,
-    '{"targetLength":"long","emojiPolicy":"never","hashtagPolicy":"none","ctaStyle":"question","defaultVariantCount":3}'::jsonb
+    '{"targetLength":"long","emojiPolicy":"never","hashtagPolicy":"none","ctaStyle":"question","defaultVariantCount":3}'::jsonb,
+    true,
+    72,
+    3
   ),
   (
     '20000000-0000-4000-8000-000000000004',
@@ -109,7 +121,10 @@ values
     array['Global'],
     'low',
     '{"formality":70,"warmth":45,"boldness":60,"humor":10,"evidenceDensity":95,"sentenceStyle":"crisp","preferredVocabulary":["operating model","accountability","adoption"],"avoidVocabulary":["AI will replace everyone"],"bannedPhrases":["guaranteed viral"]}'::jsonb,
-    '{"targetLength":"medium","emojiPolicy":"never","hashtagPolicy":"none","ctaStyle":"question","defaultVariantCount":3}'::jsonb
+    '{"targetLength":"medium","emojiPolicy":"never","hashtagPolicy":"none","ctaStyle":"question","defaultVariantCount":3}'::jsonb,
+    true,
+    72,
+    3
   ),
   (
     '20000000-0000-4000-8000-000000000005',
@@ -121,7 +136,10 @@ values
     array['Global'],
     'medium',
     '{"formality":25,"warmth":90,"boldness":85,"humor":45,"evidenceDensity":55,"sentenceStyle":"crisp","preferredVocabulary":["take flight","build","learn"],"avoidVocabulary":["overnight success"],"bannedPhrases":["guaranteed viral"]}'::jsonb,
-    '{"targetLength":"medium","emojiPolicy":"natural","hashtagPolicy":"none","ctaStyle":"question","defaultVariantCount":3}'::jsonb
+    '{"targetLength":"medium","emojiPolicy":"natural","hashtagPolicy":"none","ctaStyle":"question","defaultVariantCount":3}'::jsonb,
+    true,
+    72,
+    3
   )
 on conflict (brand_id) do update set
   audience_definition = excluded.audience_definition,
@@ -132,4 +150,7 @@ on conflict (brand_id) do update set
   geographic_focus = excluded.geographic_focus,
   risk_tolerance = excluded.risk_tolerance,
   voice_settings = excluded.voice_settings,
-  generation_defaults = excluded.generation_defaults;
+  generation_defaults = excluded.generation_defaults,
+  automatic_opportunity_selection = excluded.automatic_opportunity_selection,
+  minimum_opportunity_score = excluded.minimum_opportunity_score,
+  daily_draft_limit = excluded.daily_draft_limit;

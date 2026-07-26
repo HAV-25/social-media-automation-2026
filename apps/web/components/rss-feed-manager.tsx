@@ -381,7 +381,7 @@ export function RssFeedManager({
                   {route.selected ? (
                     <div className="mt-4 grid grid-cols-2 gap-3">
                       <label className="text-[10px] font-bold text-[var(--muted)]">
-                        Policy
+                        Route behavior
                         <select
                           value={route.generationPolicy}
                           onChange={(event) =>
@@ -392,39 +392,9 @@ export function RssFeedManager({
                           }
                           className="mt-1 w-full rounded-lg border border-[var(--line)] px-2 py-2 text-xs font-normal text-[var(--ink)]"
                         >
-                          <option value="score_then_research">Score then research</option>
-                          <option value="ingest_only">Ingest only</option>
+                          <option value="score_then_research">Use in brand selection</option>
+                          <option value="ingest_only">Store and score only</option>
                         </select>
-                      </label>
-                      <label className="text-[10px] font-bold text-[var(--muted)]">
-                        Minimum score
-                        <input
-                          type="number"
-                          min={0}
-                          max={100}
-                          value={route.minimumScore}
-                          onChange={(event) =>
-                            updateRoute(route.brandId, {
-                              minimumScore: Number(event.target.value),
-                            })
-                          }
-                          className="mt-1 w-full rounded-lg border border-[var(--line)] px-2 py-2 text-xs font-normal text-[var(--ink)]"
-                        />
-                      </label>
-                      <label className="text-[10px] font-bold text-[var(--muted)]">
-                        Daily limit
-                        <input
-                          type="number"
-                          min={0}
-                          max={100}
-                          value={route.dailyGenerationLimit}
-                          onChange={(event) =>
-                            updateRoute(route.brandId, {
-                              dailyGenerationLimit: Number(event.target.value),
-                            })
-                          }
-                          className="mt-1 w-full rounded-lg border border-[var(--line)] px-2 py-2 text-xs font-normal text-[var(--ink)]"
-                        />
                       </label>
                       <label className="text-[10px] font-bold text-[var(--muted)]">
                         Route tags
@@ -438,6 +408,10 @@ export function RssFeedManager({
                           className="mt-1 w-full rounded-lg border border-[var(--line)] px-2 py-2 text-xs font-normal text-[var(--ink)]"
                         />
                       </label>
+                      <p className="col-span-2 rounded-xl bg-stone-50 px-3 py-2 text-[10px] leading-4 text-[var(--muted)]">
+                        Minimum score and daily volume are controlled once in this brand&apos;s
+                        Daily opportunity selection settings.
+                      </p>
                       <label className="text-[10px] font-bold text-[var(--muted)]">
                         Include keywords
                         <input

@@ -3446,6 +3446,7 @@ grant select on
   public.claim_sources,
   public.angles,
   public.post_drafts,
+  public.post_versions,
   public.post_claims,
   public.image_assets,
   public.generation_runs,

@@ -37,7 +37,7 @@ test("plain text becomes an editable and approvable draft without paid services"
   await expect(
     page.getByRole("heading", { name: "Why this opportunity scored here" }),
   ).toBeVisible();
-  await expect(page.getByText("AI operating models", { exact: true })).toBeVisible();
+  await expect(page.getByText(/AI operating models become useful/).first()).toBeVisible();
   const researchResponsePromise = page.waitForResponse(
     (response) =>
       response.request().method() === "POST" &&

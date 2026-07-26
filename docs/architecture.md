@@ -55,10 +55,12 @@ All supported source adapters converge on a strict normalized/failure contract.
 Deterministic application code owns canonicalization, extraction, hashing,
 deduplication, clustering, scoring, and risk arithmetic. For RSS, a service-only
 transaction advances the staged source and creates one brand-specific
-opportunity per routed brand. The feed-brand policy row is locked while
-reserving the UTC-day research allowance, preventing concurrent workers from
-exceeding its limit. n8n coordinates these signed calls but stores no editorial
-state.
+opportunity per routed brand. Automatic selection is governed once per brand:
+a deterministic minimum score and a UTC-day draft limit apply across all of
+that brand's active feeds. The brand profile row is the shared quota lock, so
+concurrent feed workers cannot exceed the cross-feed limit. Individual feed
+routes may still opt out through `ingest_only`. n8n coordinates these signed
+calls but stores no editorial state.
 
 ## Bounded research pipeline
 

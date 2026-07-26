@@ -427,3 +427,19 @@ Image direction and deterministic composition independently sanitize every
 headline and source label. This defense in depth also protects existing records
 and provider-returned structured direction. Selective template recomposition
 reuses validated immutable base art without a second paid provider call.
+
+## ADR-035 — Automatic RSS selection is a brand-wide policy
+
+**Status:** Accepted, 2026-07-26
+
+The automatic preparation policy belongs to the brand, not to each feed route.
+Administrators configure one minimum opportunity score and one maximum number
+of selected drafts per UTC day. Every active feed routed to that brand competes
+under the same deterministic policy; an individual route may only opt out by
+remaining `ingest_only`.
+
+The reservation transaction locks the brand profile row and counts prior
+reservations across every feed for that brand. This prevents concurrent workers
+from exceeding the cross-feed daily limit while preserving idempotency and
+service-only execution. Selection may automatically prepare material for human
+review, but it does not approve, schedule, or publish content.

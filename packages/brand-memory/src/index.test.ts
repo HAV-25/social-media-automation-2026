@@ -5,6 +5,8 @@ import {
   brandAssetMetadataSchema,
   brandProfileInputSchema,
   buildNormalizedBrandContext,
+  defaultOpportunitySelectionPolicy,
+  opportunitySelectionPolicySchema,
   selectRelevantExamples,
   validateBrandAssetBytes,
   type BrandContextInput,
@@ -47,6 +49,21 @@ const baseContext: BrandContextInput = {
 };
 
 describe("brand memory", () => {
+  it("bounds the brand-wide automatic opportunity policy", () => {
+    expect(opportunitySelectionPolicySchema.parse(defaultOpportunitySelectionPolicy)).toEqual({
+      automaticSelection: true,
+      minimumScore: 72,
+      dailyDraftLimit: 3,
+    });
+    expect(
+      opportunitySelectionPolicySchema.safeParse({
+        automaticSelection: true,
+        minimumScore: 101,
+        dailyDraftLimit: 21,
+      }).success,
+    ).toBe(false);
+  });
+
   it("validates profile bounds and upload MIME/size", () => {
     expect(
       brandProfileInputSchema.safeParse({

@@ -747,3 +747,41 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   Inter font into SVG vector outlines and traces the licensed font asset into
   the production server bundle, making typography deterministic across local
   and serverless environments.
+
+### Brand-wide daily opportunity selection
+
+- Replaced duplicated per-feed score and volume controls with one brand policy:
+  automatic selection, minimum opportunity score, and maximum drafts per UTC
+  day. Klaank currently uses automatic selection, score 72, and three drafts.
+- The service-only reservation now locks the brand profile and counts
+  reservations across all routed feeds, preserving idempotency while preventing
+  concurrent feed workers from exceeding the shared daily cap.
+- Focused brand-memory and migration suites pass 120 tests. The live Supabase
+  project has the migration applied; RLS remains enabled, authenticated profile
+  access remains policy-controlled, and only `service_role` can execute the
+  reservation function.
+- Corrected a pre-existing production grant omission that prevented authorized
+  reviewers from reading immutable post versions. The live project now permits
+  authenticated `SELECT` on `post_versions` under its existing RLS policy; no
+  write grant was added.
+
+### Reviewer navigation and RSS decision visibility
+
+- Moved brand administration out of the daily operations navigation and into a
+  working Settings screen alongside the signed-in account context.
+- Activated a selected-brand Ready Posts screen backed by live post drafts and
+  immutable current versions. Klaank's real Version 2 draft is included with
+  its quality score, status, source, and direct review link.
+- Added a selected-brand “Today's RSS scan” view that accounts for every routed
+  feed, including healthy feeds with no new item. It distinguishes scored,
+  filtered, duplicate, and pending items and explains the latest deterministic
+  routing decision without displaying hostile source text.
+- Live tracing confirmed that Bloomberg, IEEE Spectrum, and TechCrunch are all
+  healthy. IEEE produced the robotics opportunity scored 73.19; the recent
+  Bloomberg and TechCrunch items correctly failed Klaank's robotics/automation
+  include-keyword gate rather than disappearing as unexplained missing data.
+- Selective regeneration is proven live by immutable Version 2, its feedback
+  event, a zero-cost deterministic generation run, and the later verification
+  result (quality 89.25, evidence 92, brand fit 80). The real post remains
+  unapproved for reviewer demonstration; approval stays terminal, current-
+  version-bound, readiness-gated, audited, and service-only.

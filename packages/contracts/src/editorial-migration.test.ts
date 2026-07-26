@@ -45,7 +45,9 @@ describe("editorial quality and regeneration migration", () => {
     expect(sql).toContain("post.selective_regeneration");
     expect(sql).toContain("app-selective-regeneration");
     expect(initialSql).toContain("where version.post_draft_id = target_draft_id");
-    expect(reviewFixSql).toContain("pg_get_functiondef('private.review_post(jsonb)'::regprocedure)");
+    expect(reviewFixSql).toContain(
+      "pg_get_functiondef('private.review_post(jsonb)'::regprocedure)",
+    );
     expect(reviewFixSql).toContain("where version.post_draft_id = target_draft_id");
   });
 

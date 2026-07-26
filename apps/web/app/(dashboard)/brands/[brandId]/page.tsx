@@ -88,7 +88,7 @@ export default async function BrandConfigurationPage({
   const [{ brandId }, query, user] = await Promise.all([params, searchParams, getCurrentUser()]);
   const configuration = await getBrandConfiguration(brandId);
   if (!configuration) notFound();
-  const { brand, profile, examples, assets, context } = configuration;
+  const { brand, profile, opportunityPolicy, examples, assets, context } = configuration;
   const editable = user ? canManageBrand(user.role) : false;
   const boundSaveProfile = saveBrandProfile.bind(null, brandId);
   const boundAddExample = addBrandExample.bind(null, brandId);
@@ -236,6 +236,69 @@ export default async function BrandConfigurationPage({
                       <option value="medium">Medium</option>
                       <option value="high">High</option>
                     </select>
+                  </label>
+                </div>
+              </fieldset>
+
+              <fieldset
+                disabled={!editable}
+                className="rounded-3xl border border-[var(--line)] bg-[var(--paper)] p-6 disabled:opacity-70 lg:p-8"
+              >
+                <legend className="serif px-2 text-2xl">Daily opportunity selection</legend>
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--muted)]">
+                  One brand-wide policy ranks opportunities from every active feed. It replaces
+                  separate per-feed score and volume limits, so the daily queue contains the
+                  strongest items overall. Nothing is published or scheduled automatically.
+                </p>
+                <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                  <label className="flex items-start gap-3 rounded-2xl border border-[var(--line)] bg-white p-4 sm:col-span-2">
+                    <input
+                      name="automaticOpportunitySelection"
+                      type="checkbox"
+                      defaultChecked={opportunityPolicy.automaticSelection}
+                      className="mt-1 size-4 accent-[var(--sage)]"
+                    />
+                    <span>
+                      <strong className="block text-sm">
+                        Automatically select strong opportunities
+                      </strong>
+                      <span className="mt-1 block text-xs leading-5 text-[var(--muted)]">
+                        Intake, normalization, deduplication, clustering, and scoring remain
+                        automatic. Qualifying items enter the bounded preparation queue.
+                      </span>
+                    </span>
+                  </label>
+                  <label className="text-xs font-bold text-[var(--muted)]">
+                    Minimum opportunity score
+                    <input
+                      required
+                      name="minimumOpportunityScore"
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={1}
+                      defaultValue={opportunityPolicy.minimumScore}
+                      className="mt-1.5 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm font-normal text-[var(--ink)]"
+                    />
+                    <span className="mt-1 block text-[10px] font-normal leading-4">
+                      Items below this score remain visible but are not selected automatically.
+                    </span>
+                  </label>
+                  <label className="text-xs font-bold text-[var(--muted)]">
+                    Maximum selected per UTC day
+                    <input
+                      required
+                      name="dailyDraftLimit"
+                      type="number"
+                      min={0}
+                      max={20}
+                      step={1}
+                      defaultValue={opportunityPolicy.dailyDraftLimit}
+                      className="mt-1.5 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm font-normal text-[var(--ink)]"
+                    />
+                    <span className="mt-1 block text-[10px] font-normal leading-4">
+                      This is one shared cap across all feeds for this brand.
+                    </span>
                   </label>
                 </div>
               </fieldset>

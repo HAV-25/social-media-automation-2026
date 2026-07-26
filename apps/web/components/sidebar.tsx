@@ -40,9 +40,12 @@ export function Sidebar({
       <SidebarNav />
 
       <div className="mt-auto border-t border-white/10 pt-4">
-        <div className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white/35">
+        <a
+          href="/settings"
+          className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white/60 transition hover:bg-white/8 hover:text-white"
+        >
           <Settings2 size={18} /> Settings
-        </div>
+        </a>
         <div className="mt-2 flex items-center gap-3 px-3 py-3">
           <CircleUserRound size={30} className="text-white/70" />
           <div className="min-w-0">

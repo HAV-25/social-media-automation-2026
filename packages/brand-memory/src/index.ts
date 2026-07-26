@@ -29,6 +29,13 @@ export const generationDefaultsSchema = z.object({
 });
 export type GenerationDefaults = z.infer<typeof generationDefaultsSchema>;
 
+export const opportunitySelectionPolicySchema = z.object({
+  automaticSelection: z.boolean(),
+  minimumScore: z.number().min(0).max(100),
+  dailyDraftLimit: z.number().int().min(0).max(20),
+});
+export type OpportunitySelectionPolicy = z.infer<typeof opportunitySelectionPolicySchema>;
+
 export const defaultVoiceSettings: VoiceSettings = {
   formality: 60,
   warmth: 55,
@@ -47,6 +54,12 @@ export const defaultGenerationSettings: GenerationDefaults = {
   hashtagPolicy: "none",
   ctaStyle: "question",
   defaultVariantCount: 3,
+};
+
+export const defaultOpportunitySelectionPolicy: OpportunitySelectionPolicy = {
+  automaticSelection: true,
+  minimumScore: 72,
+  dailyDraftLimit: 3,
 };
 
 export const brandProfileInputSchema = z.object({
