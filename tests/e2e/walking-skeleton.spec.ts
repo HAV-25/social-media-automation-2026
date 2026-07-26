@@ -20,6 +20,11 @@ test("plain text becomes an editable and approvable draft without paid services"
 
   await page.getByRole("link", { name: "Runs & errors" }).click();
   await expect(page.getByRole("heading", { name: "Runs & errors" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What AI work cost this brand" })).toBeVisible();
+  await expect(page.getByText("By workflow step")).toBeVisible();
+  await expect(page.getByText("By model")).toBeVisible();
+  await expect(page.getByText("By source input")).toBeVisible();
+  await expect(page.getByText(/paid calls · \d+ ledgered steps/)).toBeVisible();
   await expect(page.getByText("provider_timeout")).toBeVisible();
   await expect(page.getByText("stalled", { exact: true })).toBeVisible();
   await expect(page.getByText(/sk-demo-secret/)).toHaveCount(0);

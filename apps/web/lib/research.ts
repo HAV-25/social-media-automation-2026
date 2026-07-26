@@ -296,7 +296,12 @@ export async function persistResearchEvidence(input: {
         model: input.providerResult.model,
         promptVersion: input.providerResult.promptVersion,
         responseId: input.providerResult.responseId,
-        usage: input.providerResult.usage,
+        usage: {
+          ...input.providerResult.usage,
+          model: input.providerResult.model,
+          promptVersion: input.providerResult.promptVersion,
+          responseId: input.providerResult.responseId,
+        },
       },
     })
     .single();

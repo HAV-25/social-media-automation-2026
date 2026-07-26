@@ -132,10 +132,15 @@ and no publish or schedule action exists.
 ### UAT-11 — Operations, recovery, and cost
 
 1. Open Runs & errors and filter by state and workflow stage.
-2. Inspect one successful run and one controlled failed or retried run.
-3. Confirm attempts, duration, model, usage, step cost, total cost, error class,
+2. Change the time window and confirm the exact cost ledger updates for the
+   selected brand across workflow step, model, source input, and content
+   package.
+3. Open one content package from the ledger and reconcile its research,
+   writing, image, draft-readiness, and approval counts.
+4. Inspect one successful run and one controlled failed or retried run.
+5. Confirm attempts, duration, model, usage, step cost, total cost, error class,
    and recovery action are understandable.
-4. Retry only where the interface says it is safe and confirm idempotency.
+6. Retry only where the interface says it is safe and confirm idempotency.
 
 Pass when operational history agrees with the content record and a retry cannot
 duplicate content or spend.

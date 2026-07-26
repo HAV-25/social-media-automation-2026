@@ -1,6 +1,10 @@
 import "server-only";
 import { operationsRunFilterSchema, type OperationsRunFilter } from "@content-engine/contracts";
 import { z } from "zod";
+import {
+  brandAiCostObservabilitySchema,
+  emptyBrandAiCostObservability,
+} from "./cost-observability-core";
 import { demoBrands } from "./demo-data";
 import {
   decodeOperationsCursor,
@@ -250,6 +254,14 @@ export async function getOperationsPage(
       }),
     );
     const runs = all.filter((run) => matchesFilter(run, filter)).slice(0, PAGE_SIZE);
+    const cost = {
+      ...emptyBrandAiCostObservability(brandId, windowStart(filter.window)),
+      aiRunCount: all.filter((run) => run.model !== null).length,
+      paidRunCount: all.filter((run) => run.costUsd > 0).length,
+      inputTokens: all.reduce((sum, run) => sum + run.inputTokens, 0),
+      outputTokens: all.reduce((sum, run) => sum + run.outputTokens, 0),
+      totalCostUsd: all.reduce((sum, run) => sum + run.costUsd, 0),
+    };
     return {
       filter,
       runs,
@@ -260,8 +272,8 @@ export async function getOperationsPage(
         inProgress: all.filter((run) => ["queued", "running"].includes(run.status)).length,
         failed: all.filter((run) => run.status === "failed").length,
         stalled: all.filter((run) => run.isStalled).length,
-        visibleCostUsd: runs.reduce((sum, run) => sum + run.costUsd, 0),
       },
+      cost: brandAiCostObservabilitySchema.parse(cost),
     };
   }
 
@@ -346,7 +358,7 @@ export async function getOperationsPage(
     }),
   );
   const runs = normalized.filter((run) => matchesFilter(run, filter));
-  const [total, inProgress, failed, stalled] = await Promise.all([
+  const [total, inProgress, failed, stalled, costResult] = await Promise.all([
     supabase
       .from("generation_runs")
       .select("id", { count: "exact", head: true })
@@ -367,8 +379,12 @@ export async function getOperationsPage(
       .eq("brand_id", brandId)
       .eq("status", "running")
       .lt("started_at", new Date(Date.now() - STALLED_AFTER_MS).toISOString()),
+    supabase.rpc("get_brand_ai_cost_observability", {
+      p_brand_id: brandId,
+      p_since: start,
+    }),
   ]);
-  if (total.error ?? inProgress.error ?? failed.error ?? stalled.error) {
+  if (total.error ?? inProgress.error ?? failed.error ?? stalled.error ?? costResult.error) {
     throw new Error("Operations summary could not be loaded.");
   }
   const last = pageRows.at(-1);
@@ -385,7 +401,7 @@ export async function getOperationsPage(
       inProgress: inProgress.count ?? 0,
       failed: failed.count ?? 0,
       stalled: stalled.count ?? 0,
-      visibleCostUsd: runs.reduce((sum, run) => sum + run.costUsd, 0),
     },
+    cost: brandAiCostObservabilitySchema.parse(costResult.data),
   };
 }

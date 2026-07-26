@@ -731,3 +731,19 @@ Payal is the primary Phase 1 UAT reviewer. UAT evidence follows
 `docs/uat-test-plan.md`; a journey passes only when its durable database,
 workflow, cost, provenance, and audit records agree with the visible reviewer
 experience.
+
+## ADR-054 — Cost totals use the durable ledger and content-package allocation
+
+**Status:** Accepted, 2026-07-26
+
+AI cost reporting uses immutable `generation_runs.model_usage` provenance as
+the accounting ledger. An actual recorded cost takes precedence over an
+estimate, and a reservation is shown only when no completed cost exists. Brand
+totals are calculated in PostgreSQL for the selected time window rather than
+by summing the currently paginated Runs screen.
+
+Research is shared across the three style variants, so completed-work cost is
+grouped by opportunity as one content package. This avoids assigning the same
+research cost to every draft and overstating spend. Zero-cost mock and
+deterministic records remain visible as ledgered steps for auditability but
+never increase recorded spend.

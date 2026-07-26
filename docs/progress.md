@@ -1066,3 +1066,33 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
 - Release verification passed `pnpm format:check`, `pnpm lint`,
   `pnpm typecheck`, all 13 repository test tasks (including 71 web tests),
   `pnpm build`, and all four Chromium regression journeys.
+
+### Exact AI cost observability
+
+- Replaced the misleading paginated “Visible cost” total with an exact,
+  brand-scoped cost ledger for the selected time window. The database summary
+  reports recorded cost, paid calls, ledgered steps, input/output tokens, web
+  searches, and generated images.
+- Added breakdowns by workflow step, model, source input, and content package.
+  Each package links back to its opportunity and shows draft, review-ready, and
+  approval counts without multiplying shared research spend across styles.
+- Normalized every supported historical model-usage shape and backfilled model,
+  prompt version, and response ID on all three persisted research runs that had
+  a durable research record. Future research persistence writes the same
+  complete provenance directly.
+- Applied `ai_cost_observability` and its brand/time index to Supabase project
+  `hqffgchxwtymyfwtkmdt`. An authenticated Klaank reviewer transaction returned
+  the real 30-day total of `$0.649108` across 12 paid calls; a temporary
+  brand-limited reviewer was denied Spaarker cost access and the transaction
+  was rolled back. Direct catalog verification confirms the function is
+  security-invoker, anonymous execution is denied, authenticated execution is
+  granted, and the brand/time index exists.
+- Added strict response parsing, cost formatting and label tests, migration
+  security contracts, a ten-assertion pgTAP RLS/aggregation test, and Chromium
+  coverage for the reviewer-facing ledger. Local Docker was unavailable, so
+  the pgTAP file could not run locally; equivalent live RLS and aggregation
+  checks passed against the connected project without retaining test data.
+- Release verification passed formatting, lint, strict type checking, all 13
+  repository test tasks (291 assertions), the optimized production build, and
+  all four Chromium regression journeys. No paid provider call or Netlify build
+  was made.

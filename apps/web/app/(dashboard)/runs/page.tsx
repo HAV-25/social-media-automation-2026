@@ -12,6 +12,12 @@ import {
 import { cookies } from "next/headers";
 import { operationsRunFilterSchema } from "@content-engine/contracts";
 import { getCurrentUser } from "@/lib/auth";
+import {
+  costSourceTypeLabel,
+  costStageLabel,
+  emptyBrandAiCostObservability,
+  formatRecordedCost,
+} from "@/lib/cost-observability-core";
 import { parseDemoRecoveredRuns } from "@/lib/demo-recovery-store";
 import { getOperationsPage } from "@/lib/operations";
 import { getWorkspaceSnapshot } from "@/lib/workspace";
@@ -91,8 +97,8 @@ export default async function RunsPage({ searchParams }: { searchParams: Promise
         inProgress: 0,
         failed: 0,
         stalled: 0,
-        visibleCostUsd: 0,
       },
+      cost: emptyBrandAiCostObservability(snapshot.activeBrand.id, null),
     };
   });
   const isOrganizationAdministrator = user?.organizationRole === "administrator";
@@ -102,8 +108,8 @@ export default async function RunsPage({ searchParams }: { searchParams: Promise
     { label: "Failed", value: operations.summary.failed, Icon: AlertTriangle },
     { label: "Stalled", value: operations.summary.stalled, Icon: ShieldAlert },
     {
-      label: "Visible cost",
-      value: `$${operations.summary.visibleCostUsd.toFixed(4)}`,
+      label: "AI cost · selected window",
+      value: formatRecordedCost(operations.cost.totalCostUsd),
       Icon: Coins,
     },
   ];
@@ -221,6 +227,130 @@ export default async function RunsPage({ searchParams }: { searchParams: Promise
             </a>
           </div>
         </form>
+
+        <section className="mt-6 rounded-3xl border border-[var(--line)] bg-[var(--ink)] p-5 text-white paper-shadow sm:p-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="max-w-2xl">
+              <p className="text-[10px] font-bold tracking-[0.18em] text-emerald-200 uppercase">
+                Exact cost ledger
+              </p>
+              <h2 className="serif mt-2 text-3xl">What AI work cost this brand</h2>
+              <p className="mt-2 text-sm leading-6 text-white/65">
+                These totals cover every recorded AI step in the selected time window—not only the
+                runs visible on this page. Zero-cost mocks and deterministic steps never inflate
+                spend.
+              </p>
+            </div>
+            <div className="rounded-2xl bg-white/10 px-5 py-4 text-right">
+              <p className="text-[10px] font-bold tracking-wide text-white/55 uppercase">
+                Recorded total
+              </p>
+              <p className="serif mt-1 text-3xl font-bold">
+                {formatRecordedCost(operations.cost.totalCostUsd)}
+              </p>
+              <p className="mt-1 text-xs text-white/55">
+                {operations.cost.paidRunCount} paid calls · {operations.cost.aiRunCount} ledgered
+                steps
+              </p>
+            </div>
+          </div>
+
+          <dl className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {[
+              {
+                label: "Input tokens",
+                value: operations.cost.inputTokens.toLocaleString(),
+              },
+              {
+                label: "Output tokens",
+                value: operations.cost.outputTokens.toLocaleString(),
+              },
+              {
+                label: "Web searches",
+                value: operations.cost.webSearchCalls.toLocaleString(),
+              },
+              {
+                label: "Generated images",
+                value: operations.cost.generatedImages.toLocaleString(),
+              },
+            ].map((metric) => (
+              <div key={metric.label} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <dt className="text-[10px] font-bold tracking-wide text-white/50 uppercase">
+                  {metric.label}
+                </dt>
+                <dd className="mt-1 text-xl font-bold">{metric.value}</dd>
+              </div>
+            ))}
+          </dl>
+
+          <div className="mt-6 grid gap-4 xl:grid-cols-3">
+            <CostBreakdown
+              title="By workflow step"
+              rows={operations.cost.byStage.map((row) => ({
+                key: row.key,
+                label: costStageLabel(row.key),
+                costUsd: row.costUsd,
+                runCount: row.runCount,
+              }))}
+            />
+            <CostBreakdown
+              title="By model"
+              rows={operations.cost.byModel.map((row) => ({
+                key: row.key,
+                label: row.key,
+                costUsd: row.costUsd,
+                runCount: row.runCount,
+              }))}
+            />
+            <CostBreakdown
+              title="By source input"
+              rows={operations.cost.bySourceType.map((row) => ({
+                key: row.key,
+                label: costSourceTypeLabel(row.key),
+                costUsd: row.costUsd,
+                runCount: row.runCount,
+              }))}
+            />
+          </div>
+
+          <details className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-4">
+            <summary className="cursor-pointer text-sm font-bold">
+              Inspect costs by content package ({operations.cost.byPackage.length})
+            </summary>
+            <div className="mt-4 divide-y divide-white/10">
+              {operations.cost.byPackage.map((item) => (
+                <div
+                  key={item.opportunityId}
+                  className="grid gap-2 py-3 text-sm md:grid-cols-[minmax(0,1fr)_auto_auto]"
+                >
+                  <div className="min-w-0">
+                    <a
+                      href={`/opportunities/${item.opportunityId}`}
+                      className="font-semibold text-white underline decoration-white/25 underline-offset-4"
+                    >
+                      {item.sourceTitle}
+                    </a>
+                    <p className="mt-1 text-xs text-white/50">
+                      {costSourceTypeLabel(item.sourceType)} · {item.runCount} AI-related steps
+                    </p>
+                  </div>
+                  <p className="text-xs text-white/60 md:text-right">
+                    {item.draftCount} drafts · {item.reviewReadyCount} review-ready ·{" "}
+                    {item.approvedCount} approved
+                  </p>
+                  <p className="font-bold md:min-w-24 md:text-right">
+                    {formatRecordedCost(item.costUsd)}
+                  </p>
+                </div>
+              ))}
+              {operations.cost.byPackage.length === 0 ? (
+                <p className="py-4 text-sm text-white/55">
+                  No AI-backed content package was recorded in this window.
+                </p>
+              ) : null}
+            </div>
+          </details>
+        </section>
 
         <div className="mt-5 space-y-3">
           {operations.runs.map((run) => (
@@ -408,5 +538,33 @@ export default async function RunsPage({ searchParams }: { searchParams: Promise
         ) : null}
       </section>
     </>
+  );
+}
+
+function CostBreakdown({
+  title,
+  rows,
+}: {
+  title: string;
+  rows: Array<{ key: string; label: string; costUsd: number; runCount: number }>;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+      <h3 className="text-xs font-bold tracking-wide text-white/55 uppercase">{title}</h3>
+      <div className="mt-3 space-y-3">
+        {rows.map((row) => (
+          <div key={row.key} className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{row.label}</p>
+              <p className="mt-0.5 text-[11px] text-white/45">
+                {row.runCount} {row.runCount === 1 ? "run" : "runs"}
+              </p>
+            </div>
+            <p className="shrink-0 text-sm font-bold">{formatRecordedCost(row.costUsd)}</p>
+          </div>
+        ))}
+        {rows.length === 0 ? <p className="text-sm text-white/45">No recorded AI usage.</p> : null}
+      </div>
+    </div>
   );
 }
