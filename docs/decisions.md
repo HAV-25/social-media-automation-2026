@@ -762,3 +762,18 @@ organization and brand RLS remains authoritative. It does not introduce a
 service-role query or security-definer reporting function. Runs & Errors remains
 the technical execution view; Activity & Feedback answers who changed or
 decided what, when it happened, and why.
+
+## ADR-056 — Approved users start open; administrators may narrow access
+
+**Status:** Accepted, 2026-07-26
+
+The private approved-email pilot flow continues to provision each confirmed
+approved user into every active brand with the allowlisted role. This preserves
+the product owner's instruction that approved pilot users should not encounter a
+locked or partially disabled product by default.
+
+After provisioning, an organization administrator may deliberately change the
+member's organization role and per-brand assignments through Settings. The
+change is an authenticated, security-invoker PostgreSQL transaction with strict
+brand ownership checks, one audit event, and a database guard that prevents the
+last organization administrator from being demoted or deleted.

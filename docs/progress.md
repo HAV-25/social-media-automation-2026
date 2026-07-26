@@ -43,7 +43,7 @@
 ## Milestone 2 — Brand configuration
 
 - [x] Brand create/update and administrator-only archive/restore.
-- [ ] Membership administration interface.
+- [x] Membership administration interface.
 - [x] Structured audience, positioning, policy, voice, vocabulary, and generation
       defaults editor.
 - [x] Approved, negative, and high-performing reference example library with
@@ -64,6 +64,11 @@
   a database trigger so an editor cannot bypass the application.
 - Visual uploads validate declared size, allowed MIME, binary signatures, and
   active SVG content before private storage.
+- Organization administrators can inspect confirmed member names/emails, change
+  organization roles, and replace per-brand role assignments from Settings →
+  Team & access. The authenticated security-invoker transaction validates every
+  brand against the organization, writes one audit event, and prevents the last
+  organization administrator from being demoted.
 - The quality suite passed with 37 automated tests on 2026-07-23.
 - Execution against Supabase Storage and the pgTAP policy suite remains pending
   until a development Supabase project is designated.
@@ -1125,3 +1130,37 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   repository test tasks (297 assertions), the optimized production build, and
   all four Chromium regression journeys. No paid provider or Netlify build was
   invoked.
+
+### Administrator membership management
+
+- Added Settings → Team & access for organization administrators. The page
+  lists existing authorized members, organization roles, confirmed profile
+  emails, assigned brands, and each brand-level role without exposing the
+  private pilot allowlist, credentials, or `auth.users`.
+- Preserved the approved-pilot default: an approved signup still receives every
+  active brand initially. Administrators can then deliberately narrow or change
+  that member's role and brand scope; no access is blocked merely because this
+  interface exists.
+- Added the authenticated, security-invoker
+  `manage_organization_member_access` transaction. It bounds and validates the
+  complete payload, rejects inactive or cross-organization brands, replaces
+  assignments atomically, updates the organization role, and writes one
+  organization-scoped audit event.
+- Added a database trigger that prevents update or deletion of the last
+  organization administrator. A rollback-only live probe confirmed a rejected
+  self-demotion preserved the administrator role, original brand assignment,
+  and zero partial audit events.
+- Applied migration `manage_organization_members` to Supabase project
+  `hqffgchxwtymyfwtkmdt`. The function is security-invoker, anonymous execution
+  is denied, authenticated execution is explicit, and the existing profile
+  email was safely backfilled. The organization role and membership-user access
+  paths are covered by dedicated indexes.
+- The nine-assertion live pgTAP suite passed role changes, assignment
+  replacement, audit persistence, cross-organization denial,
+  non-administrator denial, last-administrator protection, and rollback
+  integrity.
+- Release verification passed formatting, lint, strict type checking, all 13
+  repository test tasks (305 assertions), the optimized production build, and
+  all four Chromium regression journeys. The Supabase performance advisor no
+  longer reports an unindexed membership foreign key. No paid provider or
+  Netlify build was invoked.

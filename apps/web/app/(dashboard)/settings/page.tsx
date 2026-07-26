@@ -1,4 +1,4 @@
-import { ArrowRight, Building2, CircleUserRound, Settings2 } from "lucide-react";
+import { ArrowRight, Building2, CircleUserRound, Settings2, UsersRound } from "lucide-react";
 import { cookies } from "next/headers";
 import { getCurrentUser } from "@/lib/auth";
 import { getWorkspaceSnapshot } from "@/lib/workspace";
@@ -51,6 +51,23 @@ export default async function SettingsPage() {
             Manage brands <ArrowRight size={17} />
           </a>
         </article>
+
+        {user?.organizationRole === "administrator" ? (
+          <article className="rounded-3xl border border-[var(--line)] bg-white p-6">
+            <UsersRound size={24} className="text-[var(--sage)]" />
+            <h2 className="serif mt-4 text-2xl">Team &amp; access</h2>
+            <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+              Review authorized users, organization roles, and brand assignments without exposing
+              credentials or the private pilot allowlist.
+            </p>
+            <a
+              href="/settings/members"
+              className="mt-5 flex items-center justify-between rounded-xl bg-[var(--ink)] px-4 py-3 text-sm font-bold text-white"
+            >
+              Manage team access <ArrowRight size={17} />
+            </a>
+          </article>
+        ) : null}
 
         <article className="rounded-3xl border border-[var(--line)] bg-white p-6 lg:col-span-2">
           <Settings2 size={22} className="text-[var(--sage)]" />

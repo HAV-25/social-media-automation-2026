@@ -179,6 +179,20 @@ Pass when organization and brand boundaries fail closed.
 Pass when the visible history agrees with the durable audit record, links to the
 correct entity, and cannot expose activity from an unauthorized brand.
 
+### UAT-15 — Team roles and brand assignments
+
+1. Sign in as an organization administrator and open Settings → Team & access.
+2. Confirm only existing approved users are listed and no password, secret, or
+   private allowlist control is exposed.
+3. Change a test member's organization role and remove one brand assignment.
+4. Reload and confirm the change persists with exactly one activity record.
+5. Sign in as that test member and confirm the removed brand is unavailable
+   while retained brands still work at the assigned role.
+6. Attempt to demote the only remaining organization administrator.
+
+Pass when role and brand access are enforced by RLS, cross-brand data remains
+inaccessible, and the final administrator cannot be removed.
+
 ## Defect recording
 
 For every defect capture:

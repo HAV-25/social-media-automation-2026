@@ -45,6 +45,20 @@ test("plain text becomes an editable and approvable draft without paid services"
   await expect(page.getByText("Changes requested")).toBeVisible();
   await expect(page.getByText("Post draft created")).toHaveCount(0);
 
+  await page.getByRole("link", { name: "Settings", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  await page.getByRole("link", { name: "Manage team access" }).click();
+  await expect(page.getByRole("heading", { name: "Team & access" })).toBeVisible();
+  await expect(page.getByText("2 authorized members")).toBeVisible();
+  const teammateAccess = page.getByTestId("member-access-40000000-0000-4000-8000-000000000099");
+  await teammateAccess.getByLabel("Organization role").selectOption("editor");
+  await teammateAccess.getByRole("checkbox").first().uncheck();
+  await teammateAccess.getByRole("button", { name: "Save member access" }).click();
+  await expect(page).toHaveURL(/saved=40000000-0000-4000-8000-000000000099/);
+  await expect(teammateAccess.getByText("Access saved")).toBeVisible();
+  await expect(teammateAccess.getByLabel("Organization role")).toHaveValue("editor");
+  await expect(teammateAccess.locator('input[name="brandId"]:checked')).toHaveCount(4);
+
   await page.goto("/inputs/new");
   await page.getByLabel("Source title").fill("E2E decision redesign observation");
   await page

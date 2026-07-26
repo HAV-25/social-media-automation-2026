@@ -41,6 +41,11 @@
   storage prefixes.
 - Immutable versions and append-only audit/pipeline events preserve human and
   model provenance.
+- Organization membership changes execute as the authenticated administrator
+  through a security-invoker transaction. Every requested brand must be active
+  and belong to the target organization; the final organization administrator
+  is protected by a database trigger, and each successful change writes one
+  organization-scoped audit event.
 - Authenticated responses that can refresh cookies must not be shared-cached.
 - Dashboard aggregates execute as the authenticated caller, recheck brand-read
   permission, and retain source, opportunity, and run-table RLS. Anonymous

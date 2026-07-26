@@ -29,22 +29,13 @@ access denial.
 
 ## SQL Editor fallback
 
-For a new empty project, the SQL files can be run manually in this exact order:
+For a new empty project, run every committed `.sql` file in
+`supabase/migrations` in ascending filename order. The timestamp prefix is the
+authoritative order and prevents this fallback list from becoming stale as
+features are added. Then run:
 
-1. `20260723125216_initial_tenancy_and_content_schema.sql`
-2. `20260723201500_research_evidence_ledger.sql`
-3. `20260723213000_editorial_quality_and_regeneration.sql`
-4. `20260724111716_verify_editorial_post.sql`
-5. `20260724154050_image_asset_persistence_and_storage.sql`
-6. `20260724180022_operations_run_indexes.sql`
-7. `20260724183139_run_recovery.sql`
-8. `20260724190000_run_recovery_context_index.sql`
-9. `20260724205940_api_security_controls.sql`
-10. `seed.sql`
-11. `tests/database/tenancy_rls.test.sql`
-12. `tests/database/image_assets.test.sql`
-13. `tests/database/run_recovery.test.sql`
-14. `tests/database/api_security_controls.test.sql`
+1. `supabase/seed.sql`
+2. Every committed `.sql` file in `supabase/tests/database` individually.
 
 Open each local file, copy its complete contents into a fresh Supabase SQL
 Editor query, confirm the active project reference is
