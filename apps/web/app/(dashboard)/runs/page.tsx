@@ -9,7 +9,6 @@ import {
   RotateCcw,
   ShieldAlert,
 } from "lucide-react";
-import { randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 import { operationsRunFilterSchema } from "@content-engine/contracts";
 import { getCurrentUser } from "@/lib/auth";
@@ -75,11 +74,27 @@ export default async function RunsPage({ searchParams }: { searchParams: Promise
     window: first(params.window),
     cursor: first(params.cursor) || undefined,
   });
+  let operationsLoadFailed = false;
   const operations = await getOperationsPage(
     snapshot.activeBrand.id,
     filter,
     parseDemoRecoveredRuns(cookieStore.get("demo-recovered-runs")?.value),
-  );
+  ).catch(() => {
+    operationsLoadFailed = true;
+    return {
+      filter,
+      runs: [],
+      nextCursor: null,
+      runTypes: [],
+      summary: {
+        total: 0,
+        inProgress: 0,
+        failed: 0,
+        stalled: 0,
+        visibleCostUsd: 0,
+      },
+    };
+  });
   const isOrganizationAdministrator = user?.organizationRole === "administrator";
   const summaryCards = [
     { label: "All runs", value: operations.summary.total, Icon: Activity },
@@ -105,6 +120,12 @@ export default async function RunsPage({ searchParams }: { searchParams: Promise
       </header>
 
       <section className="px-6 py-8 lg:px-10 lg:py-10">
+        {operationsLoadFailed ? (
+          <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
+            Run history is temporarily unavailable. The rest of this operations screen remains
+            usable; reload to retry the durable history query.
+          </div>
+        ) : null}
         {first(params.recovery) === "queued" ? (
           <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
             Recovery queued. WF-10 will claim it on the next bounded dispatch poll.
@@ -308,11 +329,6 @@ export default async function RunsPage({ searchParams }: { searchParams: Promise
                       className="mt-4 grid gap-2 border-t border-[var(--line)] pt-4 sm:grid-cols-[1fr_auto]"
                     >
                       <input type="hidden" name="generationRunId" value={run.id} />
-                      <input
-                        type="hidden"
-                        name="idempotencyKey"
-                        value={`manual-recovery:${run.id}:${randomUUID()}`}
-                      />
                       <label className="text-xs font-semibold text-[var(--muted)]">
                         Administrator recovery reason
                         <input

@@ -785,3 +785,17 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   result (quality 89.25, evidence 92, brand fit 80). The real post remains
   unapproved for reviewer demonstration; approval stays terminal, current-
   version-bound, readiness-gated, audited, and service-only.
+
+### Runs & errors production regression
+
+- The production database continued returning generation runs, pipeline events,
+  recoveries, and summary counts successfully while `/runs` rendered the
+  generic server-error boundary.
+- The operations reader now validates run, event, and recovery history per row
+  so one incompatible historical record cannot take down the diagnosis screen.
+- The page now renders a safe retryable state if durable history cannot be
+  loaded, and render-time random idempotency material moved back to the
+  recovery server action.
+- Added the exact live queued `rss_opportunity_reservation` shape as a
+  regression fixture. The web suite passes 55 tests, strict type-checking
+  passes, and the optimized production build completes.

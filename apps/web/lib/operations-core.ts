@@ -63,6 +63,11 @@ const rawRunSchema = z
 
 export type RawOperationsRun = z.input<typeof rawRunSchema>;
 
+export function safeParseOperationsRun(raw: unknown): RawOperationsRun | null {
+  const parsed = rawRunSchema.safeParse(raw);
+  return parsed.success ? parsed.data : null;
+}
+
 export type SafeOperationsError = {
   category: OperationsErrorCategory;
   code: string;

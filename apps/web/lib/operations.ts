@@ -6,6 +6,7 @@ import {
   decodeOperationsCursor,
   encodeOperationsCursor,
   normalizeOperationsRun,
+  safeParseOperationsRun,
   type RawOperationsRun,
   type SafeRunRecovery,
 } from "./operations-core";
@@ -287,8 +288,11 @@ export async function getOperationsPage(
   }
   const { data, error } = await query.limit(PAGE_SIZE + 1);
   if (error) throw new Error("Operations runs could not be loaded.");
-  const rawRows = (data ?? []) as RawOperationsRun[];
-  const pageRows = rawRows.slice(0, PAGE_SIZE);
+  const rawRowCount = data?.length ?? 0;
+  const validRows = (data ?? [])
+    .map((row) => safeParseOperationsRun(row))
+    .filter((row): row is RawOperationsRun => row !== null);
+  const pageRows = validRows.slice(0, PAGE_SIZE);
   const runIds = pageRows.map((run) => run.id);
   const [{ data: eventData, error: eventError }, { data: recoveryData, error: recoveryError }] =
     runIds.length
@@ -315,7 +319,9 @@ export async function getOperationsPage(
   if (recoveryError) throw new Error("Operations recovery state could not be loaded.");
   const latestStageByRun = new Map<string, string>();
   for (const rawEvent of eventData ?? []) {
-    const event = eventRowSchema.parse(rawEvent);
+    const parsedEvent = eventRowSchema.safeParse(rawEvent);
+    if (!parsedEvent.success) continue;
+    const event = parsedEvent.data;
     if (event.generation_run_id && !latestStageByRun.has(event.generation_run_id)) {
       latestStageByRun.set(
         event.generation_run_id,
@@ -325,7 +331,9 @@ export async function getOperationsPage(
   }
   const recoveryByRun = new Map<string, SafeRunRecovery>();
   for (const rawRecovery of recoveryData ?? []) {
-    const recovery = recoveryRowSchema.parse(rawRecovery);
+    const parsedRecovery = recoveryRowSchema.safeParse(rawRecovery);
+    if (!parsedRecovery.success) continue;
+    const recovery = parsedRecovery.data;
     const normalizedRecovery = normalizeRecovery(recovery);
     recoveryByRun.set(recovery.root_generation_run_id, normalizedRecovery);
     recoveryByRun.set(recovery.active_generation_run_id, normalizedRecovery);
@@ -368,7 +376,7 @@ export async function getOperationsPage(
     filter,
     runs,
     nextCursor:
-      rawRows.length > PAGE_SIZE && last
+      rawRowCount > PAGE_SIZE && last
         ? encodeOperationsCursor({ createdAt: last.created_at, id: last.id })
         : null,
     runTypes: [...new Set(normalized.map((run) => run.runType))].sort(),

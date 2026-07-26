@@ -443,3 +443,18 @@ reservations across every feed for that brand. This prevents concurrent workers
 from exceeding the cross-feed daily limit while preserving idempotency and
 service-only execution. Selection may automatically prepare material for human
 review, but it does not approve, schedule, or publish content.
+
+## ADR-036 — Operational history degrades per record, not per page
+
+**Status:** Accepted, 2026-07-26
+
+The Runs & errors screen is an incident-diagnosis surface and must remain
+reachable when operational history is incomplete or contains an older record
+shape. Generation runs, pipeline events, and recovery records are validated
+individually at the application boundary. A malformed historical row is omitted
+from the presentation rather than crashing the entire screen, while database
+query failures render a safe temporary-unavailability state.
+
+This tolerance applies only to the read-only observability presentation.
+Workflow mutations, state transitions, signatures, permissions, and durable
+writes remain strict and fail closed.

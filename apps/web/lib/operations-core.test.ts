@@ -4,6 +4,7 @@ import {
   decodeOperationsCursor,
   encodeOperationsCursor,
   normalizeOperationsRun,
+  safeParseOperationsRun,
   type RawOperationsRun,
 } from "./operations-core";
 
@@ -85,6 +86,26 @@ describe("operations observability core", () => {
     );
 
     expect(normalized.durationMs).toBe(60_000);
+  });
+
+  it("accepts a queued RSS opportunity reservation and safely rejects malformed history", () => {
+    const reservation = {
+      ...baseRun,
+      run_type: "rss_opportunity_reservation",
+      workflow_name: "WF-04 Cluster and Score",
+      workflow_execution_id: null,
+      status: "queued" as const,
+      started_at: null,
+      model_usage: {
+        rssFeedId: "415298d4-0deb-43d7-95d0-26955d40bf44",
+        opportunityScore: 73.19,
+        sourceDocumentId: "6ce1a59a-4117-4af6-8b21-4440c22ddc7a",
+      },
+      created_at: "2026-07-25T17:34:37.526566+00:00",
+    };
+
+    expect(safeParseOperationsRun(reservation)?.status).toBe("queued");
+    expect(safeParseOperationsRun({ ...reservation, entity_id: null })).toBeNull();
   });
 
   it("round-trips signed-shape cursor data and rejects malformed cursors", () => {
