@@ -94,7 +94,9 @@ describe("WF-01 RSS Intake workflow", () => {
       (node) => node.name === "Prepare Selected Opportunities",
     );
 
-    expect(preparationNode?.parameters.jsCode).toContain("const result = $json.data;");
+    expect(preparationNode?.parameters.jsCode).toContain(
+      "const result = $input.first().json.data;",
+    );
   });
 
   it("exposes a brand-scoped, signed, durable one-off trigger", () => {
@@ -342,6 +344,7 @@ describe("Milestone 7 image workflow", () => {
     expect(publisher).toContain("supportsFolderPlacementOnCreate");
     expect(publisher).toContain("verified UI folder placement before publication");
     expect(publisher).toContain("errorWorkflow: errorWorkflowId");
+    expect(publisher).toContain("/workflows/${encodeURIComponent(workflowId)}/deactivate");
     expect(publisher).toContain("/workflows/${encodeURIComponent(workflowId)}/activate");
     expect(publisher).not.toContain("/publish");
     for (const workflowNumber of ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10"]) {

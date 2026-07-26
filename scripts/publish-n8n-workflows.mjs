@@ -228,7 +228,15 @@ export async function publishWorkflows({
     if (local.name === "WF-10 Error and Recovery" && workflowId) {
       errorWorkflowId = workflowId;
     }
-    if (apply && publish && workflowId && !current?.active) {
+    if (apply && publish && workflowId && current?.active && action === "update") {
+      await request(`/workflows/${encodeURIComponent(workflowId)}/deactivate`, { method: "POST" });
+    }
+    if (
+      apply &&
+      publish &&
+      workflowId &&
+      (!current?.active || (current.active && action === "update"))
+    ) {
       await request(`/workflows/${encodeURIComponent(workflowId)}/activate`, { method: "POST" });
     }
     results.push({

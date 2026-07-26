@@ -898,3 +898,9 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   a 60–74 Review band and a store-only band below 60. The consolidated local
   release passed formatting, lint, type checking, 265 tests, and the production
   Next.js build before deployment.
+- Verified the policy with a real Klaank RSS pass. Full-article extraction
+  refreshed live opportunities to scores including 83.03, 80.64, 75.51, 69.45,
+  65.24, and sub-60 results. Only a full-text 83.03 opportunity received a
+  reservation; summary-only content remained manual even when its deterministic
+  score exceeded 75. Corrected WF-01's final n8n 2.21 data-envelope read and
+  made workflow publication refresh active webhook registrations after updates.
