@@ -241,6 +241,7 @@ export async function POST(request: NextRequest) {
       if (reservationError) throw reservationError;
       const reservation = reservationRowSchema.parse(rawReservation);
       results.push({
+        actorId,
         brandId: route.brand_id,
         opportunityId: opportunity.opportunityId,
         score: opportunity.score,

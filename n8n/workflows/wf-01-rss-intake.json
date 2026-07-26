@@ -351,7 +351,8 @@
           "response": {
             "response": {
               "neverError": false,
-              "responseFormat": "json"
+              "responseFormat": "file",
+              "outputPropertyName": "data"
             }
           },
           "timeout": 30000
@@ -362,6 +363,74 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [1500, 120]
+    },
+    {
+      "parameters": {
+        "operation": "fromJson",
+        "options": {}
+      },
+      "id": "2f28250a-57af-4aa0-84f8-31da4ed62e01",
+      "name": "Decode Opportunity Decisions",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [1720, 120]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst result = $json;\nif (result.contractVersion !== '1.0' || !result.sourceDocumentId || !Array.isArray(result.results)) throw new Error('RSS analysis result contract is invalid');\nconst secret = $env.WORKFLOW_HMAC_SECRET;\nconst baseUrl = $env.N8N_WEBHOOK_BASE_URL;\nif (!secret || !baseUrl) throw new Error('Automatic preparation environment is not configured');\nconst path = '/webhook/research-v1';\nreturn result.results.filter((item) => item.researchEligible === true && item.eligibilityReason === 'reserved').map((item) => {\n  if (!item.actorId || !item.brandId || !item.opportunityId) throw new Error('Selected RSS opportunity is missing preparation context');\n  const payload = {\n    contractVersion: '1.0',\n    correlationId: crypto.randomUUID(),\n    idempotencyKey: `rss-auto-research:${item.opportunityId}`,\n    actorId: item.actorId,\n    brandId: item.brandId,\n    opportunityId: item.opportunityId,\n    allowedDomains: [],\n    requestedAt: new Date().toISOString(),\n  };\n  const body = JSON.stringify(payload);\n  const timestamp = String(Math.floor(Date.now() / 1000));\n  const nonce = crypto.randomUUID();\n  const digest = crypto.createHash('sha256').update(body, 'utf8').digest('hex');\n  const canonical = [timestamp, nonce, 'POST', path, digest].join('\\n');\n  const signature = `sha256=${crypto.createHmac('sha256', secret).update(canonical, 'utf8').digest('hex')}`;\n  return { json: { body, nonce, signature, timestamp, url: `${baseUrl}${path}` } };\n});"
+      },
+      "id": "2f28250a-57af-4aa0-84f8-31da4ed62e02",
+      "name": "Prepare Selected Opportunities",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1940, 120]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept-encoding",
+              "value": "identity"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-workflow-name",
+              "value": "WF-01 RSS Intake"
+            },
+            {
+              "name": "x-workflow-timestamp",
+              "value": "={{ $json.timestamp }}"
+            },
+            {
+              "name": "x-workflow-nonce",
+              "value": "={{ $json.nonce }}"
+            },
+            {
+              "name": "x-workflow-signature",
+              "value": "={{ $json.signature }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.body }}",
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "2f28250a-57af-4aa0-84f8-31da4ed62e03",
+      "name": "Research Draft Verify and Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2160, 120]
     }
   ],
   "pinData": {},
@@ -541,6 +610,39 @@
           }
         ]
       ]
+    },
+    "Normalize Cluster Score and Gate": {
+      "main": [
+        [
+          {
+            "node": "Decode Opportunity Decisions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decode Opportunity Decisions": {
+      "main": [
+        [
+          {
+            "node": "Prepare Selected Opportunities",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Selected Opportunities": {
+      "main": [
+        [
+          {
+            "node": "Research Draft Verify and Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
@@ -549,7 +651,7 @@
     "saveDataErrorExecution": "all",
     "saveDataSuccessExecution": "none",
     "saveManualExecutions": true,
-    "executionTimeout": 300
+    "executionTimeout": 900
   },
   "versionId": "8e619a3a-d5d3-46f7-a6d9-acde65873210",
   "meta": {

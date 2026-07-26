@@ -16,6 +16,7 @@ import {
   rssManualRunResultSchema,
   rssGenerationReservationRequestSchema,
   rssSourceAnalysisRequestSchema,
+  rssSourceAnalysisResultSchema,
   sourceAdapterResultSchema,
   validateEvidencePackageIntegrity,
   workflowRecoveryExecutionSchema,
@@ -135,6 +136,33 @@ describe("shared contracts", () => {
     });
 
     expect(result.feeds[0]?.lastPolledAt).toBe("2026-07-25T16:37:20.832+00:00");
+  });
+
+  it("binds an automatically selected RSS opportunity to a durable actor", () => {
+    const result = rssSourceAnalysisResultSchema.parse({
+      contractVersion: "1.0",
+      sourceDocumentId: "00000000-0000-4000-8000-000000000001",
+      results: [
+        {
+          actorId: "00000000-0000-4000-8000-000000000002",
+          brandId: "00000000-0000-4000-8000-000000000003",
+          opportunityId: "00000000-0000-4000-8000-000000000004",
+          score: 73,
+          riskPenalty: 4,
+          duplicate: false,
+          researchEligible: true,
+          eligibilityReason: "reserved",
+        },
+      ],
+    });
+
+    expect(result.results[0]?.actorId).toBe("00000000-0000-4000-8000-000000000002");
+    expect(
+      rssSourceAnalysisResultSchema.safeParse({
+        ...result,
+        results: [{ ...result.results[0], actorId: undefined }],
+      }).success,
+    ).toBe(false);
   });
 
   it("validates the plain-text input boundary and its idempotency key", () => {

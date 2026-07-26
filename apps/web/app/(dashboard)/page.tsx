@@ -331,8 +331,9 @@ export default async function DashboardPage() {
             </p>
             <h2 className="serif mt-3 text-2xl leading-7">Research only what earns attention.</h2>
             <p className="mt-4 text-sm leading-6 text-white/60">
-              Live processing totals for {activeBrand.name} since 00:00 UTC. Research remains
-              reviewer-triggered and budget-controlled.
+              Live processing totals for {activeBrand.name} since 00:00 UTC. Selected opportunities
+              are prepared within the brand&apos;s daily and provider cost limits, then stop for
+              human review.
             </p>
             <div className="mt-6 space-y-4 border-t border-white/10 pt-5 text-sm">
               <div className="flex justify-between">

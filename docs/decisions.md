@@ -459,6 +459,23 @@ This tolerance applies only to the read-only observability presentation.
 Workflow mutations, state transitions, signatures, permissions, and durable
 writes remain strict and fail closed.
 
+## ADR-037 — Selected RSS opportunities prepare through signed workflow handoffs
+
+**Status:** Accepted, 2026-07-26
+
+WF-01 dispatches only brand-policy reservations marked `reserved` to WF-05.
+The analysis result binds each selection to the authorized feed creator or
+organization administrator so downstream actions retain a durable human actor.
+WF-05 then orchestrates the typed WF-06, WF-07, and WF-08 webhooks: bounded
+research, the three Phase 1 content styles, deterministic verification, and one
+branded image per review-ready draft.
+
+Every handoff is HMAC-signed and uses an entity-derived idempotency key. The
+application APIs remain responsible for authorization, cost gates, structured
+model contracts, persistence, and provenance. A failed evidence or quality gate
+stops that branch. Successful branches stop at `ready_for_review`; the chain
+cannot approve, schedule, or publish content.
+
 ## ADR-037 — The daily RSS view accounts for every configured feed
 
 **Status:** Accepted, 2026-07-26

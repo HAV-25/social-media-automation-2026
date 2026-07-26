@@ -58,6 +58,9 @@ describe("WF-01 RSS Intake workflow", () => {
       "Validate RSS Intake Contract",
       "Sign Analysis Request",
       "Normalize Cluster Score and Gate",
+      "Decode Opportunity Decisions",
+      "Prepare Selected Opportunities",
+      "Research Draft Verify and Image",
     ]);
     expect(workflow.nodes.find((node) => node.name === "Fetch and Parse Feed Safely")?.type).toBe(
       "n8n-nodes-base.httpRequest",
@@ -77,6 +80,7 @@ describe("WF-01 RSS Intake workflow", () => {
     expect(source).toContain("/api/internal/workflows/rss/fetch");
     expect(source).toContain("/api/internal/workflows/rss/intake");
     expect(source).toContain("/api/internal/workflows/rss/analyze");
+    expect(source).toContain("/webhook/research-v1");
     expect(source).toContain("/webhook/rss-intake-run-v1");
     expect(source).toContain("brandQuery");
     expect(source).toContain("timingSafeEqual");
@@ -183,6 +187,7 @@ describe("Milestone 4 n8n workflow package", () => {
     expect(rssAnalyze).toContain("created_by: z.uuid().nullable()");
     expect(rssAnalyze).toContain('.from("organization_members")');
     expect(rssAnalyze).toContain("submittedBy: actorId");
+    expect(rssAnalyze).toContain("actorId,");
     expect(rssAnalyze).toContain("originalUrl: source.canonical_url");
     expect(rssAnalyze).toContain("new Date(source.published_at).toISOString()");
     expect(rssAnalyze).toContain("internalFailureSchema.safeParse");
@@ -198,6 +203,14 @@ describe("Milestone 5 research workflow", () => {
     expect(workflow.name).toBe("WF-05 Research");
     expect(source).toContain("/api/internal/workflows/recovery/execute");
     expect(source).toContain("target: 'research'");
+    expect(source).toContain("/webhook/editorial-generation-v1");
+    expect(source).toContain("/webhook/post-verification-v1");
+    expect(source).toContain("/webhook/image-generation-v1");
+    expect(source).toContain("newsworthy_authority");
+    expect(source).toContain("educational_breakdown");
+    expect(source).toContain("perspective_conversation");
+    expect(source).toContain("readyForWriting");
+    expect(source).toContain("readyForReview");
     expect(source).toContain("createHmac('sha256'");
     expect(source).toContain("timingSafeEqual");
     expect(source).not.toMatch(/service[_-]?role|credentialId|OPENAI_API_KEY|system prompt/i);
@@ -383,7 +396,7 @@ describe("n8n 2.21 runtime compatibility", () => {
     expect(requests.length).toBeGreaterThan(0);
     for (const request of requests) {
       const options = z
-        .object({ timeout: z.number().int().min(1_000).max(200_000) })
+        .object({ timeout: z.number().int().min(1_000).max(600_000) })
         .parse(request.parameters.options);
       const headers = z
         .object({

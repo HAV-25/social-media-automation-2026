@@ -817,3 +817,21 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
 - The policy summary shows the active minimum score, daily maximum, and durable
   reservation count for the current UTC day. Selection logic is covered by two
   focused regression tests; the web suite now passes 57 tests.
+
+### Automatic preparation to human review
+
+- Extended the typed RSS analysis result with the authorized actor selected by
+  the application boundary. WF-01 now dispatches only opportunities that were
+  atomically reserved by the brand-wide score and daily-limit policy.
+- Extended WF-05 into the explicit orchestration chain for bounded research,
+  materially different Newsworthy, Educational, and Perspective drafts,
+  deterministic post verification, and branded image generation.
+- Every n8n-to-n8n stage is HMAC-signed, credential-free, idempotent, bounded by
+  the application provider limits, and decoded at the n8n 2.21 file-response
+  boundary. Evidence that is not writing-ready and drafts that are not
+  review-ready stop without an image.
+- The chain terminates at human review. It contains no approval, scheduling, or
+  publishing action. Dashboard guidance now reflects automatic bounded
+  preparation rather than the former reviewer-triggered research behavior.
+- Contract, n8n compatibility, and repository suites pass: 113 contract tests,
+  58 web tests, strict lint/type checking, and the optimized production build.

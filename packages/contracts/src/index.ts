@@ -271,6 +271,7 @@ export const rssSourceAnalysisResultSchema = z.object({
   sourceDocumentId: z.uuid(),
   results: z.array(
     z.object({
+      actorId: z.uuid(),
       brandId: z.uuid(),
       opportunityId: z.uuid(),
       score: z.number().min(0).max(100),
