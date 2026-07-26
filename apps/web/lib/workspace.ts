@@ -71,8 +71,7 @@ export const getWorkspaceSnapshot = cache(async function getWorkspaceSnapshot(
   requestedBrandId?: string,
 ) {
   const env = serverEnvSchema.parse(process.env);
-  const since = new Date();
-  since.setUTCHours(0, 0, 0, 0);
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
   if (process.env.NEXT_PUBLIC_DEMO_MODE !== "false") {
     const fallbackBrand = demoBrands[0];
@@ -139,6 +138,7 @@ export const getWorkspaceSnapshot = cache(async function getWorkspaceSnapshot(
       )
       .eq("brand_id", activeBrand.id)
       .neq("status", "archived")
+      .gte("created_at", since.toISOString())
       .order("opportunity_score", { ascending: false })
       .limit(20),
     supabase.rpc("get_brand_dashboard_metrics", {

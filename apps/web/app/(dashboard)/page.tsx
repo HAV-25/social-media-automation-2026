@@ -5,22 +5,51 @@ import {
   FilePlus2,
   Filter,
   Radio,
+  RotateCcw,
   Search,
   Sparkles,
 } from "lucide-react";
 import { cookies } from "next/headers";
 import { OpportunityCard } from "@/components/opportunity-card";
 import { getRssDailyDecisions } from "@/lib/rss-daily-decisions";
+import { filterAndSortRssItems, rssFeedFilterSchema } from "@/lib/rss-feed-filters";
 import { getWorkspaceSnapshot } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
-  const cookieStore = await cookies();
+type SearchParams = Record<string, string | string[] | undefined>;
+
+function first(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function viewHref(view: "all" | "priority" | "review") {
+  return view === "all" ? "/" : `/?view=${view}`;
+}
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
+  const [cookieStore, query] = await Promise.all([cookies(), searchParams]);
   const { activeBrand, dashboardMetrics, opportunities } = await getWorkspaceSnapshot(
     cookieStore.get("active-brand")?.value,
   );
   const rssOverview = await getRssDailyDecisions(activeBrand.id, dashboardMetrics.since);
+  const feedFilter = rssFeedFilterSchema.parse({
+    q: first(query.q),
+    view: first(query.view),
+    feed: first(query.feed),
+    state: first(query.state),
+    minScore: first(query.minScore) || undefined,
+    sort: first(query.sort),
+  });
+  const visibleRssItems = filterAndSortRssItems(
+    rssOverview.items,
+    feedFilter,
+    rssOverview.policy.minimumScore,
+  );
   const today = new Intl.DateTimeFormat("en-GB", {
     dateStyle: "long",
     timeZone: "UTC",
@@ -67,13 +96,32 @@ export default async function DashboardPage() {
             </p>
           </div>
           <div className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-white p-1">
-            <button className="rounded-lg bg-[var(--ink)] px-3 py-2 text-xs font-semibold text-white">
+            <a
+              href={viewHref("all")}
+              className={`rounded-lg px-3 py-2 text-xs font-semibold ${
+                feedFilter.view === "all" ? "bg-[var(--ink)] text-white" : "text-[var(--muted)]"
+              }`}
+            >
               All
-            </button>
-            <button className="px-3 py-2 text-xs font-semibold text-[var(--muted)]">
+            </a>
+            <a
+              href={viewHref("priority")}
+              className={`rounded-lg px-3 py-2 text-xs font-semibold ${
+                feedFilter.view === "priority"
+                  ? "bg-[var(--ink)] text-white"
+                  : "text-[var(--muted)]"
+              }`}
+            >
               Priority
-            </button>
-            <button className="px-3 py-2 text-xs font-semibold text-[var(--muted)]">Review</button>
+            </a>
+            <a
+              href={viewHref("review")}
+              className={`rounded-lg px-3 py-2 text-xs font-semibold ${
+                feedFilter.view === "review" ? "bg-[var(--ink)] text-white" : "text-[var(--muted)]"
+              }`}
+            >
+              Review
+            </a>
           </div>
         </div>
 
@@ -110,18 +158,92 @@ export default async function DashboardPage() {
           ))}
         </div>
 
-        <div className="mt-7 flex flex-wrap gap-3">
-          <label className="flex min-w-[260px] flex-1 items-center gap-2 rounded-xl border border-[var(--line)] bg-white px-4 py-2.5 text-sm text-[var(--muted)]">
-            <Search size={17} />
+        <form
+          method="get"
+          className="mt-7 grid gap-3 rounded-2xl border border-[var(--line)] bg-white/70 p-4 md:grid-cols-2 xl:grid-cols-[minmax(240px,1.5fr)_1fr_1fr_0.8fr_1fr_auto]"
+        >
+          <input type="hidden" name="view" value={feedFilter.view} />
+          <label className="text-xs font-semibold text-[var(--muted)]">
+            Search
+            <span className="mt-1.5 flex items-center gap-2 rounded-xl border border-[var(--line)] bg-white px-3 py-2.5">
+              <Search size={16} />
+              <input
+                name="q"
+                defaultValue={feedFilter.q}
+                maxLength={100}
+                className="w-full bg-transparent text-sm text-[var(--ink)] outline-none"
+                placeholder="Article, feed or reason"
+              />
+            </span>
+          </label>
+          <label className="text-xs font-semibold text-[var(--muted)]">
+            Feed
+            <select
+              name="feed"
+              defaultValue={feedFilter.feed}
+              className="mt-1.5 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm text-[var(--ink)]"
+            >
+              <option value="all">All feeds</option>
+              {rssOverview.feeds.map((feed) => (
+                <option key={feed.feedId} value={feed.feedId}>
+                  {feed.feedName}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-xs font-semibold text-[var(--muted)]">
+            Decision
+            <select
+              name="state"
+              defaultValue={feedFilter.state}
+              className="mt-1.5 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm text-[var(--ink)]"
+            >
+              <option value="all">All decisions</option>
+              <option value="scored">Scored</option>
+              <option value="filtered">Filtered</option>
+              <option value="duplicate">Duplicate</option>
+              <option value="pending">Processing</option>
+            </select>
+          </label>
+          <label className="text-xs font-semibold text-[var(--muted)]">
+            Minimum score
             <input
-              className="w-full bg-transparent outline-none"
-              placeholder="Search sources and topics"
+              name="minScore"
+              type="number"
+              min={0}
+              max={100}
+              step={1}
+              defaultValue={feedFilter.minScore}
+              placeholder="Any"
+              className="mt-1.5 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm text-[var(--ink)]"
             />
           </label>
-          <button className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-white px-4 py-2.5 text-sm font-semibold">
-            <Filter size={16} /> Filters
-          </button>
-        </div>
+          <label className="text-xs font-semibold text-[var(--muted)]">
+            Sort
+            <select
+              name="sort"
+              defaultValue={feedFilter.sort}
+              className="mt-1.5 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm text-[var(--ink)]"
+            >
+              <option value="newest">Newest first</option>
+              <option value="score_desc">Highest score</option>
+              <option value="score_asc">Lowest score</option>
+              <option value="feed">Feed name</option>
+            </select>
+          </label>
+          <div className="flex items-end gap-2">
+            <button className="flex items-center gap-2 rounded-xl bg-[var(--ink)] px-4 py-2.5 text-sm font-semibold text-white">
+              <Filter size={15} /> Apply
+            </button>
+            <a
+              href="/"
+              aria-label="Reset opportunity filters"
+              className="rounded-xl border border-[var(--line)] bg-white p-2.5 text-[var(--muted)]"
+            >
+              <RotateCcw size={16} />
+            </a>
+          </div>
+        </form>
 
         {rssOverview.feeds.length ? (
           <section className="mt-7 rounded-3xl border border-[var(--line)] bg-white/65 p-5 lg:p-6">
@@ -224,9 +346,9 @@ export default async function DashboardPage() {
                 </p>
                 <h2 className="serif mt-1 text-2xl">Every RSS item and its decision</h2>
                 <p className="mt-2 max-w-3xl text-xs leading-5 text-[var(--muted)]">
-                  This includes today’s scored opportunities, brand-filtered articles, duplicates,
-                  and items still processing. If a feed has no new article today, its latest known
-                  item remains visible for context.
+                  This rolling 24-hour view includes scored opportunities, brand-filtered articles,
+                  duplicates and items still processing. Older articles move automatically to the
+                  archive without being deleted.
                 </p>
               </div>
               <div className="rounded-2xl bg-[var(--sage-soft)] px-4 py-3 text-xs text-[var(--sage)]">
@@ -246,7 +368,7 @@ export default async function DashboardPage() {
               </div>
             </div>
             <div className="divide-y divide-[var(--line)]">
-              {rssOverview.items.map((item) => {
+              {visibleRssItems.map((item) => {
                 const selectionLabels = {
                   selected: "Selected for preparation",
                   review: "Review manually",
@@ -274,10 +396,10 @@ export default async function DashboardPage() {
                             minute: "2-digit",
                           })}
                         </span>
-                        {!item.inCurrentWindow ? (
+                        {item.resurfacedAt ? (
                           <>
                             <span>·</span>
-                            <span>Latest feed item</span>
+                            <span>Resurfaced for review</span>
                           </>
                         ) : null}
                       </div>
@@ -320,6 +442,14 @@ export default async function DashboardPage() {
                   </article>
                 );
               })}
+              {!visibleRssItems.length ? (
+                <div className="p-8 text-center">
+                  <p className="text-sm font-semibold">No RSS items match these filters.</p>
+                  <a href="/" className="mt-2 inline-flex text-xs font-bold text-[var(--sage)]">
+                    Reset filters
+                  </a>
+                </div>
+              ) : null}
             </div>
           </section>
         ) : null}

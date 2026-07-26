@@ -17,12 +17,10 @@ const available = [
   { label: "Sources", icon: Radio, href: "/sources" },
   { label: "Runs & errors", icon: TriangleAlert, href: "/runs" },
   { label: "Ready posts", icon: Sparkles, href: "/posts" },
+  { label: "Archive", icon: Archive, href: "/archive" },
 ];
 
-const upcoming = [
-  { label: "Styles", icon: BookOpenText },
-  { label: "Archive", icon: Archive },
-];
+const upcoming = [{ label: "Styles", icon: BookOpenText }];
 
 export function SidebarNav() {
   const pathname = usePathname();

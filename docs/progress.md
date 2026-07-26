@@ -955,3 +955,37 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   generation runs, images, or spend. Guarded deletion preserved all six
   normalized source documents and the configured RSS feeds; verification
   confirmed zero targeted opportunity rows remain.
+
+### Rolling RSS archive and resurfacing
+
+- Replaced the UTC-calendar daily RSS list with a rolling 24-hour active window.
+  The main opportunity cards use the same rolling boundary. Older feed articles
+  move to a selected-brand Archive view without deletion.
+- Activated Archive navigation and added retained score, opportunity state,
+  downstream draft outcome, automatic-archive explanation, and direct
+  opportunity inspection.
+- Added an authenticated, brand-routed resurfacing state with RLS, explicit
+  grants, an indexed brand/time access path, actor attribution, and an audit
+  event. Resurfaced scored articles return to the active inbox for 24 hours but
+  do not bypass research, verification, approval, or the 75-point automatic
+  preparation threshold.
+- Applied the review-state and foreign-key index migrations to the connected
+  Supabase project. Direct inspection confirms RLS enabled, one authenticated
+  SELECT/INSERT/UPDATE policy, no anonymous grant, and covering indexes for the
+  active-window query and each foreign key.
+- Added focused rolling-window tests and migration contract checks. The
+  consolidated release passes formatting, lint, strict type-checking, all 269
+  repository tests, and the optimized production build.
+
+### Daily opportunity filtering and sorting
+
+- Activated server-validated Content Inbox controls for article/feed/reason
+  search, feed selection, decision state, minimum score, and newest,
+  highest-score, lowest-score, or feed-name ordering.
+- Activated the All, Priority, and Review views. Priority derives from the
+  selected brand's current automatic threshold; Review derives from the manual
+  review decision rather than a duplicated hard-coded score rule.
+- Filter inputs are bounded and fail safely to default values. Focused
+  combinations cover automatic priority, manual review, feed state, minimum
+  score, search, and numeric score ordering. Web strict type-checking and all 67
+  web tests pass locally.

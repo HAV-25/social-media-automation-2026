@@ -600,6 +600,20 @@ visible but are marked for manual review and cannot be reserved for automatic
 preparation. Re-analysis refreshes deterministic opportunity intelligence while
 preserving the opportunity identity, workflow state, and audit history.
 
+## ADR-042 — RSS inbox retention is a rolling view, not destructive archival
+
+The selected-brand RSS inbox shows items first observed during the rolling
+24-hour window plus articles explicitly resurfaced during that window. Older
+items remain durable and move to the Archive view without changing or deleting
+their source, opportunity, evidence, draft, image, feedback, run, or audit
+records.
+
+Resurfacing stores one idempotent brand-and-item review state, records the actor
+and audit event, and returns the existing scored opportunity to the active view
+for 24 hours. It never changes the deterministic score, creates a draft,
+bypasses the brand's automatic threshold, approves content, schedules content,
+or publishes content.
+
 Reservation idempotency includes the server-owned brand-policy version. A
 policy edit therefore creates a new bounded decision without allowing score
 text or user-controlled metadata to redefine request identity.

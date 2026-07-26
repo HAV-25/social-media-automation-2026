@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { explainRssRouteFilter } from "./rss-routing-visibility";
+import { isRssItemActive, rssItemActivityTimestamp } from "./rss-archive-policy";
 import {
   deriveRssSelectionVisibility,
   RSS_AUTOMATIC_MINIMUM_SCORE,
@@ -67,6 +68,11 @@ const reservationRowSchema = z.object({
   created_at: z.string(),
 });
 
+const resurfaceRowSchema = z.object({
+  rss_feed_item_id: z.uuid(),
+  resurfaced_at: z.string(),
+});
+
 export type RssDailyItemDecision = {
   itemId: string;
   feedId: string;
@@ -80,6 +86,7 @@ export type RssDailyItemDecision = {
   opportunityId: string | null;
   opportunityStatus: string | null;
   analysisBasis: "full_article" | "rss_summary" | null;
+  resurfacedAt: string | null;
   selection:
     | "selected"
     | "review"
@@ -166,31 +173,61 @@ export async function getRssDailyDecisions(
   if (!routes.length) return { feeds: [], items: [], policy };
 
   const feedIds = routes.map((route) => route.rss_feed_id);
-  const { data: rawItems, error: itemError } = await supabase
-    .from("rss_feed_items")
-    .select(
-      "id,rss_feed_id,title,first_seen_at,source_document_id,source_documents(raw_text,status,duplicate_of_source_id,extraction_confidence,metadata)",
-    )
-    .in("rss_feed_id", feedIds)
-    .order("first_seen_at", { ascending: false })
-    .limit(100);
-  if (itemError) throw new Error(`Unable to load today's RSS items: ${itemError.message}`);
-  const recentItems = z.array(itemRowSchema).parse(rawItems ?? []);
-  const windowStart = new Date(since).getTime();
-  const items = recentItems.filter((item) => new Date(item.first_seen_at).getTime() >= windowStart);
-  const latestItemByFeed = new Map<string, (typeof recentItems)[number]>();
-  for (const item of recentItems) {
-    if (!latestItemByFeed.has(item.rss_feed_id)) latestItemByFeed.set(item.rss_feed_id, item);
+  const { data: rawResurfaceRows, error: resurfaceError } = await supabase
+    .from("rss_item_review_states")
+    .select("rss_feed_item_id,resurfaced_at")
+    .eq("brand_id", brandId)
+    .gte("resurfaced_at", since);
+  if (resurfaceError) throw new Error("Unable to load resurfaced RSS items.");
+  const resurfaceRows = z.array(resurfaceRowSchema).parse(rawResurfaceRows ?? []);
+  const resurfacedAtByItem = new Map(
+    resurfaceRows.map((row) => [row.rss_feed_item_id, row.resurfaced_at] as const),
+  );
+  const resurfacedItemIds = [...resurfacedAtByItem.keys()];
+  const itemSelect =
+    "id,rss_feed_id,title,first_seen_at,source_document_id,source_documents(raw_text,status,duplicate_of_source_id,extraction_confidence,metadata)";
+  const [recentResult, resurfacedResult] = await Promise.all([
+    supabase
+      .from("rss_feed_items")
+      .select(itemSelect)
+      .in("rss_feed_id", feedIds)
+      .gte("first_seen_at", since)
+      .order("first_seen_at", { ascending: false })
+      .limit(100),
+    resurfacedItemIds.length
+      ? supabase
+          .from("rss_feed_items")
+          .select(itemSelect)
+          .in("rss_feed_id", feedIds)
+          .in("id", resurfacedItemIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (recentResult.error || resurfacedResult.error) {
+    throw new Error(
+      `Unable to load the active RSS window: ${
+        (recentResult.error ?? resurfacedResult.error)?.message
+      }`,
+    );
   }
+  const recentItems = z.array(itemRowSchema).parse(recentResult.data ?? []);
+  const resurfacedItems = z.array(itemRowSchema).parse(resurfacedResult.data ?? []);
   const visibleItems = [
-    ...items,
-    ...[...latestItemByFeed.values()].filter(
-      (latest) => !items.some((item) => item.id === latest.id),
-    ),
+    ...new Map(
+      [...recentItems, ...resurfacedItems].map((item) => [item.id, item] as const),
+    ).values(),
   ].sort(
     (left, right) =>
-      new Date(right.first_seen_at).getTime() - new Date(left.first_seen_at).getTime(),
+      rssItemActivityTimestamp({
+        firstSeenAt: right.first_seen_at,
+        resurfacedAt: resurfacedAtByItem.get(right.id),
+      }) -
+      rssItemActivityTimestamp({
+        firstSeenAt: left.first_seen_at,
+        resurfacedAt: resurfacedAtByItem.get(left.id),
+      }),
   );
+  const windowStart = new Date(since).getTime();
+  const items = visibleItems;
   const sourceIds = visibleItems
     .map((item) => item.source_document_id)
     .filter((id): id is string => Boolean(id));
@@ -350,7 +387,12 @@ export async function getRssDailyDecisions(
       feedName: feedNameById.get(item.rss_feed_id) ?? "RSS feed",
       title: item.title,
       firstSeenAt: item.first_seen_at,
-      inCurrentWindow: new Date(item.first_seen_at).getTime() >= windowStart,
+      inCurrentWindow: isRssItemActive({
+        firstSeenAt: item.first_seen_at,
+        resurfacedAt: resurfacedAtByItem.get(item.id),
+        windowStart: since,
+      }),
+      resurfacedAt: resurfacedAtByItem.get(item.id) ?? null,
     };
     if (opportunity) {
       const score = Number(opportunity.opportunity_score);
