@@ -18,7 +18,7 @@ const reusableDraftRowSchema = z.object({
 const reusableRunRowSchema = z.object({
   id: z.uuid(),
   entity_id: z.uuid(),
-  created_at: z.iso.datetime(),
+  created_at: z.iso.datetime({ offset: true }),
 });
 
 type ContentStyle = EditorialWorkflowRequest["contentStyles"][number];

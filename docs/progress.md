@@ -918,6 +918,11 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
 - Existing terminal, non-review-ready, or provenance-incomplete drafts fail
   closed rather than being overwritten or regenerated automatically. Reused and
   new results retain the requested deterministic style order.
+- The reuse boundary accepts Supabase's valid `+00:00` generation-run timestamp
+  shape, retained as a regression fixture. A signed probe against the older
+  production deployment returned before provider execution; Netlify automatic
+  builds are now stopped, so this release remains intentionally pending one
+  explicit manual deployment after the bundle is complete.
 - Exact boundary coverage confirms Klaank's live policy remains automatic at
   75 or higher, Review from 60 through 74, and stored-only below 60. The stale
   no-data fallback was aligned to 75 without triggering a Netlify deployment.

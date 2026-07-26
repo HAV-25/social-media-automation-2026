@@ -31,7 +31,7 @@ describe("editorial draft reuse", () => {
         {
           id: ids.newsRun,
           entity_id: ids.newsDraft,
-          created_at: "2026-07-26T10:00:00.000Z",
+          created_at: "2026-07-26T10:00:00.000+00:00",
         },
       ],
     });
