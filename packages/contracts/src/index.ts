@@ -18,6 +18,7 @@ export const contentStyleSchema = z.enum([
   "educational_breakdown",
   "perspective_conversation",
 ]);
+export type ContentStyle = z.infer<typeof contentStyleSchema>;
 export const toneSchema = z.enum([
   "authoritative",
   "conversational",
@@ -25,6 +26,7 @@ export const toneSchema = z.enum([
   "thoughtful",
   "witty",
 ]);
+export type Tone = z.infer<typeof toneSchema>;
 
 export const envSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.url().default("http://localhost:3000"),

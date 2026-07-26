@@ -58,7 +58,7 @@ export const defaultGenerationSettings: GenerationDefaults = {
 
 export const defaultOpportunitySelectionPolicy: OpportunitySelectionPolicy = {
   automaticSelection: true,
-  minimumScore: 72,
+  minimumScore: 75,
   dailyDraftLimit: 3,
 };
 

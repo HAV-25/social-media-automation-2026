@@ -17,10 +17,9 @@ const available = [
   { label: "Sources", icon: Radio, href: "/sources" },
   { label: "Runs & errors", icon: TriangleAlert, href: "/runs" },
   { label: "Ready posts", icon: Sparkles, href: "/posts" },
+  { label: "Styles", icon: BookOpenText, href: "/styles" },
   { label: "Archive", icon: Archive, href: "/archive" },
 ];
-
-const upcoming = [{ label: "Styles", icon: BookOpenText }];
 
 export function SidebarNav() {
   const pathname = usePathname();
@@ -44,17 +43,6 @@ export function SidebarNav() {
           </a>
         );
       })}
-      {upcoming.map(({ label, icon: Icon }) => (
-        <span
-          key={label}
-          aria-disabled="true"
-          className="flex cursor-not-allowed items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white/30"
-        >
-          <Icon size={18} strokeWidth={1.8} />
-          <span className="flex-1">{label}</span>
-          <span className="text-[9px] font-bold tracking-wide uppercase">Next</span>
-        </span>
-      ))}
     </nav>
   );
 }

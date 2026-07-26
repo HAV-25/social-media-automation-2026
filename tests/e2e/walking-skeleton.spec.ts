@@ -11,6 +11,13 @@ test("plain text becomes an editable and approvable draft without paid services"
     page.getByRole("heading", { name: "Today’s strongest opportunities" }),
   ).toBeVisible();
 
+  await page.getByRole("link", { name: "Styles", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Styles & tone" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Three standard styles" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Five tone overlays" })).toBeVisible();
+  await expect(page.getByText("maximum draft variants entering review")).toBeVisible();
+  await expect(page.getByText(/scoring at least 75/)).toBeVisible();
+
   await page.getByRole("link", { name: "Runs & errors" }).click();
   await expect(page.getByRole("heading", { name: "Runs & errors" })).toBeVisible();
   await expect(page.getByText("provider_timeout")).toBeVisible();
@@ -56,6 +63,17 @@ test("plain text becomes an editable and approvable draft without paid services"
   await expect(page.getByText(/fake-research-v1/)).toBeVisible();
 
   await page.getByLabel("Content style").selectOption("educational_breakdown");
+  await expect(
+    page.getByText(
+      "Extract the strongest learning value and turn it into an explanation, framework, or practical lesson.",
+    ),
+  ).toBeVisible();
+  await page.getByLabel("Tone overlay").selectOption("bold");
+  await expect(
+    page.getByText(
+      "Educational controls the post's strategic structure. Bold controls how that structure sounds. The evidence and brand-safety rules remain unchanged.",
+    ),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Generate evaluated draft" }).click();
   await expect(page).toHaveURL(/\/posts\//, { timeout: 20_000 });
   await expect(page.getByRole("heading", { name: "Edit without losing the original" })).toBeVisible(

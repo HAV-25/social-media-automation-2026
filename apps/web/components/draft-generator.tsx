@@ -1,9 +1,22 @@
 "use client";
 
-import { draftGenerationResultSchema, type DraftGenerationResult } from "@content-engine/contracts";
-import { LoaderCircle, Sparkles } from "lucide-react";
+import {
+  contentStyleSchema,
+  draftGenerationResultSchema,
+  toneSchema,
+  type ContentStyle,
+  type DraftGenerationResult,
+  type Tone,
+} from "@content-engine/contracts";
+import { BookOpenText, LoaderCircle, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import {
+  editorialStyles,
+  explainStyleTone,
+  getEditorialStyle,
+  toneOverlays,
+} from "@/lib/editorial-style-catalog";
 
 function newIdempotencyKey() {
   return `draft:${crypto.randomUUID()}`;
@@ -22,6 +35,11 @@ export function DraftGenerator({
   const [idempotencyKey] = useState(newIdempotencyKey);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [contentStyle, setContentStyle] = useState<ContentStyle>(
+    contentStyleSchema.safeParse(defaultStyle).data ?? "perspective_conversation",
+  );
+  const [tone, setTone] = useState<Tone>("thoughtful");
+  const selectedStyle = getEditorialStyle(contentStyle);
 
   async function generate(formData: FormData) {
     setPending(true);
@@ -71,28 +89,42 @@ export function DraftGenerator({
         Content style
         <select
           name="contentStyle"
-          defaultValue={defaultStyle}
+          value={contentStyle}
+          onChange={(event) => setContentStyle(contentStyleSchema.parse(event.target.value))}
           className="mt-1.5 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm font-normal text-[var(--ink)] normal-case"
         >
-          <option value="newsworthy_authority">Newsworthy Authority</option>
-          <option value="educational_breakdown">Educational Breakdown</option>
-          <option value="perspective_conversation">Perspective & Conversation</option>
+          {editorialStyles.map((style) => (
+            <option key={style.id} value={style.id}>
+              {style.label}
+            </option>
+          ))}
         </select>
       </label>
+      <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{selectedStyle.purpose}</p>
       <label className="mt-3 block text-[10px] font-bold text-[var(--muted)] uppercase">
         Tone overlay
         <select
           name="tone"
-          defaultValue="thoughtful"
+          value={tone}
+          onChange={(event) => setTone(toneSchema.parse(event.target.value))}
           className="mt-1.5 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm font-normal text-[var(--ink)] normal-case"
         >
-          <option value="authoritative">Authoritative</option>
-          <option value="conversational">Conversational</option>
-          <option value="bold">Bold</option>
-          <option value="thoughtful">Thoughtful</option>
-          <option value="witty">Witty</option>
+          {toneOverlays.map((overlay) => (
+            <option key={overlay.id} value={overlay.id}>
+              {overlay.label}
+            </option>
+          ))}
         </select>
       </label>
+      <div className="mt-3 rounded-xl bg-stone-50 p-3 text-xs leading-5 text-[var(--muted)]">
+        {explainStyleTone(contentStyle, tone)}
+      </div>
+      <a
+        href="/styles"
+        className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-[var(--sage)]"
+      >
+        <BookOpenText size={14} /> Compare all styles and tones
+      </a>
       {error ? <p className="mt-3 text-xs leading-5 text-red-700">{error}</p> : null}
       <button
         disabled={pending || !hasEvidence}

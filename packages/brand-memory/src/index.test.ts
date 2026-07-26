@@ -52,7 +52,7 @@ describe("brand memory", () => {
   it("bounds the brand-wide automatic opportunity policy", () => {
     expect(opportunitySelectionPolicySchema.parse(defaultOpportunitySelectionPolicy)).toEqual({
       automaticSelection: true,
-      minimumScore: 72,
+      minimumScore: 75,
       dailyDraftLimit: 3,
     });
     expect(

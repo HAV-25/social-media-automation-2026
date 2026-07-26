@@ -1036,3 +1036,33 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   business-facing journeys covering authentication, brand setup, autonomous
   RSS, scoring, daily selection, research, styles, quality, images, approval,
   recovery/cost, archive/resurfacing, and brand isolation.
+
+### Structured Styles workspace
+
+- Activated Styles in the selected-brand navigation and added a complete
+  reviewer-facing catalog for Newsworthy Authority, Educational Breakdown, and
+  Perspective & Conversation. Each style explains its purpose, intended reader
+  outcome, six-part structure, best-fit source types, and patterns to avoid.
+- Added the five approved tone overlays—Authoritative, Conversational, Bold,
+  Thoughtful, and Witty—with observable traits and a safety guardrail for each.
+  The screen explicitly separates strategic structure from voice treatment and
+  exposes no production-prompt editor.
+- Made the catalog the single UI source for generation labels and explanations.
+  Opportunity generation now explains the currently selected style/tone
+  combination before a paid call, while strict shared schemas reject any
+  unapproved value.
+- Made automatic volume legible: Klaank's three selected opportunities can each
+  request three independently verified styles, producing at most nine draft
+  variants before evidence or quality holds. Automatic preparation uses the
+  Thoughtful overlay and still stops at human review.
+- Corrected the remaining development and new-feed fallback threshold from 72
+  to the approved 75, matching the live Klaank policy and the 60–74 manual
+  Review band.
+- Local visual inspection confirmed the desktop hierarchy and selected
+  navigation state. The Chromium walking-skeleton journey now visits Styles,
+  verifies the 75-point explanation, changes Educational + Bold controls, and
+  confirms the combined explanation before generation. All four Chromium
+  journeys pass without paid provider calls.
+- Release verification passed `pnpm format:check`, `pnpm lint`,
+  `pnpm typecheck`, all 13 repository test tasks (including 71 web tests),
+  `pnpm build`, and all four Chromium regression journeys.

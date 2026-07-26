@@ -45,7 +45,7 @@ function routeDrafts(brands: WorkspaceBrand[], feed?: RssFeedView): RouteDraft[]
       brandId: brand.id,
       selected: Boolean(route) || (!feed && index === 0),
       generationPolicy: route?.generationPolicy ?? "score_then_research",
-      minimumScore: route?.minimumScore ?? 72,
+      minimumScore: route?.minimumScore ?? 75,
       dailyGenerationLimit: route?.dailyGenerationLimit ?? 3,
       topicTagsText: route?.topicTags.join(", ") ?? "",
       includeKeywordsText: route?.includeKeywords.join(", ") ?? "",
