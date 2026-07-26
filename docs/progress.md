@@ -383,7 +383,7 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
       administrator recovery actions.
 - [x] Feature 8.3: Workflow key rotation, user/internal rate limits, and
       systematic log redaction.
-- [ ] Feature 8.4: Cost, feed-health, approval, rejection, and generation-volume
+- [x] Feature 8.4: Cost, feed-health, approval, rejection, and generation-volume
       dashboards.
 - [ ] Feature 8.5: Retention controls, security/advisor suite, operating-limit
       load tests, and Milestone 8 release gate.
@@ -1164,3 +1164,36 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   all four Chromium regression journeys. The Supabase performance advisor no
   longer reports an unindexed membership foreign key. No paid provider or
   Netlify build was invoked.
+
+### Brand performance dashboard
+
+- Added a selected-brand Performance workspace that explains business outcomes
+  without requiring administrators to interpret the technical run ledger. It
+  combines 24-hour, 7-day, and 30-day reporting windows for current feed
+  health, reviewer outcomes, rejection reasons, generation volume, and exact
+  recorded AI cost.
+- Feed health is deterministic: an active feed with no consecutive failures and
+  a poll within 30 minutes is healthy; failing, never-polled, late, and paused
+  feeds remain separately visible with their last poll and failure count.
+- Approval rate is explicitly approved divided by approved plus rejected;
+  change requests are shown but excluded. Generation volume distinguishes
+  prepared opportunities, three-style draft variants, review-ready drafts,
+  immutable ready image assets, and successful workflow stages.
+- Reused the exact cost ledger already delivered for Feature 8.4 and linked the
+  business summary to Runs & errors for per-step, model, source, and content
+  package inspection.
+- Applied `brand_performance_dashboard` to Supabase project
+  `hqffgchxwtymyfwtkmdt`. Its function is security-invoker, validates a maximum
+  366-day window, denies anonymous execution, grants only authenticated
+  execution, and relies on existing brand/table RLS. The live 11-assertion
+  transaction passed feed classification, decision arithmetic, rejection
+  reasons, volume, invalid-window denial, and cross-brand denial.
+- A live Klaank read returned five healthy routed feeds, four review-ready
+  drafts across two prepared opportunities, and nine ready immutable image
+  assets. Post-migration advisors reported no new security finding; the new
+  feedback index has only the expected unused-index informational notice until
+  normal reporting traffic uses it.
+- Release verification passed formatting, lint, strict type checking, all 13
+  repository test tasks (313 assertions), the optimized production build, and
+  all four Chromium regression journeys. No paid provider or Netlify build was
+  invoked.

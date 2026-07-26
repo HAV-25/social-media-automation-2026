@@ -35,6 +35,18 @@ test("plain text becomes an editable and approvable draft without paid services"
   ).toBeVisible();
   await expect(page.getByText(/scheduled · attempt 0\/3/).first()).toBeVisible();
 
+  await page.getByRole("link", { name: "Performance" }).click();
+  await expect(
+    page.getByRole("heading", { name: "What the content engine delivered" }),
+  ).toBeVisible();
+  await expect(page.getByText("Healthy feeds", { exact: true })).toBeVisible();
+  await expect(page.getByText("Approval rate", { exact: true })).toBeVisible();
+  await expect(page.getByText("Rejection reasons", { exact: true })).toBeVisible();
+  await expect(page.getByText("IEEE Spectrum Robotics")).toBeVisible();
+  await page.getByLabel("Reporting window").selectOption("30d");
+  await page.getByRole("button", { name: "Apply" }).click();
+  await expect(page).toHaveURL(/performance\?window=30d/);
+
   await page.getByRole("link", { name: "Activity & feedback" }).click();
   await expect(page.getByRole("heading", { name: "Activity & feedback" })).toBeVisible();
   await expect(page.getByText("Make the opening more specific to robotics buyers.")).toBeVisible();

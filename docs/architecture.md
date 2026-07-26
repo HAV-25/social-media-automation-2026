@@ -49,6 +49,19 @@ retry the exact original execution. Only an organization administrator can
 queue a manual retry; PostgreSQL reauthorizes the actor and preserves the
 failed generation-run history.
 
+## Operational reporting
+
+The Performance workspace gives business reviewers a selected-brand summary of
+feed health, review outcomes, rejection reasons, generation volume, and recorded
+AI cost. A security-invoker PostgreSQL function performs bounded time-window
+aggregation while preserving every underlying RLS policy. It reports neither
+raw feed errors nor provider responses.
+
+Runs & Errors remains the technical execution/recovery view, and Activity &
+Feedback remains the immutable human/system accountability view. These three
+surfaces share durable Supabase records but answer different operational
+questions.
+
 ## Lean source pipeline
 
 All supported source adapters converge on a strict normalized/failure contract.

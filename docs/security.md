@@ -50,6 +50,10 @@
 - Dashboard aggregates execute as the authenticated caller, recheck brand-read
   permission, and retain source, opportunity, and run-table RLS. Anonymous
   callers cannot execute the aggregate function.
+- Performance aggregates are security-invoker, accept only a valid reporting
+  window of at most 366 days, and read only RLS-visible brand rows. Feed health
+  omits raw feed errors; rejection reporting exposes only the bounded reviewer
+  reason already authorized for the selected brand.
 - Errors are typed and redacted; provider/database secrets never reach users.
 - Log metadata is recursively bounded and redacts authorization, cookies,
   credentials, JWTs, connection passwords, source content, prompts, tokens, and

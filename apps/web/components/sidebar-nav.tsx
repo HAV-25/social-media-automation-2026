@@ -2,6 +2,7 @@
 
 import {
   Archive,
+  ChartNoAxesCombined,
   History,
   BookOpenText,
   FilePlus2,
@@ -17,6 +18,7 @@ const available = [
   { label: "Add source", icon: FilePlus2, href: "/inputs/new" },
   { label: "Sources", icon: Radio, href: "/sources" },
   { label: "Runs & errors", icon: TriangleAlert, href: "/runs" },
+  { label: "Performance", icon: ChartNoAxesCombined, href: "/performance" },
   { label: "Activity & feedback", icon: History, href: "/activity" },
   { label: "Ready posts", icon: Sparkles, href: "/posts" },
   { label: "Styles", icon: BookOpenText, href: "/styles" },

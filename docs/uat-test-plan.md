@@ -193,6 +193,26 @@ correct entity, and cannot expose activity from an unauthorized brand.
 Pass when role and brand access are enforced by RLS, cross-brand data remains
 inaccessible, and the final administrator cannot be removed.
 
+### UAT-16 — Brand performance and cost
+
+1. Open Performance for Klaank and select Last 7 days.
+2. Compare the feed-health list with Sources and confirm each routed feed has a
+   clear healthy, late, failing, never-polled, or paused state.
+3. Compare prepared opportunities, draft variants, ready image assets, and
+   successful workflow stages with Content inbox, Ready posts, and Runs &
+   errors.
+4. Approve one review-ready draft and reject another with a reason, then reload
+   Performance.
+5. Confirm approval/rejection totals and the rejection reason update. Confirm
+   approval rate equals approved divided by approved plus rejected and excludes
+   change requests.
+6. Follow Exact cost ledger and reconcile the total with the per-step, model,
+   source, and content-package breakdown.
+7. Switch brands and confirm the first brand's metrics disappear.
+
+Pass when the business summary reconciles with durable source, post, run, cost,
+and reviewer-decision records without exposing another brand's data.
+
 ## Defect recording
 
 For every defect capture:

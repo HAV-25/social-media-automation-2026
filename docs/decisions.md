@@ -777,3 +777,23 @@ member's organization role and per-brand assignments through Settings. The
 change is an authenticated, security-invoker PostgreSQL transaction with strict
 brand ownership checks, one audit event, and a database guard that prevents the
 last organization administrator from being demoted or deleted.
+
+## ADR-057 — Performance reporting separates business outcomes from run diagnosis
+
+**Status:** Accepted, 2026-07-26
+
+The selected-brand Performance workspace is the business reporting surface for
+feed reliability, preparation volume, reviewer decisions, rejection reasons,
+and recorded AI cost. Runs & Errors remains the technical diagnosis and
+recovery surface; Activity & Feedback remains the immutable accountability
+history.
+
+Feed health uses a deterministic 30-minute freshness boundary, twice the
+current 15-minute polling interval. Approval rate is approved divided by
+approved plus rejected; change requests are reported separately. Ready image
+volume counts immutable ready image assets rather than implying that content
+was approved or published.
+
+The reporting function is security-invoker and reads only RLS-visible rows. It
+accepts a bounded time window, exposes no raw feed/provider error, and has
+explicit authenticated execution with anonymous execution revoked.
