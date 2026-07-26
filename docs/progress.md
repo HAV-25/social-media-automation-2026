@@ -929,3 +929,14 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
 - Repository-wide formatting, lint, strict type-checking, all 269 automated
   tests, valid WF-05 JSON parsing, and the optimized production build passed.
   No paid AI, image, or Netlify build call was made.
+- The manually released cost-safe reuse path returned the existing real
+  Newsworthy SceneSmith draft in 2.47 seconds with the same draft, version, and
+  generation-run identifiers and `duplicate: true`. The generation ledger
+  remained at two historical calls and $0.05486, proving the release made no
+  new writer call.
+- Live WF-07 verification correctly reevaluated all three real SceneSmith
+  drafts but exposed an over-broad gate: a material sim-to-real evidence
+  boundary rejected every draft even though the drafts avoided the disputed
+  broad-solution claims and explicitly preserved the caveat. Verification now
+  blocks only when a draft maps to a claim participating in the material
+  conflict, while retaining an inspectable warning when the draft avoids it.

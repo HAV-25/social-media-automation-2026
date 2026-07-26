@@ -620,3 +620,20 @@ model call. Existing terminal, non-review-ready, or provenance-incomplete
 drafts fail closed for human attention instead of incurring new spend or
 overwriting editorial work. Newly generated and reused results are returned in
 the original requested style order.
+
+## ADR-047 — Material evidence conflicts block only drafts that rely on them
+
+**Status:** Accepted, 2026-07-26
+
+A material conflict in the research ledger remains visible to reviewers, but it
+does not automatically reject every draft produced from that research package.
+Deterministic verification counts a contradiction only when the draft maps to a
+claim that participates in the material conflict. A draft that avoids those
+claims receives an explicit warning and may continue through the remaining
+quality gates.
+
+This distinction preserves fail-closed behavior for disputed claims while
+allowing carefully qualified writing to use independent verified evidence. The
+conflict, its member claims, and its prescribed resolution remain durable and
+inspectable; this rule does not change a claim's verification state or usage
+guidance.

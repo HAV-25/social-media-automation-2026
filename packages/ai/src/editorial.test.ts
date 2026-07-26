@@ -110,6 +110,83 @@ describe("deterministic editorial evaluation", () => {
     expect(evaluation.readyForReview).toBe(false);
   });
 
+  it("warns without blocking when a draft avoids materially conflicted claims", () => {
+    const conflictedEvidence = evidencePackageSchema.parse({
+      ...evidence,
+      claims: [
+        ...evidence.claims,
+        {
+          ...evidence.claims[0],
+          claimKey: "claim_conflicted1",
+          text: "The operating model guarantees every decision will improve",
+          verificationState: "disputed",
+          usageGuidance: "do_not_use",
+        },
+      ],
+      conflicts: [
+        {
+          conflictKey: "conflict_material1",
+          claimKeys: ["claim_conflicted1"],
+          description: "The broad guarantee conflicts with the primary evidence.",
+          resolution: "Do not use the broad guarantee.",
+          material: true,
+        },
+      ],
+    });
+    const content = {
+      hook: "Clear organizational thinking starts with the operating model",
+      body: "For operators building better organizations, the operating model changes the decision path.",
+      closing: "What changes next?",
+      fullText:
+        "Clear organizational thinking starts with the operating model\n\nFor operators building better organizations, the operating model changes the decision path.\n\nWhat changes next?",
+    };
+
+    const evaluation = evaluateEditorialDraft({
+      content,
+      brandContext,
+      evidence: conflictedEvidence,
+      sourceText: "A different source description.",
+    });
+
+    expect(evaluation.contradictions).toBe(0);
+    expect(evaluation.warnings).toContain(
+      "The evidence ledger contains a material conflict; the draft avoids its claims.",
+    );
+    expect(evaluation.readyForReview).toBe(true);
+  });
+
+  it("blocks a draft that relies on a materially conflicted claim", () => {
+    const conflictedEvidence = evidencePackageSchema.parse({
+      ...evidence,
+      conflicts: [
+        {
+          conflictKey: "conflict_material1",
+          claimKeys: ["claim_primary1"],
+          description: "The primary claim has conflicting evidence.",
+          resolution: "Do not rely on the claim until the conflict is resolved.",
+          material: true,
+        },
+      ],
+    });
+    const content = {
+      hook: "A clearer operating model",
+      body: "The operating model changes the decision path.",
+      closing: "What changes next?",
+      fullText:
+        "A clearer operating model\n\nThe operating model changes the decision path.\n\nWhat changes next?",
+    };
+
+    const evaluation = evaluateEditorialDraft({
+      content,
+      brandContext,
+      evidence: conflictedEvidence,
+      sourceText: "A different source description.",
+    });
+
+    expect(evaluation.contradictions).toBe(1);
+    expect(evaluation.readyForReview).toBe(false);
+  });
+
   it("preserves untouched components during selective regeneration", () => {
     const content = {
       hook: "Original hook",

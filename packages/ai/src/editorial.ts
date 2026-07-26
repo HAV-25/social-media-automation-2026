@@ -198,7 +198,11 @@ export function evaluateEditorialDraft(input: {
       claim.verificationState !== "verified" &&
       claim.usageGuidance !== "do_not_use",
   ).length;
-  const contradictions = input.evidence.conflicts.filter((conflict) => conflict.material).length;
+  const referencedClaimKeys = new Set(sentenceClaims.flatMap((mapping) => mapping.claimKeys));
+  const materialConflicts = input.evidence.conflicts.filter((conflict) => conflict.material);
+  const contradictions = materialConflicts.filter((conflict) =>
+    conflict.claimKeys.some((claimKey) => referencedClaimKeys.has(claimKey)),
+  ).length;
   const unsupportedSentences = sentenceClaims.filter(
     (mapping) => mapping.state === "unsupported",
   ).length;
@@ -211,7 +215,11 @@ export function evaluateEditorialDraft(input: {
   if (prohibitedPhrases.length > 0) warnings.push("Draft contains prohibited brand language.");
   if (restrictedTopics.length > 0) warnings.push("Draft touches a restricted topic.");
   if (cliches.length > 0) warnings.push("Draft contains cliché language.");
-  if (contradictions > 0) warnings.push("The evidence ledger contains a material conflict.");
+  if (contradictions > 0) {
+    warnings.push("The draft relies on a claim involved in a material evidence conflict.");
+  } else if (materialConflicts.length > 0) {
+    warnings.push("The evidence ledger contains a material conflict; the draft avoids its claims.");
+  }
 
   const qualityScore = Math.max(
     0,
