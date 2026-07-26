@@ -950,3 +950,8 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   provenance, and exactly $0.005 cost. The Newsworthy draft is now a complete
   Ready Posts review item; approval and package download remain deliberate
   authenticated human actions.
+- Removed six explicitly identified sub-75 Klaank test opportunities from the
+  production demo dataset after confirming they had no research runs, drafts,
+  generation runs, images, or spend. Guarded deletion preserved all six
+  normalized source documents and the configured RSS feeds; verification
+  confirmed zero targeted opportunity rows remain.
