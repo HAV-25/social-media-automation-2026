@@ -279,6 +279,36 @@ describe("bounded research providers", () => {
     expect(result.evidencePackage.readyForWriting).toBe(true);
   });
 
+  it("does not let a quarantined core claim veto separately verified core evidence", async () => {
+    const evidence = verifiedEvidence();
+    evidence.claims.push({
+      ...evidence.claims[0]!,
+      claimKey: "claim_blocked001",
+      importance: "core",
+      riskLevel: "high",
+      verificationState: "unsupported",
+      usageGuidance: "do_not_use",
+      caveat: "This statement is retained only to prevent it from entering a post.",
+      evidence: [evidence.claims[0]!.evidence[0]!],
+    });
+    evidence.readyForWriting = false;
+    const fetchMock = vi.fn<typeof fetch>(async () => {
+      return new Response(JSON.stringify(providerResponse(evidence)), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    });
+
+    const result = await providerWithFetch(fetchMock).research(request());
+
+    expect(result.evidencePackage.readyForWriting).toBe(true);
+    expect(result.evidencePackage.claims[1]).toMatchObject({
+      importance: "core",
+      verificationState: "unsupported",
+      usageGuidance: "do_not_use",
+    });
+  });
+
   it("recomputes writing readiness from the normalized claims ledger", async () => {
     const evidence = verifiedEvidence();
     evidence.readyForWriting = false;

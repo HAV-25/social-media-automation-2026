@@ -864,3 +864,15 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   feed. This prevents a weak lead article from hiding stronger adjacent
   opportunities while the brand-wide daily maximum remains the hard paid-work
   control.
+- Corrected RSS reservation observability: the atomic selection decision is now
+  persisted as succeeded with a completion timestamp instead of remaining
+  queued indefinitely. Existing queued reservation records are normalized, so
+  the Runs & errors in-progress counter represents real outstanding work.
+- A second real bounded research run on MIT SceneSmith recorded two web
+  searches, 22,315 input tokens, 2,824 output tokens, and $0.118148 estimated
+  cost. It produced multiple verified core facts and material sim-to-real and
+  latency caveats.
+- Corrected ledger readiness so an explicitly quarantined `do_not_use` core
+  statement cannot veto separately verified usable core claims. The statement
+  remains durable and unavailable to writers; non-quarantined unsupported or
+  disputed core claims continue to block.

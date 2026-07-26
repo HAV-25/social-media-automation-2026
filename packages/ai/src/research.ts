@@ -278,7 +278,9 @@ function enforceEvidenceSafety(
   );
   const hasBlockedCore = claims.some(
     (claim) =>
-      claim.importance === "core" && ["unsupported", "disputed"].includes(claim.verificationState),
+      claim.importance === "core" &&
+      claim.usageGuidance !== "do_not_use" &&
+      ["unsupported", "disputed"].includes(claim.verificationState),
   );
   const readyForWriting = hasUsableCore && !hasBlockedCore;
   return evidencePackageSchema.parse({

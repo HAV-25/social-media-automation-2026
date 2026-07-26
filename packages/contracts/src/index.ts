@@ -804,9 +804,21 @@ export function validateEvidencePackageIntegrity(value: EvidencePackage) {
   }
   if (
     value.readyForWriting &&
+    !value.claims.some(
+      (claim) =>
+        claim.importance === "core" &&
+        claim.usageGuidance !== "do_not_use" &&
+        !["unsupported", "disputed"].includes(claim.verificationState),
+    )
+  ) {
+    issues.push("Evidence package is ready without a usable core claim.");
+  }
+  if (
+    value.readyForWriting &&
     value.claims.some(
       (claim) =>
         claim.importance === "core" &&
+        claim.usageGuidance !== "do_not_use" &&
         ["unsupported", "disputed"].includes(claim.verificationState),
     )
   ) {

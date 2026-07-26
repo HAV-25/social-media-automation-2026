@@ -27,6 +27,15 @@ const statusCastMigration = readFileSync(
   ),
   "utf8",
 );
+const readinessRepairMigration = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../../../supabase/migrations/20260726143500_recompute_quarantined_claim_readiness.sql",
+      import.meta.url,
+    ),
+  ),
+  "utf8",
+);
 
 describe("research evidence ledger migration", () => {
   it("adds a normalized conflict ledger with immediate RLS", () => {
@@ -85,5 +94,17 @@ describe("research evidence ledger migration", () => {
       "'private.persist_research_evidence(jsonb)'::regprocedure",
     );
     expect(statusCastMigration).toContain("::public.opportunity_status");
+  });
+
+  it("repairs readiness only when usable core evidence has no writable blocker", () => {
+    expect(readinessRepairMigration).toContain("claim.usage_guidance::text <> 'do_not_use'");
+    expect(readinessRepairMigration).toContain(
+      "claim.verification_state::text not in ('unsupported', 'disputed')",
+    );
+    expect(readinessRepairMigration).toContain(
+      "claim.verification_state::text in ('unsupported', 'disputed')",
+    );
+    expect(readinessRepairMigration).toContain("set status = 'ready_to_generate'");
+    expect(readinessRepairMigration).toContain("'research.readiness_recomputed'");
   });
 });

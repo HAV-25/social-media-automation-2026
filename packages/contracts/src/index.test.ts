@@ -467,6 +467,18 @@ describe("shared contracts", () => {
     readyWithUnsupportedCore.claims[0]!.usageGuidance = "do_not_use";
     expect(validateEvidencePackageIntegrity(readyWithUnsupportedCore).ok).toBe(false);
 
+    const readyWithQuarantinedAdditionalCore = structuredClone(basePackage);
+    readyWithQuarantinedAdditionalCore.claims.push({
+      ...structuredClone(basePackage.claims[0]!),
+      claimKey: "claim_blocked001",
+      verificationState: "unsupported",
+      usageGuidance: "do_not_use",
+    });
+    expect(validateEvidencePackageIntegrity(readyWithQuarantinedAdditionalCore)).toEqual({
+      ok: true,
+      issues: [],
+    });
+
     const readyWithoutClaims = structuredClone(basePackage);
     readyWithoutClaims.claims = [];
     expect(validateEvidencePackageIntegrity(readyWithoutClaims).ok).toBe(false);

@@ -540,3 +540,31 @@ deduplication, routing, scoring, and brand-wide reservation.
 This catch-up bound does not increase the brand's daily preparation allowance.
 The locked brand policy remains the authoritative control for the number of
 research and draft branches allowed per UTC day.
+
+## ADR-042 — RSS reservations are completed operational decisions
+
+**Status:** Accepted, 2026-07-26
+
+An `rss_opportunity_reservation` records the result of the atomic brand-policy
+decision. It is complete when the database transaction commits and must be
+stored as `succeeded` with `completed_at`; it is not the asynchronous research
+or generation work itself.
+
+Research, editorial generation, verification, and image generation each retain
+their own generation runs and lifecycle. This separation keeps Runs & errors
+accurate: a selected opportunity does not create a permanent in-progress count,
+and downstream failures remain independently diagnosable.
+
+## ADR-043 — Quarantined claims cannot veto verified usable evidence
+
+**Status:** Accepted, 2026-07-26
+
+Writing readiness requires at least one usable core claim and no unsupported or
+disputed core claim that the writer is permitted to use. A claim explicitly
+marked `do_not_use` remains preserved in the ledger and excluded from every
+writing context, but it does not veto separately verified usable core evidence.
+
+This distinction prevents a provider-generated warning such as “do not claim
+that this solves the whole problem” from blocking a carefully bounded post
+about independently supported facts. Removing the `do_not_use` quarantine would
+make the claim blocking again; no unsupported claim becomes writable.

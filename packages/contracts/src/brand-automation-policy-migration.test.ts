@@ -27,6 +27,15 @@ const stableIdentitySql = readFileSync(
   ),
   "utf8",
 );
+const completedReservationSql = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../../../supabase/migrations/20260726142500_complete_rss_reservations.sql",
+      import.meta.url,
+    ),
+  ),
+  "utf8",
+);
 
 describe("brand-wide opportunity selection migration", () => {
   it("adds bounded policy columns to the existing RLS-protected brand profile", () => {
@@ -74,5 +83,17 @@ describe("brand-wide opportunity selection migration", () => {
     expect(stableIdentitySql).toContain("run.model_usage ->> 'sourceDocumentId'");
     expect(stableIdentitySql).toContain("run.entity_id");
     expect(stableIdentitySql).not.toContain("opportunityScore");
+  });
+
+  it("records instantaneous reservations as completed operations", () => {
+    expect(completedReservationSql).toContain("E'      ''succeeded'',");
+    expect(completedReservationSql).toContain("E'      status,\\n      completed_at,");
+    expect(completedReservationSql).toContain("status in ('queued', 'running')");
+    expect(completedReservationSql).toContain(
+      "revoke all on function private.reserve_rss_generation(jsonb)",
+    );
+    expect(completedReservationSql).not.toContain(
+      "grant execute on function public.reserve_rss_generation(jsonb)\n  to authenticated",
+    );
   });
 });
