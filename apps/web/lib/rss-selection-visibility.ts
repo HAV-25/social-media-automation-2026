@@ -1,12 +1,17 @@
 export type RssSelectionVisibility =
   | "selected"
+  | "review"
+  | "stored_only"
   | "below_threshold"
   | "daily_limit"
   | "ingest_only"
   | "awaiting_selection";
 
+export const RSS_REVIEW_MINIMUM_SCORE = 60;
+
 export function deriveRssSelectionVisibility(input: {
   selected: boolean;
+  automaticPreparationAllowed: boolean;
   automaticSelection: boolean;
   generationPolicy: string | null;
   score: number;
@@ -14,11 +19,12 @@ export function deriveRssSelectionVisibility(input: {
   selectedToday: number;
   dailyLimit: number;
 }): RssSelectionVisibility {
-  if (input.selected) return "selected";
   if (!input.automaticSelection || input.generationPolicy === "ingest_only") {
     return "ingest_only";
   }
-  if (input.score < input.minimumScore) return "below_threshold";
+  if (input.score < RSS_REVIEW_MINIMUM_SCORE) return "stored_only";
+  if (!input.automaticPreparationAllowed || input.score < input.minimumScore) return "review";
+  if (input.selected) return "selected";
   if (input.selectedToday >= input.dailyLimit) return "daily_limit";
   return "awaiting_selection";
 }

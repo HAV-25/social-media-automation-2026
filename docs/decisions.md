@@ -583,3 +583,23 @@ Structured Facebook writing uses no additional model reasoning by default and a
 2,500-token output ceiling. Research remains the reasoning-heavy stage. This
 keeps the synchronous application bridge within its hosting limit without
 weakening evidence or review gates.
+
+## ADR-045 — Automatic RSS preparation requires full text and a strong score
+
+**Status:** Accepted, 2026-07-26
+
+Klaank automatically prepares only opportunities scoring at least 75. Scores
+from 60 through 74 remain in the Review band for an optional human decision;
+scores below 60 are stored only. These bands control entry into research and
+drafting, not the separate post-quality score applied after writing.
+
+Before scoring, the RSS analysis boundary attempts an SSRF-protected, MIME- and
+size-bounded extraction of the canonical article. When at least 500 readable
+characters are unavailable, the title and RSS summary remain durable and
+visible but are marked for manual review and cannot be reserved for automatic
+preparation. Re-analysis refreshes deterministic opportunity intelligence while
+preserving the opportunity identity, workflow state, and audit history.
+
+Reservation idempotency includes the server-owned brand-policy version. A
+policy edit therefore creates a new bounded decision without allowing score
+text or user-controlled metadata to redefine request identity.

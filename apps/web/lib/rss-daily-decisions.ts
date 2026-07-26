@@ -1,7 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { explainRssRouteFilter } from "./rss-routing-visibility";
-import { deriveRssSelectionVisibility } from "./rss-selection-visibility";
+import { deriveRssSelectionVisibility, RSS_REVIEW_MINIMUM_SCORE } from "./rss-selection-visibility";
 import { createSupabaseServerClient } from "./supabase/server";
 
 const routeRowSchema = z.object({
@@ -30,6 +30,13 @@ const itemRowSchema = z.object({
       raw_text: z.string().nullable(),
       status: z.string(),
       duplicate_of_source_id: z.uuid().nullable(),
+      extraction_confidence: z.union([z.number(), z.string()]).nullable(),
+      metadata: z
+        .object({
+          requiresManualReview: z.boolean().optional(),
+          reviewReasons: z.array(z.string()).optional(),
+        })
+        .passthrough(),
     })
     .nullable(),
 });
@@ -68,8 +75,11 @@ export type RssDailyItemDecision = {
   score: number | null;
   opportunityId: string | null;
   opportunityStatus: string | null;
+  analysisBasis: "full_article" | "rss_summary" | null;
   selection:
     | "selected"
+    | "review"
+    | "stored_only"
     | "below_threshold"
     | "daily_limit"
     | "ingest_only"
@@ -104,6 +114,7 @@ export type RssDailyOverview = {
     minimumScore: number;
     dailyLimit: number;
     selectedToday: number;
+    reviewMinimumScore: number;
   };
 };
 
@@ -116,6 +127,7 @@ export async function getRssDailyDecisions(
     minimumScore: 72,
     dailyLimit: 0,
     selectedToday: 0,
+    reviewMinimumScore: RSS_REVIEW_MINIMUM_SCORE,
   };
   if (process.env.NEXT_PUBLIC_DEMO_MODE !== "false") {
     return { feeds: [], items: [], policy: emptyPolicy };
@@ -145,6 +157,7 @@ export async function getRssDailyDecisions(
     minimumScore: Number(rawBrandPolicy.minimum_opportunity_score),
     dailyLimit: rawBrandPolicy.daily_draft_limit,
     selectedToday: 0,
+    reviewMinimumScore: RSS_REVIEW_MINIMUM_SCORE,
   };
   if (!routes.length) return { feeds: [], items: [], policy };
 
@@ -152,7 +165,7 @@ export async function getRssDailyDecisions(
   const { data: rawItems, error: itemError } = await supabase
     .from("rss_feed_items")
     .select(
-      "id,rss_feed_id,title,first_seen_at,source_document_id,source_documents(raw_text,status,duplicate_of_source_id)",
+      "id,rss_feed_id,title,first_seen_at,source_document_id,source_documents(raw_text,status,duplicate_of_source_id,extraction_confidence,metadata)",
     )
     .in("rss_feed_id", feedIds)
     .order("first_seen_at", { ascending: false })
@@ -213,17 +226,44 @@ export async function getRssDailyDecisions(
     .from("generation_runs")
     .select("entity_id,created_at")
     .eq("brand_id", brandId)
-    .eq("run_type", "rss_opportunity_reservation");
+    .eq("run_type", "rss_opportunity_reservation")
+    .eq("status", "succeeded");
   reservationQuery = opportunityIds.length
     ? reservationQuery.or(`created_at.gte.${since},entity_id.in.(${opportunityIds.join(",")})`)
     : reservationQuery.gte("created_at", since);
   const { data: rawReservations, error: reservationError } = await reservationQuery;
   if (reservationError) throw new Error("Unable to load today's RSS selection decisions.");
   const reservations = z.array(reservationRowSchema).parse(rawReservations ?? []);
-  const selectedOpportunityIds = new Set(reservations.map((reservation) => reservation.entity_id));
+  const opportunityById = new Map(
+    opportunities.map((opportunity) => [opportunity.id, opportunity]),
+  );
+  const sourceById = new Map(
+    visibleItems
+      .filter((item) => item.source_document_id && item.source_documents)
+      .map((item) => [item.source_document_id!, item.source_documents!]),
+  );
+  const summaryOnly = (sourceDocumentId: string) =>
+    sourceById.get(sourceDocumentId)?.metadata.requiresManualReview === true;
+  const qualifiesUnderCurrentPolicy = (opportunityId: string) => {
+    const opportunity = opportunityById.get(opportunityId);
+    return Boolean(
+      opportunity &&
+        Number(opportunity.opportunity_score) >= policy.minimumScore &&
+        !summaryOnly(opportunity.source_document_id),
+    );
+  };
+  const selectedOpportunityIds = new Set(
+    reservations
+      .filter((reservation) => qualifiesUnderCurrentPolicy(reservation.entity_id))
+      .map((reservation) => reservation.entity_id),
+  );
   policy.selectedToday = new Set(
     reservations
-      .filter((reservation) => new Date(reservation.created_at).getTime() >= windowStart)
+      .filter(
+        (reservation) =>
+          new Date(reservation.created_at).getTime() >= windowStart &&
+          qualifiesUnderCurrentPolicy(reservation.entity_id),
+      )
       .map((reservation) => reservation.entity_id),
   ).size;
 
@@ -234,10 +274,13 @@ export async function getRssDailyDecisions(
         const sourceId = item.source_document_id;
         const opportunity = sourceId ? opportunitiesBySource.get(sourceId) : null;
         if (opportunity) {
+          const basis = summaryOnly(opportunity.source_document_id)
+            ? "RSS summary only; automatic preparation is disabled"
+            : "Scored from the safely extracted full article";
           return {
             title: item.title,
             state: "scored" as const,
-            explanation: `Opportunity ${opportunity.status.replaceAll("_", " ")}`,
+            explanation: `${basis} · Opportunity ${opportunity.status.replaceAll("_", " ")}`,
             score: Number(opportunity.opportunity_score),
             opportunityId: opportunity.id,
           };
@@ -307,8 +350,10 @@ export async function getRssDailyDecisions(
     };
     if (opportunity) {
       const score = Number(opportunity.opportunity_score);
+      const isSummaryOnly = summaryOnly(opportunity.source_document_id);
       const selection = deriveRssSelectionVisibility({
         selected: selectedOpportunityIds.has(opportunity.id),
+        automaticPreparationAllowed: !isSummaryOnly,
         automaticSelection: policy.automaticSelection,
         generationPolicy: route?.generation_policy ?? null,
         score,
@@ -319,10 +364,13 @@ export async function getRssDailyDecisions(
       return {
         ...base,
         state: "scored" as const,
-        explanation: `Opportunity ${opportunity.status.replaceAll("_", " ")}`,
+        explanation: isSummaryOnly
+          ? "RSS summary only; stored for review and excluded from automatic preparation"
+          : `Scored from the safely extracted full article · Opportunity ${opportunity.status.replaceAll("_", " ")}`,
         score,
         opportunityId: opportunity.id,
         opportunityStatus: opportunity.status,
+        analysisBasis: isSummaryOnly ? ("rss_summary" as const) : ("full_article" as const),
         selection,
       };
     }
@@ -334,6 +382,7 @@ export async function getRssDailyDecisions(
         score: null,
         opportunityId: null,
         opportunityStatus: null,
+        analysisBasis: null,
         selection: "not_applicable" as const,
       };
     }
@@ -345,6 +394,7 @@ export async function getRssDailyDecisions(
         score: null,
         opportunityId: null,
         opportunityStatus: null,
+        analysisBasis: null,
         selection: "not_applicable" as const,
       };
     }
@@ -360,6 +410,7 @@ export async function getRssDailyDecisions(
       score: null,
       opportunityId: null,
       opportunityStatus: null,
+      analysisBasis: null,
       selection: "not_applicable" as const,
     };
   });

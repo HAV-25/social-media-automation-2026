@@ -31,7 +31,7 @@ export type GenerationDefaults = z.infer<typeof generationDefaultsSchema>;
 
 export const opportunitySelectionPolicySchema = z.object({
   automaticSelection: z.boolean(),
-  minimumScore: z.number().min(0).max(100),
+  minimumScore: z.number().min(60).max(100),
   dailyDraftLimit: z.number().int().min(0).max(20),
 });
 export type OpportunitySelectionPolicy = z.infer<typeof opportunitySelectionPolicySchema>;

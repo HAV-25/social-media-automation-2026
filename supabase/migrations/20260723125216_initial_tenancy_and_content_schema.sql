@@ -178,7 +178,7 @@ create table public.rss_feed_brand_links (
   brand_id uuid not null,
   generation_policy text not null default 'score_then_research'
     check (generation_policy in ('ingest_only', 'score_then_research')),
-  minimum_score numeric(5,2) not null default 72 check (minimum_score between 0 and 100),
+  minimum_score numeric(5,2) not null default 72 check (minimum_score between 60 and 100),
   daily_generation_limit integer not null default 3 check (daily_generation_limit between 0 and 100),
   topic_tags text[] not null default '{}',
   include_keywords text[] not null default '{}',
@@ -1501,8 +1501,13 @@ begin
     )
     on conflict (brand_id, source_document_id) where source_document_id is not null
     do update set
-      updated_at = public.opportunities.updated_at,
-      cluster_id = coalesce(excluded.cluster_id, public.opportunities.cluster_id)
+      updated_at = now(),
+      cluster_id = coalesce(excluded.cluster_id, public.opportunities.cluster_id),
+      value_nucleus = excluded.value_nucleus,
+      recommended_style = excluded.recommended_style,
+      opportunity_score = excluded.opportunity_score,
+      risk_penalty = excluded.risk_penalty,
+      score_breakdown = excluded.score_breakdown
     returning id into opportunity_record_id;
   elsif cluster_record_id is not null then
     update public.opportunities
@@ -2474,7 +2479,7 @@ begin
           organization_member.role = 'administrator'
           or brand_member.role in ('administrator', 'editor')
         )
-        or (route.value ->> 'minimumScore')::numeric not between 0 and 100
+        or (route.value ->> 'minimumScore')::numeric not between 60 and 100
         or (route.value ->> 'dailyGenerationLimit')::integer not between 0 and 100
         or coalesce(route.value ->> 'generationPolicy', '') not in (
           'ingest_only',

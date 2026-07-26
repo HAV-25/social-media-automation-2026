@@ -1,7 +1,7 @@
 alter table public.brand_profiles
   add column automatic_opportunity_selection boolean not null default true,
   add column minimum_opportunity_score numeric(5,2) not null default 72
-    check (minimum_opportunity_score between 0 and 100),
+    check (minimum_opportunity_score between 60 and 100),
   add column daily_draft_limit integer not null default 3
     check (daily_draft_limit between 0 and 20);
 

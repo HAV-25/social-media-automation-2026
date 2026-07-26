@@ -881,3 +881,20 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   the no-reasoning structured-writing default with a 2,500-token ceiling.
   Validation, per-style budgets, deterministic persistence order, and human
   review remain unchanged.
+- Restored Klaank's production opportunity policy with the business-approved
+  bands: automatic preparation at 75 or higher, manual Review from 60 through
+  74, and store-only below 60. The live Supabase profile was updated and the
+  policy change was audited.
+- RSS analysis now safely extracts the canonical full article before final
+  scoring. Summary-only fallbacks remain visible with explicit provenance and
+  are excluded from automatic research and writing regardless of score.
+- Added versioned re-analysis and policy-aware reservation identities. The
+  deployed atomic ingestion function now refreshes value nucleus, style, score,
+  risk, and score breakdown when a staged RSS source gains full text, while
+  preserving the durable opportunity identity and lifecycle.
+- Enforced the automatic-preparation safety floor in both application schemas
+  and the live Supabase database: brand and legacy feed-route thresholds cannot
+  be configured below 60. Klaank remains configured at 75, giving the business
+  a 60–74 Review band and a store-only band below 60. The consolidated local
+  release passed formatting, lint, type checking, 265 tests, and the production
+  Next.js build before deployment.

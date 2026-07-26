@@ -58,6 +58,13 @@ describe("brand memory", () => {
     expect(
       opportunitySelectionPolicySchema.safeParse({
         automaticSelection: true,
+        minimumScore: 59,
+        dailyDraftLimit: 3,
+      }).success,
+    ).toBe(false);
+    expect(
+      opportunitySelectionPolicySchema.safeParse({
+        automaticSelection: true,
         minimumScore: 101,
         dailyDraftLimit: 21,
       }).success,

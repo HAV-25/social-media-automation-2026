@@ -68,9 +68,9 @@ insert into public.brand_profiles (
 values
   (
     '20000000-0000-4000-8000-000000000001',
-    'Working assumption — leaders building modern organizations and teams; team confirmation required.',
-    'Working assumption — clear signals about how work and leadership are changing; team confirmation required.',
-    array['Future of work', 'Leadership', 'Organizational design'],
+    'Business decision-makers, operations leaders, engineers, procurement teams, and innovation leaders evaluating robotics for commercial environments; alongside robotics suppliers and system integrators seeking qualified B2B visibility.',
+    'An evidence-led marketplace guide that helps organizations discover robotics solutions, understand real use cases, compare requirements, and make more confident procurement decisions.',
+    array['Robotics market news and commercial deployments', 'Industrial automation use cases', 'Buyer education, readiness and ROI', 'Robotics suppliers, integrators and ecosystem', 'Safety, workforce and responsible adoption'],
     array['Unverified claims', 'Guaranteed outcomes'],
     array['Invite a considered response'],
     array['Global'],
@@ -78,7 +78,7 @@ values
     '{"formality":65,"warmth":55,"boldness":55,"humor":15,"evidenceDensity":80,"sentenceStyle":"balanced","preferredVocabulary":["operating model","human judgment"],"avoidVocabulary":["disruption for disruption''s sake"],"bannedPhrases":["guaranteed viral"]}'::jsonb,
     '{"targetLength":"medium","emojiPolicy":"never","hashtagPolicy":"none","ctaStyle":"question","defaultVariantCount":3}'::jsonb,
     true,
-    72,
+    75,
     3
   ),
   (

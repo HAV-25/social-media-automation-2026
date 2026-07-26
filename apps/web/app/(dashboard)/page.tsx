@@ -230,15 +230,27 @@ export default async function DashboardPage() {
                 </p>
               </div>
               <div className="rounded-2xl bg-[var(--sage-soft)] px-4 py-3 text-xs text-[var(--sage)]">
-                <strong>{rssOverview.policy.selectedToday}</strong> selected today · score{" "}
-                <strong>≥ {rssOverview.policy.minimumScore}</strong> · daily maximum{" "}
-                <strong>{rssOverview.policy.dailyLimit}</strong>
+                <strong>{rssOverview.policy.selectedToday}</strong> selected today · automatic{" "}
+                <strong>≥ {rssOverview.policy.minimumScore}</strong>
+                {rssOverview.policy.minimumScore > rssOverview.policy.reviewMinimumScore ? (
+                  <>
+                    {" "}
+                    · review{" "}
+                    <strong>
+                      {rssOverview.policy.reviewMinimumScore}–{rssOverview.policy.minimumScore - 1}
+                    </strong>
+                  </>
+                ) : null}{" "}
+                · stored only <strong>&lt; {rssOverview.policy.reviewMinimumScore}</strong> · daily
+                maximum <strong>{rssOverview.policy.dailyLimit}</strong>
               </div>
             </div>
             <div className="divide-y divide-[var(--line)]">
               {rssOverview.items.map((item) => {
                 const selectionLabels = {
                   selected: "Selected for preparation",
+                  review: "Review manually",
+                  stored_only: "Stored only",
                   below_threshold: "Below score threshold",
                   daily_limit: "Daily maximum reached",
                   ingest_only: "Scoring only",
@@ -286,7 +298,9 @@ export default async function DashboardPage() {
                       className={`w-fit rounded-full px-3 py-1.5 text-[10px] font-bold ${
                         item.selection === "selected"
                           ? "bg-emerald-50 text-emerald-800"
-                          : item.selection === "below_threshold" || item.selection === "daily_limit"
+                          : item.selection === "review" ||
+                              item.selection === "below_threshold" ||
+                              item.selection === "daily_limit"
                             ? "bg-amber-50 text-amber-800"
                             : "bg-stone-100 text-stone-700"
                       }`}

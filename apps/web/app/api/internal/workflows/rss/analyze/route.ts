@@ -2,13 +2,13 @@ import {
   manualInputResultSchema,
   rssSourceAnalysisRequestSchema,
   rssSourceAnalysisResultSchema,
-  sourceAdapterNormalizedResultSchema,
 } from "@content-engine/contracts";
 import { sha256Hex } from "@content-engine/security";
-import { normalizeManualInput } from "@content-engine/source-processing";
+import { fetchAndExtractUrl } from "@content-engine/source-processing";
 import { type NextRequest, NextResponse } from "next/server";
 import { z, ZodError } from "zod";
 import { persistNormalizedSource } from "@/lib/persist-normalized-source";
+import { selectRssAnalysisSource } from "@/lib/rss-analysis-source";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { authenticateWorkflowRequest, WorkflowAuthError } from "@/lib/workflow-auth";
 
@@ -44,6 +44,7 @@ const brandProfileSchema = z.object({
   positioning: z.string(),
   content_pillars: z.array(z.string()),
   restricted_topics: z.array(z.string()),
+  updated_at: z.string(),
 });
 
 const reservationRowSchema = z.object({
@@ -131,7 +132,9 @@ export async function POST(request: NextRequest) {
     }
     const { data: rawProfiles, error: profileError } = await supabase
       .from("brand_profiles")
-      .select("brand_id,audience_definition,positioning,content_pillars,restricted_topics")
+      .select(
+        "brand_id,audience_definition,positioning,content_pillars,restricted_topics,updated_at",
+      )
       .in(
         "brand_id",
         routes.map((route) => route.brand_id),
@@ -139,8 +142,8 @@ export async function POST(request: NextRequest) {
     if (profileError) throw profileError;
     const profiles = z.array(brandProfileSchema).parse(rawProfiles ?? []);
 
-    const combinedText = [source.title, source.raw_text].filter(Boolean).join("\n\n");
-    if (combinedText.trim().length < 20) {
+    const summaryText = [source.title, source.raw_text].filter(Boolean).join("\n\n");
+    if (summaryText.trim().length < 20) {
       await supabase
         .from("source_documents")
         .update({
@@ -150,32 +153,34 @@ export async function POST(request: NextRequest) {
         .eq("id", source.id);
       return failure(422, "rss_content_too_short", "The RSS item has too little text to analyze.");
     }
-    const normalized = normalizeManualInput({
-      title: source.title ?? "Untitled RSS item",
-      text: combinedText,
-      language: "en",
-      stripMarkup: true,
-    });
-    const normalizedSource = sourceAdapterNormalizedResultSchema.parse({
-      contractVersion: "1.0",
-      outcome: "normalized",
-      sourceType: "rss",
-      title: normalized.title,
-      cleanText: normalized.cleanText,
-      contentHash: normalized.contentHash,
-      language: normalized.language,
-      canonicalUrl: source.canonical_url ?? undefined,
-      sections: [{ index: 0, label: "RSS item", text: normalized.cleanText }],
-      requiresManualReview: false,
-      reviewReasons: [],
-      provenance: {
-        submittedBy: actorId,
-        originalUrl: source.canonical_url ?? undefined,
-        author: source.author ?? undefined,
-        publisher: source.publisher ?? undefined,
-        publishedAt: source.published_at ? new Date(source.published_at).toISOString() : undefined,
-        receivedAt: payload.requestedAt,
+    const extracted = source.canonical_url
+      ? await fetchAndExtractUrl({
+          url: source.canonical_url,
+          language: "en",
+          provenance: {
+            submittedBy: actorId,
+            originalUrl: source.canonical_url,
+            author: source.author ?? undefined,
+            publisher: source.publisher ?? undefined,
+            publishedAt: source.published_at
+              ? new Date(source.published_at).toISOString()
+              : undefined,
+            receivedAt: payload.requestedAt,
+          },
+        })
+      : null;
+    const analysisSource = selectRssAnalysisSource({
+      source: {
+        title: source.title,
+        rawText: source.raw_text,
+        canonicalUrl: source.canonical_url,
+        author: source.author,
+        publisher: source.publisher,
+        publishedAt: source.published_at,
       },
+      actorId,
+      requestedAt: payload.requestedAt,
+      extracted,
     });
 
     const results = [];
@@ -192,7 +197,7 @@ export async function POST(request: NextRequest) {
         sourceType: "rss",
         sourceDocumentId: source.id,
         contentHashOverride: source.content_hash,
-        source: normalizedSource,
+        source: analysisSource.source,
         rawText: source.raw_text,
         scorePolicy: {
           audienceDefinition: profile.audience_definition,
@@ -210,10 +215,11 @@ export async function POST(request: NextRequest) {
         );
       }
       const opportunity = manualInputResultSchema.parse(await persisted.json());
+      const policyVersion = sha256Hex(profile.updated_at).slice(0, 16);
       const reservationPayload = {
         contractVersion: "1.0",
         correlationId: payload.correlationId,
-        idempotencyKey: `rss-reserve:${source.id}:${route.brand_id}`,
+        idempotencyKey: `rss-reserve-v2:${source.id}:${route.brand_id}:${policyVersion}`,
         feedId: feed.id,
         brandId: route.brand_id,
         sourceDocumentId: source.id,
@@ -227,18 +233,23 @@ export async function POST(request: NextRequest) {
           reservationPayload.brandId,
           reservationPayload.sourceDocumentId,
           reservationPayload.opportunityId,
+          profile.updated_at,
         ].join(":"),
       );
-      const { data: rawReservation, error: reservationError } = await supabase
-        .rpc("reserve_rss_generation", {
-          payload: {
-            ...reservationPayload,
-            requestHash: reservationRequestHash,
-          },
-        })
-        .single();
-      if (reservationError) throw reservationError;
-      const reservation = reservationRowSchema.parse(rawReservation);
+      const reservation = analysisSource.automaticPreparationAllowed
+        ? await (async () => {
+            const { data: rawReservation, error: reservationError } = await supabase
+              .rpc("reserve_rss_generation", {
+                payload: {
+                  ...reservationPayload,
+                  requestHash: reservationRequestHash,
+                },
+              })
+              .single();
+            if (reservationError) throw reservationError;
+            return reservationRowSchema.parse(rawReservation);
+          })()
+        : ({ eligible: false, reason: "ingest_only" } as const);
       results.push({
         actorId,
         brandId: route.brand_id,
@@ -246,6 +257,7 @@ export async function POST(request: NextRequest) {
         score: opportunity.score,
         riskPenalty: opportunity.riskPenalty,
         duplicate: opportunity.duplicate,
+        analysisBasis: analysisSource.analysisBasis,
         researchEligible: reservation.eligible,
         eligibilityReason: reservation.reason,
       });

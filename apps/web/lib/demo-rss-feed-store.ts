@@ -3,7 +3,7 @@ import { z } from "zod";
 const demoRssRouteSchema = z.object({
   brandId: z.uuid(),
   generationPolicy: z.enum(["ingest_only", "score_then_research"]),
-  minimumScore: z.number().min(0).max(100),
+  minimumScore: z.number().min(60).max(100),
   dailyGenerationLimit: z.number().int().min(0).max(100),
   topicTags: z.array(z.string()).max(30),
   includeKeywords: z.array(z.string()).max(50),

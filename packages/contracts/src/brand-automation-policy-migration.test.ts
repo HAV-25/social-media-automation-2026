@@ -40,7 +40,7 @@ const completedReservationSql = readFileSync(
 describe("brand-wide opportunity selection migration", () => {
   it("adds bounded policy columns to the existing RLS-protected brand profile", () => {
     expect(sql).toContain("automatic_opportunity_selection boolean not null default true");
-    expect(sql).toContain("minimum_opportunity_score between 0 and 100");
+    expect(sql).toContain("minimum_opportunity_score between 60 and 100");
     expect(sql).toContain("daily_draft_limit between 0 and 20");
   });
 

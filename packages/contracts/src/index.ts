@@ -177,7 +177,7 @@ export const rssFeedPlanItemSchema = z.object({
     z.object({
       brandId: z.uuid(),
       generationPolicy: z.enum(["ingest_only", "score_then_research"]),
-      minimumScore: z.number().min(0).max(100),
+      minimumScore: z.number().min(60).max(100),
       dailyGenerationLimit: z.number().int().min(0).max(100),
       includeKeywords: z.array(z.string().min(1).max(100)).max(50),
       excludeKeywords: z.array(z.string().min(1).max(100)).max(50),
@@ -192,7 +192,7 @@ export const rssFeedPlanSchema = z.object({
 const rssBrandRouteInputSchema = z.object({
   brandId: z.uuid(),
   generationPolicy: z.enum(["ingest_only", "score_then_research"]),
-  minimumScore: z.number().min(0).max(100),
+  minimumScore: z.number().min(60).max(100),
   dailyGenerationLimit: z.number().int().min(0).max(100),
   topicTags: z.array(z.string().trim().min(1).max(80)).max(30),
   includeKeywords: z.array(z.string().trim().min(1).max(100)).max(50),
@@ -277,6 +277,7 @@ export const rssSourceAnalysisResultSchema = z.object({
       score: z.number().min(0).max(100),
       riskPenalty: z.number().min(0).max(30),
       duplicate: z.boolean(),
+      analysisBasis: z.enum(["full_article", "rss_summary"]),
       researchEligible: z.boolean(),
       eligibilityReason: z.enum([
         "reserved",

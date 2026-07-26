@@ -158,6 +158,7 @@ describe("shared contracts", () => {
           score: 73,
           riskPenalty: 4,
           duplicate: false,
+          analysisBasis: "full_article",
           researchEligible: true,
           eligibilityReason: "reserved",
         },

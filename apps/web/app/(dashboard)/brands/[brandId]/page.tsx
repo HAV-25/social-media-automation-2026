@@ -274,14 +274,15 @@ export default async function BrandConfigurationPage({
                       required
                       name="minimumOpportunityScore"
                       type="number"
-                      min={0}
+                      min={60}
                       max={100}
                       step={1}
                       defaultValue={opportunityPolicy.minimumScore}
                       className="mt-1.5 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm font-normal text-[var(--ink)]"
                     />
                     <span className="mt-1 block text-[10px] font-normal leading-4">
-                      Items below this score remain visible but are not selected automatically.
+                      Scores 60 to one point below this threshold enter Review. Scores below 60 are
+                      stored only. Neither group is selected automatically.
                     </span>
                   </label>
                   <label className="text-xs font-bold text-[var(--muted)]">
