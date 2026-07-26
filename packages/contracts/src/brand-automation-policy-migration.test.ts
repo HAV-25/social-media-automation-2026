@@ -9,6 +9,15 @@ const migrationPath = fileURLToPath(
   ),
 );
 const sql = readFileSync(migrationPath, "utf8");
+const secretKeyCompatibilitySql = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../../../supabase/migrations/20260726135500_support_secret_keys_for_brand_automation.sql",
+      import.meta.url,
+    ),
+  ),
+  "utf8",
+);
 
 describe("brand-wide opportunity selection migration", () => {
   it("adds bounded policy columns to the existing RLS-protected brand profile", () => {
@@ -32,5 +41,21 @@ describe("brand-wide opportunity selection migration", () => {
     expect(sql).toContain("Idempotency key was reused with a different request");
     expect(sql).toContain("security definer");
     expect(sql).toContain("set search_path = ''");
+  });
+
+  it("supports opaque secret keys without broadening reservation execution", () => {
+    expect(secretKeyCompatibilitySql).toContain("current_setting(''request.jwt.claims'', true)");
+    expect(secretKeyCompatibilitySql).toContain(
+      "'private.reserve_rss_generation(jsonb)'::regprocedure",
+    );
+    expect(secretKeyCompatibilitySql).toContain(
+      "revoke all on function public.reserve_rss_generation(jsonb)",
+    );
+    expect(secretKeyCompatibilitySql).toContain(
+      "grant execute on function public.reserve_rss_generation(jsonb)",
+    );
+    expect(secretKeyCompatibilitySql).not.toContain(
+      "grant execute on function public.reserve_rss_generation(jsonb)\n  to authenticated",
+    );
   });
 });

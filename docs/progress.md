@@ -835,3 +835,8 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   preparation rather than the former reviewer-triggered research behavior.
 - Contract, n8n compatibility, and repository suites pass: 113 contract tests,
   58 web tests, strict lint/type checking, and the optimized production build.
+- A signed production probe identified that the brand-wide reservation function
+  was created after the general opaque Supabase secret-key compatibility
+  migration and still read the legacy JWT-only role setting. A narrowly scoped
+  follow-up migration applies the supported gateway claims guard while
+  preserving service-role-only grants.

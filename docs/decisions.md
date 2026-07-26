@@ -476,6 +476,17 @@ model contracts, persistence, and provenance. A failed evidence or quality gate
 stops that branch. Successful branches stop at `ready_for_review`; the chain
 cannot approve, schedule, or publish content.
 
+## ADR-038 — New privileged functions use opaque-key gateway claims
+
+**Status:** Accepted, 2026-07-26
+
+The hosted Supabase gateway maps an `sb_secret_` key to `service_role` and
+populates `request.jwt.claims`; it does not populate the legacy
+`request.jwt.claim.role` setting. Any privileged function added after the
+general secret-key compatibility migration must therefore use the JSON claims
+guard. Execution remains restricted independently through explicit
+`service_role` grants and revocation from `PUBLIC`, `anon`, and `authenticated`.
+
 ## ADR-037 — The daily RSS view accounts for every configured feed
 
 **Status:** Accepted, 2026-07-26
