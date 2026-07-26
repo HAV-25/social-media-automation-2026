@@ -35,6 +35,16 @@ test("plain text becomes an editable and approvable draft without paid services"
   ).toBeVisible();
   await expect(page.getByText(/scheduled · attempt 0\/3/).first()).toBeVisible();
 
+  await page.getByRole("link", { name: "Activity & feedback" }).click();
+  await expect(page.getByRole("heading", { name: "Activity & feedback" })).toBeVisible();
+  await expect(page.getByText("Make the opening more specific to robotics buyers.")).toBeVisible();
+  await page.getByLabel("Activity type").selectOption("feedback");
+  await page.getByRole("button", { name: "Apply" }).click();
+  await expect(page).toHaveURL(/view=feedback/);
+  await expect(page.getByText("Post approved")).toBeVisible();
+  await expect(page.getByText("Changes requested")).toBeVisible();
+  await expect(page.getByText("Post draft created")).toHaveCount(0);
+
   await page.goto("/inputs/new");
   await page.getByLabel("Source title").fill("E2E decision redesign observation");
   await page

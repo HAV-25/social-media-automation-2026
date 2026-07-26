@@ -1096,3 +1096,32 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   repository test tasks (291 assertions), the optimized production build, and
   all four Chromium regression journeys. No paid provider call or Netlify build
   was made.
+
+### Brand-scoped activity and feedback
+
+- Added an Activity & Feedback workspace for the selected brand. It presents
+  reviewer feedback, other attributed human actions, and workflow changes as a
+  chronological accountability history instead of requiring administrators to
+  infer decisions from technical run records.
+- Added bounded time, activity-type, and text filters; rejection and
+  change-request reasons; actor names; durable timestamps; entity identifiers;
+  and direct links back to posts, opportunities, or runs where the audit entity
+  supports inspection.
+- Kept the query on the authenticated Supabase client so the existing
+  organization/brand RLS policies remain authoritative. No service credential,
+  exposed security-definer function, or client-side secret was introduced.
+- Added the partial `(brand_id, created_at desc)` access-path index used by the
+  selected-brand history query and covering indexes for the audit actor and
+  composite brand/organization foreign keys, plus focused filter,
+  classification, label, reason, link, rolling-window, and migration-contract
+  tests.
+- Applied both index migrations to Supabase project
+  `hqffgchxwtymyfwtkmdt`. A rollback-only authenticated reviewer probe could
+  read all 39 Klaank audit records and zero Spaarker audit records; the
+  temporary identity and membership were not retained. The post-DDL advisors
+  reported no new security finding and no remaining uncovered audit-table
+  foreign key.
+- Release verification passed formatting, lint, strict type checking, all 13
+  repository test tasks (297 assertions), the optimized production build, and
+  all four Chromium regression journeys. No paid provider or Netlify build was
+  invoked.

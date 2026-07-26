@@ -166,6 +166,19 @@ Pass when archive is durable history rather than deletion.
 
 Pass when organization and brand boundaries fail closed.
 
+### UAT-14 — Activity and feedback accountability
+
+1. Reject one review-ready draft with a reason and approve another.
+2. Open Activity & feedback for the selected brand.
+3. Filter to Reviewer feedback and confirm both decisions, reviewer identity,
+   timestamps, and the rejection reason appear.
+4. Open the affected post from the activity record.
+5. Switch to another brand and confirm the first brand's history disappears.
+6. Search for the rejection reason and change the time window.
+
+Pass when the visible history agrees with the durable audit record, links to the
+correct entity, and cannot expose activity from an unauthorized brand.
+
 ## Defect recording
 
 For every defect capture:

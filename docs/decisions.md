@@ -747,3 +747,18 @@ grouped by opportunity as one content package. This avoids assigning the same
 research cost to every draft and overstating spend. Zero-cost mock and
 deterministic records remain visible as ledgered steps for auditability but
 never increase recorded spend.
+
+## ADR-055 — Audit history is a brand-scoped accountability view
+
+**Status:** Accepted, 2026-07-26
+
+The reviewer interface exposes immutable `audit_logs` records through a
+selected-brand Activity & Feedback workspace. It combines editorial feedback,
+other attributed human changes, and workflow actions in one chronological
+history while preserving their distinct classifications.
+
+The page is read-only and uses the authenticated Supabase client so existing
+organization and brand RLS remains authoritative. It does not introduce a
+service-role query or security-definer reporting function. Runs & Errors remains
+the technical execution view; Activity & Feedback answers who changed or
+decided what, when it happened, and why.

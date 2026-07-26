@@ -2,6 +2,7 @@
 
 import {
   Archive,
+  History,
   BookOpenText,
   FilePlus2,
   LayoutDashboard,
@@ -16,6 +17,7 @@ const available = [
   { label: "Add source", icon: FilePlus2, href: "/inputs/new" },
   { label: "Sources", icon: Radio, href: "/sources" },
   { label: "Runs & errors", icon: TriangleAlert, href: "/runs" },
+  { label: "Activity & feedback", icon: History, href: "/activity" },
   { label: "Ready posts", icon: Sparkles, href: "/posts" },
   { label: "Styles", icon: BookOpenText, href: "/styles" },
   { label: "Archive", icon: Archive, href: "/archive" },
