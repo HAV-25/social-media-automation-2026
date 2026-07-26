@@ -1,0 +1,184 @@
+# Phase 1 UAT test plan
+
+## Purpose
+
+This plan lets the business reviewer validate the complete internal workflow
+without requiring knowledge of Supabase or n8n. Payal is the primary UAT
+reviewer. Phase 1 remains human-approved and must not publish or schedule
+content.
+
+## Test configuration
+
+- Production application: `https://appsbrite-social.netlify.app`
+- Initial test brand: Klaank
+- Automatic opportunity threshold: 75
+- Manual Review band: 60–74
+- Automatic daily maximum: 3 opportunities per UTC day
+- RSS polling: every 15 minutes
+- Standard styles: Newsworthy, Educational, and Perspective
+- Tone overlays: choose only from the structured options shown by the product
+
+Record the test date, account email, selected brand, article title, and any
+visible run identifier for every result. Do not record passwords or API keys.
+
+## UAT journeys
+
+### UAT-01 — Authentication and brand access
+
+1. Sign up or sign in with an approved reviewer account.
+2. Open Klaank and confirm the selected brand remains Klaank after navigation.
+3. Sign out and confirm protected pages cannot be reopened anonymously.
+
+Pass when authentication is real, access is brand-scoped, and no demo identity
+or hard-coded dashboard metric appears.
+
+### UAT-02 — Brand editorial configuration
+
+1. Review Klaank's description, audience, voice, examples, prohibited language,
+   visual assets, automatic threshold, Review band, and daily maximum.
+2. Make one harmless configuration edit and save it.
+3. Reload and confirm the edit persists with audit history.
+
+Pass when configuration is durable and affects only the selected brand.
+
+### UAT-03 — Feed setup and autonomous intake
+
+1. Open Sources and confirm active feed URLs and brand routing.
+2. Add or edit one valid RSS feed.
+3. Wait for the next 15-minute poll, or use the explicit one-off intake control.
+4. Confirm Runs & errors records the intake and each feed shows its latest poll.
+
+Pass when a real feed is fetched without manual approval at every stage and a
+repeated poll does not create a duplicate source.
+
+### UAT-04 — Daily source decisions
+
+1. Open Content inbox after a poll.
+2. Confirm every newly observed item is visible as filtered, pending, scored,
+   automatically selected, waiting for capacity, or retained.
+3. Use search, feed, state, score, and ordering controls.
+4. Open a scored item and compare its value nucleus and score explanation with
+   the source article.
+
+Pass when filtered items explain why they were not scored, scored items show
+their arithmetic, and the Priority view contains only automatically preparable
+items at or above 75.
+
+### UAT-05 — Daily limit and Review band
+
+1. Confirm no more than three eligible opportunities are automatically selected
+   across all Klaank feeds during one UTC day.
+2. Confirm a score from 60 through 74 appears under Review and does not generate
+   automatically.
+3. Confirm a score below 60 remains stored but is not a post candidate.
+
+Pass when the selected count is brand-wide, resets at 00:00 UTC, and lower
+scores cannot silently consume an automatic slot.
+
+### UAT-06 — Research and claims
+
+1. Open an automatically selected opportunity.
+2. Inspect the research package, sources, claim type, confidence, support,
+   conflicts, and usage guidance.
+3. Follow at least one evidence link.
+4. Confirm model, usage, and cost are shown for the research step.
+
+Pass when statements are traceable to evidence and unsupported or conflicting
+claims are visibly constrained.
+
+### UAT-07 — Three distinct post styles
+
+1. Generate Newsworthy, Educational, and Perspective versions for one eligible
+   opportunity.
+2. Apply an approved tone overlay.
+3. Read the explanation of each style and compare the three drafts.
+
+Pass when the drafts are materially different, remain faithful to the evidence
+ledger and brand voice, and no arbitrary production-prompt editor is exposed.
+
+### UAT-08 — Quality review, edit, and selective regeneration
+
+1. Inspect quality, risk, similarity, evidence, and brand-fit results.
+2. Edit one draft and save it.
+3. Selectively regenerate one component or one style.
+4. Confirm the other approved content is unchanged.
+5. Confirm each provider call shows model, usage, and recorded cost.
+
+Pass when changes are durable, bounded, attributable to the reviewer, and do
+not cause duplicate paid calls on retry.
+
+### UAT-09 — Branded image
+
+1. Review the three ranked image concepts.
+2. Generate the selected concept.
+3. Compare the exact displayed provider prompt with the resulting image.
+4. Confirm deterministic brand composition and image provenance.
+5. Regenerate once and verify the new attempt and cost are separately recorded.
+
+Pass when the image, exact prompt, model, prompt version, usage, cost, and
+selected concept are inspectable.
+
+### UAT-10 — Approval and package
+
+1. Reject one test draft and verify the reason is retained.
+2. Approve a separate complete post.
+3. Copy its text and download its image/package.
+4. Inspect the package for source, evidence, prompt/model, version, cost, and
+   human-decision provenance.
+
+Pass when only a human can approve, rejected work is not presented as ready,
+and no publish or schedule action exists.
+
+### UAT-11 — Operations, recovery, and cost
+
+1. Open Runs & errors and filter by state and workflow stage.
+2. Inspect one successful run and one controlled failed or retried run.
+3. Confirm attempts, duration, model, usage, step cost, total cost, error class,
+   and recovery action are understandable.
+4. Retry only where the interface says it is safe and confirm idempotency.
+
+Pass when operational history agrees with the content record and a retry cannot
+duplicate content or spend.
+
+### UAT-12 — Archive and resurfacing
+
+1. After an item leaves the rolling 24-hour inbox, find it in Archive.
+2. Inspect its retained score and downstream outcome.
+3. Resurface one scored item.
+4. Confirm it returns to the inbox for 24 hours without changing its score,
+   automatically generating content, approving it, or consuming an automatic
+   slot without an explicit reviewer action.
+
+Pass when archive is durable history rather than deletion.
+
+### UAT-13 — Isolation and prohibited behavior
+
+1. Switch brands and confirm Klaank records do not leak into another brand.
+2. Attempt direct navigation to a known record outside the selected/assigned
+   brand.
+3. Confirm there is no automatic publish, schedule, or virality-guarantee
+   control.
+
+Pass when organization and brand boundaries fail closed.
+
+## Defect recording
+
+For every defect capture:
+
+- UAT case and step
+- expected result
+- actual result
+- brand and article
+- time in UTC
+- screenshot
+- visible run or record identifier
+- whether the defect blocks the end-to-end demonstration
+
+Never include passwords, Supabase secret keys, OpenAI keys, workflow HMAC
+secrets, cookies, or authorization headers.
+
+## Sign-off
+
+UAT is complete only when every critical journey passes, no security or
+data-isolation defect is open, provider cost is visible at every paid step, and
+Payal accepts the end-to-end reviewer experience.

@@ -25,7 +25,9 @@ export function filterAndSortRssItems(
       if (filter.minScore !== undefined && (item.score ?? -1) < filter.minScore) return false;
       if (
         filter.view === "priority" &&
-        (item.score === null || item.score < automaticMinimumScore)
+        (item.score === null ||
+          item.score < automaticMinimumScore ||
+          !["selected", "awaiting_selection", "daily_limit"].includes(item.selection))
       ) {
         return false;
       }

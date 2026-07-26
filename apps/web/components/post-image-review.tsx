@@ -14,6 +14,7 @@ type State = {
   template: ImageTemplate;
   validation: ImageValidation | null;
   model: string | null;
+  prompt: string | null;
   promptVersion: string | null;
   estimatedCostUsd: number;
 };
@@ -98,6 +99,24 @@ export function PostImageReview({
 
       <div className="grid gap-0 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
         <div className="bg-[var(--ink)] p-4 sm:p-6">
+          {state.prompt ? (
+            <details
+              open
+              className="mb-4 rounded-2xl border border-white/15 bg-white/5 p-4 text-white"
+              data-testid="image-generation-prompt"
+            >
+              <summary className="cursor-pointer text-xs font-bold tracking-[0.12em] uppercase">
+                Exact image-generation prompt
+              </summary>
+              <p className="mt-2 text-[11px] leading-5 text-white/55">
+                Sent to {state.model ?? "the recorded image model"} using{" "}
+                {state.promptVersion ?? "an unversioned prompt"}.
+              </p>
+              <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap rounded-xl bg-black/20 p-3 font-mono text-[11px] leading-5 text-white/80">
+                {state.prompt}
+              </pre>
+            </details>
+          ) : null}
           {state.status === "ready" && state.imageAssetId ? (
             <img
               key={state.imageAssetId}

@@ -1,4 +1,5 @@
 import {
+  buildImageGenerationPrompt,
   createImageDirection,
   sanitizeImageDisplayText,
   type ImageProvider,
@@ -105,7 +106,7 @@ export async function executeImageWorkflow(
       baseImage,
       finalImage,
       provider: generated,
-      prompt: `Server-controlled image brief for ${selected.title}.`,
+      prompt: buildImageGenerationPrompt(selected),
     },
     dependencies.persistence,
   );

@@ -48,6 +48,7 @@ describe("reviewer download package", () => {
           template: "insight_split",
           validation: null,
           model: "fake-image-v1",
+          prompt: "Create a polished editorial base image.",
           promptVersion: "image-director.v1",
           providerResponseId: "fake-response",
           estimatedCostUsd: 0,

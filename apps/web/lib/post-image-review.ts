@@ -1,5 +1,5 @@
 import "server-only";
-import { sanitizeImageDisplayText } from "@content-engine/ai";
+import { buildImageGenerationPrompt, sanitizeImageDisplayText } from "@content-engine/ai";
 import {
   generatedImageSchema,
   imageDirectionSchema,
@@ -80,6 +80,7 @@ export type PostImageReviewState = {
   template: ImageTemplate;
   validation: ImageValidation | null;
   model: string | null;
+  prompt: string | null;
   promptVersion: string | null;
   providerResponseId: string | null;
   estimatedCostUsd: number;
@@ -101,6 +102,7 @@ function pendingState(post: PostDetail, direction: ImageDirection): PostImageRev
     template: templateForStyle(selected.imageStyle),
     validation: null,
     model: null,
+    prompt: null,
     promptVersion: null,
     providerResponseId: null,
     estimatedCostUsd: 0,
@@ -111,6 +113,9 @@ function pendingState(post: PostDetail, direction: ImageDirection): PostImageRev
 }
 
 function demoState(record: DemoImageRecord): PostImageReviewState {
+  const concept = record.imageDirection.concepts.find(
+    (candidate) => candidate.conceptKey === record.selectedConceptKey,
+  );
   return {
     status: "ready",
     imageAssetId: record.imageAssetId,
@@ -120,6 +125,7 @@ function demoState(record: DemoImageRecord): PostImageReviewState {
     template: record.template,
     validation: record.validation,
     model: record.model,
+    prompt: concept ? buildImageGenerationPrompt(concept) : null,
     promptVersion: record.promptVersion,
     providerResponseId: record.providerResponseId,
     estimatedCostUsd: record.estimatedCostUsd,
@@ -140,6 +146,7 @@ function persistentState(row: PersistentImageRow): PostImageReviewState {
     template: row.template,
     validation: row.validation,
     model: row.model,
+    prompt: row.prompt,
     promptVersion: row.prompt_version,
     providerResponseId: row.provider_response_id,
     estimatedCostUsd: modelRecord.success ? modelRecord.data.usage.estimatedCostUsd : 0,
@@ -389,7 +396,7 @@ export async function performPostImageAction(input: {
       baseImage: artifact.baseImage,
       finalImage: artifact.finalImage,
       provider: artifact.generated,
-      prompt: `Server-controlled image brief for ${artifact.concept.title}.`,
+      prompt: buildImageGenerationPrompt(artifact.concept),
     } satisfies PersistGeneratedImageInput,
     new SupabaseImageAssetPersistencePort(),
   );

@@ -651,3 +651,83 @@ allowing carefully qualified writing to use independent verified evidence. The
 conflict, its member claims, and its prescribed resolution remain durable and
 inspectable; this rule does not change a claim's verification state or usage
 guidance.
+
+## ADR-048 — Image review exposes the exact provider prompt
+
+**Status:** Accepted, 2026-07-26
+
+The image provider prompt is built by one exported, versioned function and the
+same exact string is both sent to the provider and persisted with the immutable
+image asset. Post review displays that recorded prompt above the branded image
+alongside the model and prompt version so an administrator can assess creative
+quality against the actual provider instruction.
+
+The earlier generic image-brief placeholders are deterministically recoverable
+from each immutable selected concept and `image-director.v1`. A guarded
+one-time migration backfills those prompts under an exclusive table lock,
+records an audit event for every repaired asset, and restores the provenance
+immutability trigger before releasing the transaction.
+
+## ADR-049 — Priority means automatically preparable, not score alone
+
+**Status:** Accepted, 2026-07-26
+
+The Priority inbox view contains only opportunities that meet the selected
+brand's automatic score threshold and are eligible for automatic preparation.
+A high-scoring RSS-summary-only item remains in Review because missing full
+article evidence prevents automatic research and writing. Selected,
+awaiting-capacity, and daily-limit opportunities remain Priority because all
+other automatic eligibility gates passed.
+
+## ADR-050 — Styles are structured editorial controls, not prompt editors
+
+**Status:** Accepted, 2026-07-26
+
+Phase 1 exposes three standard post styles: Newsworthy, Educational, and
+Perspective. Reviewers may combine a style with an approved tone overlay and
+must be shown a plain-language explanation of the intended structure, use case,
+and expected difference from the other styles.
+
+Production prompts remain versioned TypeScript modules. The Styles interface
+does not expose arbitrary prompt editing. This keeps editorial configuration
+understandable, testable, and resistant to accidental prompt or safety-control
+changes.
+
+## ADR-051 — RSS polling and automatic daily selection
+
+**Status:** Accepted, 2026-07-26
+
+The active RSS workflow polls every 15 minutes throughout the day. Each poll
+retrieves up to three recent items per active feed by default. Durable
+feed-item, source, analysis, and reservation idempotency prevents an item from
+being processed or charged twice when it appears in later polls.
+
+Automatic opportunity selection is shared across every feed routed to the
+brand, not allocated per feed or per poll. Klaank initially permits at most
+three automatically selected opportunities per UTC day, and the count resets
+at 00:00 UTC. Opportunities scoring at least 75 compete for those slots in
+arrival order after all evidence and eligibility gates pass. Scores from 60
+through 74 remain available for optional manual review and do not consume an
+automatic slot unless a reviewer deliberately advances them.
+
+## ADR-052 — Observe actual AI cost before setting business budgets
+
+**Status:** Accepted, 2026-07-26
+
+Research, writing, verification, regeneration, image generation, and any other
+provider-backed step must persist and display its model, usage, currency, and
+actual recorded cost at the step and aggregate run levels. Initial business
+budgets remain configurable but are not yet calibrated from assumed spend.
+
+Existing per-call bounds, idempotency, retry limits, and provider safety gates
+remain in force while real UAT usage is measured. Later budget decisions will
+use the recorded cost history rather than estimates alone.
+
+## ADR-053 — Phase 1 UAT ownership
+
+**Status:** Accepted, 2026-07-26
+
+Payal is the primary Phase 1 UAT reviewer. UAT evidence follows
+`docs/uat-test-plan.md`; a journey passes only when its durable database,
+workflow, cost, provenance, and audit records agree with the visible reviewer
+experience.

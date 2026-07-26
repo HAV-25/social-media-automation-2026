@@ -353,7 +353,7 @@ export const imageProviderConfigSchema = z
   });
 export type ImageProviderConfig = z.input<typeof imageProviderConfigSchema>;
 
-function generationPrompt(concept: ImageConcept) {
+export function buildImageGenerationPrompt(concept: ImageConcept) {
   return `Create a polished editorial base image for an internal social-content workflow.
 
 VISUAL_CONCEPT_DATA
@@ -417,7 +417,7 @@ export class OpenAIImageProvider implements ImageProvider {
       const response = await this.client.images.generate(
         {
           model: this.config.model,
-          prompt: generationPrompt(request.concept),
+          prompt: buildImageGenerationPrompt(request.concept),
           n: 1,
           size: this.config.size,
           quality: this.config.quality,

@@ -30,6 +30,7 @@ const item = (
 const items = [
   item("priority", 82, "selected"),
   item("review", 68, "review"),
+  item("summary-only-high-score", 83, "review"),
   item("filtered", null, "not_applicable", "filtered"),
 ];
 
@@ -44,7 +45,15 @@ describe("RSS feed filters", () => {
       filterAndSortRssItems(items, rssFeedFilterSchema.parse({ view: "review" }), 75).map(
         (value) => value.itemId,
       ),
-    ).toEqual(["review"]);
+    ).toEqual(["review", "summary-only-high-score"]);
+  });
+
+  it("excludes high-scoring summary-only items from automatic Priority", () => {
+    expect(
+      filterAndSortRssItems(items, rssFeedFilterSchema.parse({ view: "priority" }), 75).map(
+        (value) => value.itemId,
+      ),
+    ).not.toContain("summary-only-high-score");
   });
 
   it("combines feed decision, score, search, and score sorting safely", () => {
@@ -58,6 +67,10 @@ describe("RSS feed filters", () => {
       }),
       75,
     );
-    expect(filtered.map((value) => value.itemId)).toEqual(["review", "priority"]);
+    expect(filtered.map((value) => value.itemId)).toEqual([
+      "review",
+      "priority",
+      "summary-only-high-score",
+    ]);
   });
 });

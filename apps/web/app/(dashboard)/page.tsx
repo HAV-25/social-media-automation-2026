@@ -53,7 +53,7 @@ export default async function DashboardPage({
   const today = new Intl.DateTimeFormat("en-GB", {
     dateStyle: "long",
     timeZone: "UTC",
-  }).format(new Date(dashboardMetrics.since));
+  }).format(new Date());
   const currency = new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
@@ -413,8 +413,17 @@ export default async function DashboardPage({
                         Score
                       </p>
                       <p className="serif mt-1 text-xl font-bold">
-                        {item.score === null ? "—" : `${item.score.toFixed(0)}/100`}
+                        {item.score === null ? "Not scored" : `${item.score.toFixed(0)}/100`}
                       </p>
+                      {item.score === null ? (
+                        <p className="mt-1 text-[10px] leading-4 text-[var(--muted)]">
+                          {item.state === "filtered"
+                            ? "Filtered before scoring"
+                            : item.state === "duplicate"
+                              ? "Existing source retained"
+                              : "Scoring in progress"}
+                        </p>
+                      ) : null}
                     </div>
                     <span
                       className={`w-fit rounded-full px-3 py-1.5 text-[10px] font-bold ${
@@ -475,9 +484,9 @@ export default async function DashboardPage({
             </p>
             <h2 className="serif mt-3 text-2xl leading-7">Research only what earns attention.</h2>
             <p className="mt-4 text-sm leading-6 text-white/60">
-              Live processing totals for {activeBrand.name} since 00:00 UTC. Selected opportunities
-              are prepared within the brand&apos;s daily and provider cost limits, then stop for
-              human review.
+              Live processing totals for {activeBrand.name} since the rolling window began. Selected
+              opportunities are prepared within the brand&apos;s daily and provider cost limits,
+              then stop for human review.
             </p>
             <div className="mt-6 space-y-4 border-t border-white/10 pt-5 text-sm">
               <div className="flex justify-between">

@@ -60,6 +60,7 @@ export {
 } from "./evals";
 export {
   createImageDirection,
+  buildImageGenerationPrompt,
   FakeImageDirector,
   FakeImageProvider,
   imageDirectorConfigSchema,

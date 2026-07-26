@@ -3,6 +3,7 @@ import { createDeterministicBaseImage } from "@content-engine/image-compositor";
 import type OpenAI from "openai";
 import { describe, expect, it, vi } from "vitest";
 import {
+  buildImageGenerationPrompt,
   createImageDirection,
   FakeImageDirector,
   FakeImageProvider,
@@ -236,6 +237,9 @@ describe("image direction and providers", () => {
       moderation: "auto",
     });
     expect(generate.mock.calls[0]?.[0].prompt).toContain("Include no words");
+    expect(generate.mock.calls[0]?.[0].prompt).toBe(
+      buildImageGenerationPrompt(providerRequest().concept),
+    );
     expect(result.usage).toEqual({
       inputTokens: 100,
       outputTokens: 900,

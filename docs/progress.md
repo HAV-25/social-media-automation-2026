@@ -989,3 +989,50 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   combinations cover automatic priority, manual review, feed state, minimum
   score, search, and numeric score ordering. Web strict type-checking and all 67
   web tests pass locally.
+
+### Score-state repair and exact image prompt review
+
+- Production diagnosis proved that six apparent `pending` Klaank articles were
+  the normalized sources retained after the earlier requested deletion of their
+  sub-75 opportunity rows. Deterministic re-analysis restored all six real
+  opportunity records and visible scores without research, writing, image, or
+  other paid provider work.
+- Filtered feed items remain intentionally unscored because brand keyword
+  routing stops them before opportunity creation. The next interface release
+  replaces the ambiguous dash with `Not scored` and `Filtered before scoring`.
+- The exact versioned image-provider prompt now has one implementation used for
+  both provider invocation and durable persistence. Post review displays the
+  recorded prompt above the branded image with its model and prompt version.
+- Migration `backfill_exact_image_prompts` was applied to project
+  `hqffgchxwtymyfwtkmdt`. All nine existing image assets now contain exact
+  `image-director.v1` prompts, zero generic placeholders remain, each repair has
+  an audit event, and the immutable provenance trigger was queried back after
+  the transaction.
+- Authenticated production verification confirmed Archive navigation, manual
+  Review filtering, article search, and descending score ordering. No Klaank
+  feed item was yet older than the rolling 24-hour boundary, so the empty
+  Archive state was correct and a real resurfacing click was not fabricated by
+  changing source timestamps.
+- Priority semantics now require automatic-preparation eligibility in addition
+  to the brand score threshold. Summary-only opportunities remain in Review
+  even above 75. The dashboard operating date now represents the current UTC
+  date rather than the start of its rolling measurement window.
+
+### UAT operating decisions
+
+- Confirmed the deployed WF-01 contract polls every 15 minutes throughout the
+  day. Default retrieval is bounded to three recent entries per feed per poll;
+  durable idempotency prevents later polls from duplicating sources or spend.
+- Confirmed Klaank's initial automatic selection policy is a brand-wide maximum
+  of three eligible opportunities per UTC day, resetting at 00:00 UTC, rather
+  than three per feed or per polling cycle.
+- Accepted a structured Styles experience comprising Newsworthy, Educational,
+  and Perspective plus approved tone overlays and plain-language explanations.
+  Arbitrary production-prompt editing remains outside the reviewer interface.
+- Accepted cost observability before budget calibration: every paid AI stage
+  must expose durable model, usage, step cost, and aggregate cost while existing
+  per-call and retry protections remain active.
+- Added `docs/uat-test-plan.md` with Payal as the primary reviewer and thirteen
+  business-facing journeys covering authentication, brand setup, autonomous
+  RSS, scoring, daily selection, research, styles, quality, images, approval,
+  recovery/cost, archive/resurfacing, and brand isolation.
