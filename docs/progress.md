@@ -845,3 +845,11 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   identity now uses the stable feed, brand, source, and opportunity tuple, and
   existing hashes are migrated so improved scoring cannot turn a safe replay
   into an idempotency conflict.
+- The first live automatic-preparation execution completed RSS acquisition,
+  normalization, scoring, and reservation, then stopped before research because
+  the new dispatch node read the outer Extract From File item instead of n8n
+  2.21's parsed `data` envelope. No paid provider call was reached.
+- WF-01 and all three non-terminal WF-05 response consumers now read the
+  decoded envelope explicitly and fail closed on a malformed contract. Direct
+  regression assertions cover the opportunity, research, draft-set, and
+  verification consumers; the contract suite passes 117 tests.

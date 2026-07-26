@@ -512,3 +512,17 @@ also show their deterministic score and brand-wide selection outcome:
 selected, below threshold, daily maximum reached, scoring only, or awaiting
 selection. Selection visibility is derived from durable reservation runs and
 the active brand policy; it does not start research or generation.
+
+## ADR-040 — n8n decoded file responses are consumed through the data envelope
+
+**Status:** Accepted, 2026-07-26
+
+n8n 2.21's Extract From File node exposes parsed JSON to the following node as
+`$json.data`. Every non-terminal application response in the automatic RSS
+preparation chain must therefore be decoded and then read through that explicit
+envelope. Contract tests inspect the actual downstream Code-node expressions
+for opportunity decisions, research, editorial generation, and verification;
+checking only that a decoder node exists is insufficient.
+
+The application response contracts remain unchanged. A missing or malformed
+envelope fails closed before the next signed workflow handoff.

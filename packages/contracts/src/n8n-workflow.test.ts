@@ -88,6 +88,15 @@ describe("WF-01 RSS Intake workflow", () => {
     expect(source).toContain("rss-item:");
   });
 
+  it("reads decoded opportunity decisions from the n8n 2.21 data envelope", () => {
+    const workflow = workflowSchema.parse(JSON.parse(readFileSync(workflowPath, "utf8")));
+    const preparationNode = workflow.nodes.find(
+      (node) => node.name === "Prepare Selected Opportunities",
+    );
+
+    expect(preparationNode?.parameters.jsCode).toContain("const result = $json.data;");
+  });
+
   it("exposes a brand-scoped, signed, durable one-off trigger", () => {
     const route = readFileSync(`${appDirectory}api/rss-intake/run/route.ts`, "utf8");
     const workflow = readFileSync(`${workflowDirectory}wf-01-rss-intake.json`, "utf8");
@@ -214,6 +223,27 @@ describe("Milestone 5 research workflow", () => {
     expect(source).toContain("createHmac('sha256'");
     expect(source).toContain("timingSafeEqual");
     expect(source).not.toMatch(/service[_-]?role|credentialId|OPENAI_API_KEY|system prompt/i);
+  });
+
+  it("reads every decoded automatic-preparation response from the n8n 2.21 data envelope", () => {
+    const workflow = workflowSchema.parse(
+      JSON.parse(readFileSync(`${workflowDirectory}wf-05-research.json`, "utf8")),
+    );
+    const codeByNode = new Map(
+      workflow.nodes
+        .filter((node) => node.type === "n8n-nodes-base.code")
+        .map((node) => [node.name, z.object({ jsCode: z.string() }).parse(node.parameters).jsCode]),
+    );
+
+    expect(codeByNode.get("Sign Three-style Draft Request")).toContain(
+      "const research = $json.data;",
+    );
+    expect(codeByNode.get("Sign Draft Verification Requests")).toContain(
+      "const draftSet = $json.data;",
+    );
+    expect(codeByNode.get("Sign Ready Draft Image Requests")).toContain(
+      "const verification = input.json.data;",
+    );
   });
 });
 
