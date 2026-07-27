@@ -88,13 +88,15 @@ claims are visibly constrained.
 
 ### UAT-07 — Three distinct post styles
 
-1. Generate Newsworthy, Educational, and Perspective versions for one eligible
-   opportunity.
-2. Apply an approved tone overlay.
-3. Read the explanation of each style and compare the three drafts.
+1. Open an automatically selected opportunity after its research run completes.
+2. Confirm Newsworthy, Educational, and Perspective versions were prepared
+   without a reviewer clicking an intermediate generation control.
+3. Confirm automatic preparation used the configured default tone overlay.
+4. Read the explanation of each style and compare the three drafts.
 
 Pass when the drafts are materially different, remain faithful to the evidence
-ledger and brand voice, and no arbitrary production-prompt editor is exposed.
+ledger and brand voice, no arbitrary production-prompt editor is exposed, and
+the reviewer was not required to start writing manually.
 
 ### UAT-08 — Quality review, edit, and selective regeneration
 
@@ -110,13 +112,41 @@ not cause duplicate paid calls on retry.
 ### UAT-09 — Branded image
 
 1. Review the three ranked image concepts.
-2. Generate the selected concept.
+2. Confirm a branded image was prepared automatically for every draft that
+   passed verification.
 3. Compare the exact displayed provider prompt with the resulting image.
 4. Confirm deterministic brand composition and image provenance.
 5. Regenerate once and verify the new attempt and cost are separately recorded.
 
 Pass when the image, exact prompt, model, prompt version, usage, cost, and
-selected concept are inspectable.
+selected concept are inspectable and the initial image did not require an
+intermediate reviewer action.
+
+## Controlled autonomous smoke journey
+
+Run this once after each release candidate deployment before inviting additional
+reviewers:
+
+1. Record the deployed Git commit and UTC start time.
+2. Trigger one Klaank RSS intake or wait for the scheduled 15-minute poll.
+3. Choose one newly observed, eligible article that scores at least 75 and does
+   not reuse a previously prepared opportunity.
+4. Do not click Research, Generate draft, Verify, or Generate image.
+5. Wait for the opportunity to appear in Ready posts.
+6. Confirm the same correlation can be followed through RSS intake,
+   normalization/deduplication, scoring, reservation, research, three isolated
+   style generations, three verifications, and branded image generation.
+7. Record the exact research, writing, verification, and image costs shown by
+   the application.
+8. Open one complete draft, inspect its evidence and image prompt, approve it,
+   and download its package.
+9. Confirm the package contains the approved text and image plus source,
+   evidence, prompt/model, version, cost, and human-decision provenance.
+10. Confirm there is no publish or schedule action.
+
+Pass only when steps 2–5 require no intermediate human action, every paid stage
+has a durable cost record, approval remains human-only, and the downloaded
+package matches the approved version.
 
 ### UAT-10 — Approval and package
 

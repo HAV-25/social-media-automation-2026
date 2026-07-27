@@ -1044,6 +1044,18 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   business-facing journeys covering authentication, brand setup, autonomous
   RSS, scoring, daily selection, research, styles, quality, images, approval,
   recovery/cost, archive/resurfacing, and brand isolation.
+- Tightened the autonomous UAT acceptance path: the first three eligible
+  opportunities at 75 or above must proceed from completed research through
+  three isolated style calls, verification, and branded images without
+  intermediate reviewer clicks. The controlled smoke journey now requires
+  correlation-level evidence, exact per-stage costs, human approval, and a
+  matching downloaded package.
+- Diagnosed historical WF-05 execution `9807`: research completed successfully,
+  but the former batched three-style request failed with
+  `malformed_upstream_response`. The name-stable remote workflow now matches the
+  cost-safe version that isolates each style into its own idempotent call, and
+  all ten workflows were queried as active before the consolidated application
+  deployment.
 
 ### Structured Styles workspace
 
