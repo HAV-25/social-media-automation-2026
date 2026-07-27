@@ -1406,3 +1406,30 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   Sharp 0.35 runtime. The preflight now uses Sharp's supported short-form color
   keys, passes end to end, resolves its font from nested serverless directories,
   and explicitly includes that font plus Sharp in Netlify's function bundle.
+
+### Consolidated readiness audit and quota correction
+
+- A production read-only audit found a real 82.98 Klaank opportunity still in
+  `candidate` state with no generation run despite automatic selection being
+  enabled at 75 and the daily maximum being four.
+- The fourth slot had been consumed by a second successful reservation for an
+  already-prepared 80.64 opportunity after the brand policy revision changed.
+  The inbox simultaneously displayed zero selected because its count was
+  restricted to opportunities still present in the rolling 24-hour feed.
+- The reservation function now rejects an already-prepared opportunity,
+  counts distinct opportunity IDs for the current UTC day, and preserves the
+  existing service-role-only execution boundary. Durable recovery remains the
+  only retry path for downstream failures.
+- The inbox counter now counts distinct current-day reservations independently
+  of rolling feed visibility. Contracts include the explicit
+  `already_prepared` outcome, and focused contract, migration, web, and strict
+  type checks pass.
+- The consolidated release still requires the production migration, one
+  deployment, and a fresh untouched RSS-to-reviewable-package journey before
+  autonomous UAT can be declared complete.
+- Consolidated local release verification passed formatting, lint, strict type
+  checking, all 13 repository test tasks (331 assertions), the optimized
+  production build, all four Chromium journeys, and the production-dependency
+  audit with no known vulnerabilities. The n8n publication plan reports all
+  ten workflows unchanged and active; its runtime bridge preflight confirms
+  every required variable without disclosing values.

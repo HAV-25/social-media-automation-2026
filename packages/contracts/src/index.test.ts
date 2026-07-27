@@ -197,6 +197,18 @@ describe("shared contracts", () => {
         results: [{ ...result.results[0], actorId: undefined }],
       }).success,
     ).toBe(false);
+    expect(
+      rssSourceAnalysisResultSchema.safeParse({
+        ...result,
+        results: [
+          {
+            ...result.results[0],
+            researchEligible: false,
+            eligibilityReason: "already_prepared",
+          },
+        ],
+      }).success,
+    ).toBe(true);
   });
 
   it("validates the plain-text input boundary and its idempotency key", () => {

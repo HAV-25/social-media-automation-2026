@@ -10,6 +10,19 @@ export type RssSelectionVisibility =
 export const RSS_REVIEW_MINIMUM_SCORE = 60;
 export const RSS_AUTOMATIC_MINIMUM_SCORE = 75;
 
+export function countDistinctDailyReservations(
+  reservations: Array<{ entityId: string; createdAt: string }>,
+  dailyStart: string,
+) {
+  const dailyStartMs = Date.parse(dailyStart);
+  if (!Number.isFinite(dailyStartMs)) throw new Error("Daily reservation start is invalid.");
+  return new Set(
+    reservations
+      .filter(({ createdAt }) => Date.parse(createdAt) >= dailyStartMs)
+      .map(({ entityId }) => entityId),
+  ).size;
+}
+
 export function deriveRssSelectionVisibility(input: {
   selected: boolean;
   automaticPreparationAllowed: boolean;

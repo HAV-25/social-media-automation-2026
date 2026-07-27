@@ -252,7 +252,14 @@ export const rssGenerationReservationRequestSchema = z.object({
 export const rssGenerationReservationResultSchema = z.object({
   contractVersion: z.literal("1.0"),
   eligible: z.boolean(),
-  reason: z.enum(["reserved", "ingest_only", "below_threshold", "daily_limit", "inactive"]),
+  reason: z.enum([
+    "reserved",
+    "already_prepared",
+    "ingest_only",
+    "below_threshold",
+    "daily_limit",
+    "inactive",
+  ]),
   generationRunId: z.uuid().optional(),
   usedToday: z.number().int().nonnegative(),
   dailyLimit: z.number().int().nonnegative(),
@@ -283,6 +290,7 @@ export const rssSourceAnalysisResultSchema = z.object({
       researchEligible: z.boolean(),
       eligibilityReason: z.enum([
         "reserved",
+        "already_prepared",
         "ingest_only",
         "below_threshold",
         "daily_limit",

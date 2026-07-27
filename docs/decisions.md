@@ -946,3 +946,19 @@ function artifacts. Runtime lookup walks only the current directory and a
 bounded number of parents, allowing the same code to run from the repository,
 Next.js output, or Netlify's nested handler directory without scanning unrelated
 filesystem locations. Tests exercise the exact preflight and nested-path lookup.
+
+## ADR-067 — Daily capacity counts distinct prepared opportunities
+
+**Status:** Accepted, 2026-07-27
+
+An automatic-selection slot is consumed by a distinct opportunity, not by an
+idempotency record or policy revision. A brand-policy edit or UTC rollover may
+make an eligible, unprepared opportunity reconsiderable, but it must never
+reserve an opportunity that already has a successful RSS reservation.
+
+The reservation function serializes decisions per brand, checks for a prior
+successful reservation of the opportunity, and counts distinct opportunity IDs
+for the current UTC day. Downstream failures are retried through durable
+recovery; they do not create another selection reservation. The content-inbox
+counter uses the same distinct-opportunity definition even when an older
+opportunity has moved outside the rolling feed window.

@@ -4,6 +4,7 @@ import { utcDayStart } from "./brand-archive-policy-core";
 import { explainRssRouteFilter } from "./rss-routing-visibility";
 import { isRssItemActive, rssItemActivityTimestamp } from "./rss-archive-policy";
 import {
+  countDistinctDailyReservations,
   deriveRssSelectionVisibility,
   RSS_AUTOMATIC_MINIMUM_SCORE,
   RSS_REVIEW_MINIMUM_SCORE,
@@ -229,7 +230,6 @@ export async function getRssDailyDecisions(
       }),
   );
   const dailySelectionStart = utcDayStart(new Date());
-  const dailySelectionStartMs = Date.parse(dailySelectionStart);
   const items = visibleItems;
   const sourceIds = visibleItems
     .map((item) => item.source_document_id)
@@ -303,15 +303,13 @@ export async function getRssDailyDecisions(
       .filter((reservation) => qualifiesUnderCurrentPolicy(reservation.entity_id))
       .map((reservation) => reservation.entity_id),
   );
-  policy.selectedToday = new Set(
-    reservations
-      .filter(
-        (reservation) =>
-          Date.parse(reservation.created_at) >= dailySelectionStartMs &&
-          qualifiesUnderCurrentPolicy(reservation.entity_id),
-      )
-      .map((reservation) => reservation.entity_id),
-  ).size;
+  policy.selectedToday = countDistinctDailyReservations(
+    reservations.map((reservation) => ({
+      entityId: reservation.entity_id,
+      createdAt: reservation.created_at,
+    })),
+    dailySelectionStart,
+  );
 
   const feedDecisions = routes
     .map((route) => {

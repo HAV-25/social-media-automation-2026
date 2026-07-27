@@ -12,7 +12,14 @@ export const dynamic = "force-dynamic";
 
 const reservationRowSchema = z.object({
   eligible: z.boolean(),
-  reason: z.enum(["reserved", "ingest_only", "below_threshold", "daily_limit", "inactive"]),
+  reason: z.enum([
+    "reserved",
+    "already_prepared",
+    "ingest_only",
+    "below_threshold",
+    "daily_limit",
+    "inactive",
+  ]),
   generation_run_id: z.uuid().nullable(),
   used_today: z.number().int().nonnegative(),
   daily_limit: z.number().int().nonnegative(),

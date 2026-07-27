@@ -36,6 +36,15 @@ const completedReservationSql = readFileSync(
   ),
   "utf8",
 );
+const duplicateReservationSql = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../../../supabase/migrations/20260727160759_avoid_duplicate_rss_reservations.sql",
+      import.meta.url,
+    ),
+  ),
+  "utf8",
+);
 
 describe("brand-wide opportunity selection migration", () => {
   it("adds bounded policy columns to the existing RLS-protected brand profile", () => {
@@ -93,6 +102,25 @@ describe("brand-wide opportunity selection migration", () => {
       "revoke all on function private.reserve_rss_generation(jsonb)",
     );
     expect(completedReservationSql).not.toContain(
+      "grant execute on function public.reserve_rss_generation(jsonb)\n  to authenticated",
+    );
+  });
+
+  it("does not let a policy edit reserve or count one opportunity twice", () => {
+    expect(duplicateReservationSql).toContain("count(distinct reservation.entity_id)");
+    expect(duplicateReservationSql).toContain(
+      "when existing_run_id is not null then 'already_prepared'",
+    );
+    expect(duplicateReservationSql).toContain(
+      "reservation.entity_id = (payload ->> 'opportunityId')::uuid",
+    );
+    expect(duplicateReservationSql).toContain("reservation.status = 'succeeded'");
+    expect(duplicateReservationSql).toContain("eligibility_reason = 'already_prepared'");
+    expect(duplicateReservationSql).toContain("current_setting('request.jwt.claims', true)");
+    expect(duplicateReservationSql).toContain(
+      "revoke all on function private.reserve_rss_generation(jsonb)",
+    );
+    expect(duplicateReservationSql).not.toContain(
       "grant execute on function public.reserve_rss_generation(jsonb)\n  to authenticated",
     );
   });

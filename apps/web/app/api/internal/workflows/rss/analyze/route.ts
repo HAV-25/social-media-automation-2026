@@ -49,7 +49,14 @@ const brandProfileSchema = z.object({
 
 const reservationRowSchema = z.object({
   eligible: z.boolean(),
-  reason: z.enum(["reserved", "ingest_only", "below_threshold", "daily_limit", "inactive"]),
+  reason: z.enum([
+    "reserved",
+    "already_prepared",
+    "ingest_only",
+    "below_threshold",
+    "daily_limit",
+    "inactive",
+  ]),
 });
 const internalFailureSchema = z.object({
   error: z.object({
