@@ -1,4 +1,8 @@
-import { FakeImageProvider, ImageProviderError, type ImageProvider } from "@content-engine/ai";
+import {
+  FakeImageProvider,
+  ImageProviderError,
+  type ImageProvider,
+} from "@content-engine/ai/image";
 import type { NormalizedBrandContext } from "@content-engine/brand-memory";
 import { describe, expect, it, vi } from "vitest";
 import type { ImageAssetPersistencePort } from "./image-asset-persistence";

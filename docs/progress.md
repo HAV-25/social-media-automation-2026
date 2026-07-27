@@ -1298,3 +1298,28 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
 - Corrected Runs & errors copy to describe the actual autonomous preparation
   boundary: qualifying opportunities proceed through research, three styles,
   verification, and branded images before stopping for human review.
+
+### Autonomous preparation production-startup correction
+
+- Production proved that the daily rollover fix reserved exactly three Klaank
+  opportunities at 75 or above. The WF-01 handoff then exposed a batching
+  defect: the preparation node inspected only the first n8n analysis envelope,
+  so a below-threshold first item could discard later reserved opportunities.
+- WF-01 now validates every decoded analysis envelope, flattens every decision,
+  and starts research for every reserved opportunity. The contract suite
+  asserts the all-item behavior and passed 148 checks.
+- A bounded retry proved that all three reservations reached WF-05 together.
+  No model cost was recorded because the deployed research function failed
+  during module startup before an OpenAI request.
+- The shared AI export eagerly imported the deterministic image compositor,
+  which opened and parsed its bundled font during startup for research,
+  writing, verification, and content-action functions. The compositor now
+  loads that font only when an image is composed, and nested API functions
+  explicitly trace the checked-in font asset. This preserves deterministic
+  composition while isolating non-image workflow startup.
+- Image capabilities now use an explicit `@content-engine/ai/image` subpath.
+  The optimized research-function trace contains neither Sharp nor OpenType,
+  so non-image cold starts no longer load native image dependencies.
+- Release verification passed formatting, lint, strict type checking, all 13
+  repository test tasks (323 assertions), and the optimized production build.
+  No successful provider call or Netlify build was made during diagnosis.

@@ -4,11 +4,10 @@ import { describe, expect, it } from "vitest";
 import {
   buildLeanResearchPlan,
   FakeEditorialProvider,
-  FakeImageDirector,
-  FakeImageProvider,
   FakeResearchProvider,
   generateEditorialDraftBatch,
 } from "./index";
+import { FakeImageDirector, FakeImageProvider } from "./image";
 
 const styles = [
   "newsworthy_authority",

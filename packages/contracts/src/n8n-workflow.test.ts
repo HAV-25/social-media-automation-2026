@@ -88,15 +88,19 @@ describe("WF-01 RSS Intake workflow", () => {
     expect(source).toContain("rss-item:");
   });
 
-  it("reads decoded opportunity decisions from the n8n 2.21 data envelope", () => {
+  it("reads every decoded opportunity decision from the n8n 2.21 data envelopes", () => {
     const workflow = workflowSchema.parse(JSON.parse(readFileSync(workflowPath, "utf8")));
     const preparationNode = workflow.nodes.find(
       (node) => node.name === "Prepare Selected Opportunities",
     );
 
     expect(preparationNode?.parameters.jsCode).toContain(
-      "const result = $input.first().json.data;",
+      "const analysisResults = $input.all().map((input) => input.json.data);",
     );
+    expect(preparationNode?.parameters.jsCode).toContain(
+      "analysisResults.flatMap((result) => result.results)",
+    );
+    expect(preparationNode?.parameters.jsCode).not.toContain("$input.first()");
   });
 
   it("exposes a brand-scoped, signed, durable one-off trigger", () => {

@@ -59,25 +59,6 @@ export {
   type ResearchEvalThresholds,
 } from "./evals";
 export {
-  createImageDirection,
-  buildImageGenerationPrompt,
-  FakeImageDirector,
-  FakeImageProvider,
-  imageDirectorConfigSchema,
-  imageProviderConfigSchema,
-  imageProviderRequestSchema,
-  ImageProviderError,
-  OpenAIImageDirector,
-  OpenAIImageProvider,
-  sanitizeImageDisplayText,
-  type ImageDirector,
-  type ImageDirectorConfig,
-  type ImageDirectionRequest,
-  type ImageProvider,
-  type ImageProviderConfig,
-  type ImageProviderRequest,
-} from "./image";
-export {
   IMAGE_DIRECTOR_PROMPT_VERSION,
   IMAGE_DIRECTOR_SYSTEM_PROMPT,
 } from "./prompts/image-director.v1";

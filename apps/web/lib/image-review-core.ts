@@ -3,7 +3,7 @@ import {
   FakeImageProvider,
   sanitizeImageDisplayText,
   type ImageProviderRequest,
-} from "@content-engine/ai";
+} from "@content-engine/ai/image";
 import type { NormalizedBrandContext } from "@content-engine/brand-memory";
 import {
   imageDirectionSchema,

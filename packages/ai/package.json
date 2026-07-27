@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./image": "./src/image.ts",
     "./prompts/facebook-writer.v1": "./src/prompts/facebook-writer.v1.ts",
     "./prompts/source-analyst.v1": "./src/prompts/source-analyst.v1.ts",
     "./prompts/opportunity-analyst.v1": "./src/prompts/opportunity-analyst.v1.ts",

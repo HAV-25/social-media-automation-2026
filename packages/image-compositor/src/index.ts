@@ -15,18 +15,24 @@ const opentypeRuntime = createRequire(import.meta.url)(
   "opentype.js",
 ) as typeof import("opentype.js");
 const bundledFontRelativePath = "packages/image-compositor/assets/Inter-Bold.ttf";
-const bundledFontPath = [
-  path.join(process.cwd(), bundledFontRelativePath),
-  path.join(process.cwd(), "../..", bundledFontRelativePath),
-].find((candidate) => existsSync(candidate));
-if (!bundledFontPath) throw new Error("The bundled image-compositor font is unavailable.");
-const bundledFontBuffer = readFileSync(bundledFontPath);
-const bundledFont = opentypeRuntime.parse(
-  bundledFontBuffer.buffer.slice(
-    bundledFontBuffer.byteOffset,
-    bundledFontBuffer.byteOffset + bundledFontBuffer.byteLength,
-  ),
-);
+let bundledFont: Font | undefined;
+
+function loadBundledFont() {
+  if (bundledFont) return bundledFont;
+  const bundledFontPath = [
+    path.join(process.cwd(), bundledFontRelativePath),
+    path.join(process.cwd(), "../..", bundledFontRelativePath),
+  ].find((candidate) => existsSync(candidate));
+  if (!bundledFontPath) throw new Error("The bundled image-compositor font is unavailable.");
+  const bundledFontBuffer = readFileSync(bundledFontPath);
+  bundledFont = opentypeRuntime.parse(
+    bundledFontBuffer.buffer.slice(
+      bundledFontBuffer.byteOffset,
+      bundledFontBuffer.byteOffset + bundledFontBuffer.byteLength,
+    ),
+  );
+  return bundledFont;
+}
 
 export const FACEBOOK_IMAGE_WIDTH = 1200;
 export const FACEBOOK_IMAGE_HEIGHT = 630;
@@ -154,7 +160,7 @@ function templateRules(template: ImageTemplate) {
 }
 
 function fontForTheme(theme: BrandImageTheme) {
-  if (!theme.fontDataBase64) return bundledFont;
+  if (!theme.fontDataBase64) return loadBundledFont();
   if (!/^[A-Za-z0-9+/=]+$/.test(theme.fontDataBase64)) {
     throw new Error("Brand font data must be valid base64.");
   }

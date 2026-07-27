@@ -846,3 +846,16 @@ still-unprepared opportunity in the rolling inbox compete for the first three
 slots after 00:00 UTC without duplicating its source, opportunity, research,
 drafts, or images. The database's brand-row lock and daily run count remain the
 authoritative concurrent quota controls.
+
+## ADR-061 — Optional image resources must not gate non-image workflow startup
+
+**Status:** Accepted, 2026-07-27
+
+The deterministic compositor loads its bundled font only when composition is
+requested. Research, writing, verification, and content-action functions must
+start without opening or parsing an image-only asset.
+
+The font remains a checked-in, traced deployment asset and is explicitly
+included for nested API functions. Lazy loading changes startup isolation only;
+it does not change typography, dimensions, checksums, validation, branding, or
+the human-review boundary.

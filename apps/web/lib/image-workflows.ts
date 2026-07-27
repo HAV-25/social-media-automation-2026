@@ -4,7 +4,7 @@ import {
   ImageProviderError,
   OpenAIImageProvider,
   type ImageProvider,
-} from "@content-engine/ai";
+} from "@content-engine/ai/image";
 import {
   generatedImageSchema,
   imageDirectionSchema,

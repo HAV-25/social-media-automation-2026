@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname, "../.."),
   outputFileTracingIncludes: {
     "/*": ["../../packages/image-compositor/assets/Inter-Bold.ttf"],
+    "/api/**/*": ["../../packages/image-compositor/assets/Inter-Bold.ttf"],
   },
   poweredByHeader: false,
   reactStrictMode: true,

@@ -1,5 +1,5 @@
 import "server-only";
-import { buildImageGenerationPrompt, sanitizeImageDisplayText } from "@content-engine/ai";
+import { buildImageGenerationPrompt, sanitizeImageDisplayText } from "@content-engine/ai/image";
 import {
   generatedImageSchema,
   imageDirectionSchema,
