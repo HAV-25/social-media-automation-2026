@@ -385,10 +385,10 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
       systematic log redaction.
 - [x] Feature 8.4: Cost, feed-health, approval, rejection, and generation-volume
       dashboards.
-- [ ] Feature 8.5: Retention controls, security/advisor suite, operating-limit
+- [x] Feature 8.5: Retention controls, security/advisor suite, operating-limit
       load tests, and Milestone 8 release gate.
   - [x] Brand-configurable non-destructive RSS inbox and resurfacing windows.
-  - [ ] Consolidated security/advisor remediation and operating-limit load
+  - [x] Consolidated security/advisor remediation and operating-limit load
         tests.
 
 ### Feature 8.1 evidence
@@ -1232,3 +1232,34 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   all four Chromium regression journeys. The walking-skeleton journey changes
   Klaank to a 48-hour inbox and 12-hour resurfacing window and verifies both on
   Archive. No paid provider or Netlify build was invoked.
+
+### Feature 8.5 security, advisor, and operating-limit release gate
+
+- Added deterministic capacity regressions for the blueprint's Phase 1
+  envelope: 20 brands, 100 active feeds, 1,000 daily RSS items, three automatic
+  opportunities per brand, three editorial styles, and four concurrent
+  content/image jobs. The 1,000-item parse-and-cluster fixture completed in
+  7.39 seconds during the full suite; 60 fake evidence packages, 180 fake
+  drafts, and four fake images stayed inside their release targets and recorded
+  $0.00.
+- Upgraded `sharp` to 0.35.0 and `postcss` to 8.5.18, including transitive
+  Next.js copies with pnpm workspace overrides. The final production dependency
+  audit reports no known vulnerability. A narrow TypeScript path alias points
+  at sharp's bundled declaration file because its 0.35.0 export map omits a
+  `types` condition; runtime resolution remains the package export.
+- Ran the live Supabase security and performance advisors. Security has no
+  critical/high/error finding: five expected private-schema informational
+  notices and one leaked-password-protection warning remain. The password
+  setting is a plan-dependent Auth dashboard hardening action before access
+  expands beyond the controlled pilot. Performance findings are documented as
+  an optimization backlog rather than risking a broad RLS rewrite immediately
+  before UAT.
+- Updated the rollback-only database fixtures for opaque secret-key JWT claims,
+  current image lifecycle states, required source-to-brand routing, and safe
+  coexistence with real production rows. All eight live suites passed 104 pgTAP
+  assertions across RLS/tenancy, rate limiting, recovery, images, cost
+  attribution, member access, performance reporting, and archive policy.
+- Release verification passed formatting, lint, strict type checking, all 13
+  repository test tasks (320 assertions), the optimized production build, and
+  all four Chromium regression journeys. No paid provider call or Netlify
+  build was made.

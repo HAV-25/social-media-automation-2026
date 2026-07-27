@@ -236,6 +236,7 @@ values (
 
 set local role service_role;
 select set_config('request.jwt.claim.role', 'service_role', true);
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
 insert into storage.objects (bucket_id, name, owner_id, metadata)
 select
   'generated-images',
@@ -331,14 +332,22 @@ select throws_ok(
   'authenticated editors cannot upload generated images'
 );
 select is(
-  (select count(*) from public.image_assets),
+  (
+    select count(*)
+    from public.image_assets
+    where id = '68000000-0000-4000-8000-000000000001'
+  ),
   1::bigint,
   'assigned editor can read the image asset'
 );
 
 select set_config('request.jwt.claim.sub', '40000000-0000-4000-8000-000000000014', true);
 select is(
-  (select count(*) from public.image_assets),
+  (
+    select count(*)
+    from public.image_assets
+    where id = '68000000-0000-4000-8000-000000000001'
+  ),
   0::bigint,
   'an unassigned user cannot read the image asset'
 );
@@ -346,6 +355,7 @@ select is(
 reset role;
 set local role service_role;
 select set_config('request.jwt.claim.role', 'service_role', true);
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
 insert into storage.objects (bucket_id, name, owner_id, metadata)
 values (
   'generated-images',

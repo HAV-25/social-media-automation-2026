@@ -24,6 +24,7 @@ select is(
 
 set local role service_role;
 select set_config('request.jwt.claim.role', 'service_role', true);
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
 
 select is(
   (public.consume_api_rate_limit(

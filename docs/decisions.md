@@ -812,3 +812,21 @@ The rolling inbox window must not change daily business arithmetic. Sources,
 research spend, and automatic opportunity capacity reset at 00:00 UTC, while
 RSS visibility uses the brand's rolling window. Resurfacing never consumes an
 automatic slot or triggers AI work by itself.
+
+## ADR-059 — Phase 1 capacity is bounded by UTC selection and concurrency
+
+**Status:** Accepted, 2026-07-27
+
+The controlled pilot supports the blueprint envelope of 20 brands, 100 active
+RSS feeds, 1,000 ingested feed items per UTC day, 50 one-off submissions per
+UTC day, three standard post styles, and four concurrent content/image jobs.
+
+Each brand automatically prepares the first three opportunities that durably
+reserve a slot at a score of 75 or higher. The selection counter resets at
+00:00 UTC. Scores from 60 through 74 remain optional Review items and lower
+scores remain durable without becoming automatic candidates.
+
+Release capacity is tested with deterministic fake providers so performance
+verification never consumes paid credits or depends on provider latency.
+External research, writing, and image calls retain independent token, query,
+timeout, retry, idempotency, and cost bounds.

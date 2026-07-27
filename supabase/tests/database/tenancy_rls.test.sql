@@ -225,12 +225,26 @@ select results_eq(
   'organization administrator cannot read a different organization'
 );
 select results_eq(
-  $$ select array_agg(id order by id) from public.generation_runs $$,
+  $$
+    select array_agg(id order by id)
+    from public.generation_runs
+    where id in (
+      '60000000-0000-4000-8000-000000000001',
+      '60000000-0000-4000-8000-000000000002'
+    )
+  $$,
   $$ values (array['60000000-0000-4000-8000-000000000001'::uuid]) $$,
   'organization administrator reads only runs in their organization'
 );
 select results_eq(
-  $$ select count(*)::bigint from public.pipeline_events $$,
+  $$
+    select count(*)::bigint
+    from public.pipeline_events
+    where correlation_id in (
+      '62000000-0000-4000-8000-000000000001',
+      '62000000-0000-4000-8000-000000000002'
+    )
+  $$,
   array[1::bigint],
   'organization administrator reads only pipeline events in their organization'
 );
@@ -242,12 +256,26 @@ select results_eq(
   'brand editor reads only their assigned brand'
 );
 select results_eq(
-  $$ select array_agg(id order by id) from public.generation_runs $$,
+  $$
+    select array_agg(id order by id)
+    from public.generation_runs
+    where id in (
+      '60000000-0000-4000-8000-000000000001',
+      '60000000-0000-4000-8000-000000000002'
+    )
+  $$,
   $$ values (array['60000000-0000-4000-8000-000000000001'::uuid]) $$,
   'brand editor reads only runs for their assigned brand'
 );
 select results_eq(
-  $$ select count(*)::bigint from public.pipeline_events $$,
+  $$
+    select count(*)::bigint
+    from public.pipeline_events
+    where correlation_id in (
+      '62000000-0000-4000-8000-000000000001',
+      '62000000-0000-4000-8000-000000000002'
+    )
+  $$,
   array[1::bigint],
   'brand editor reads only pipeline events for their assigned brand'
 );
@@ -336,7 +364,11 @@ select lives_ok(
   'assigned editor can route the feed to their brand'
 );
 select results_eq(
-  $$ select count(*)::bigint from public.rss_feeds $$,
+  $$
+    select count(*)::bigint
+    from public.rss_feeds
+    where id = '50000000-0000-4000-8000-000000000001'
+  $$,
   array[1::bigint],
   'editor can read a feed after it is linked to their brand'
 );

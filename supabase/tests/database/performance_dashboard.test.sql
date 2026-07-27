@@ -57,6 +57,7 @@ values (
 
 set local role service_role;
 select set_config('request.jwt.claim.role', 'service_role', true);
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
 
 insert into public.rss_feeds (
   id, organization_id, name, feed_url, active, last_polled_at,

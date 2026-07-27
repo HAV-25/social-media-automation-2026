@@ -29,6 +29,7 @@ values (
 
 set local role service_role;
 select set_config('request.jwt.claim.role', 'service_role', true);
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
 
 insert into public.source_documents (
   id, organization_id, source_type, title, status, content_hash
@@ -40,6 +41,17 @@ values (
   'Cost observability robotics source',
   'analyzed',
   repeat('3', 64)
+);
+
+insert into public.source_brand_links (
+  organization_id, source_document_id, brand_id, relevance_score, routing_reason
+)
+values (
+  '10000000-0000-4000-8000-000000000001',
+  '50000000-0000-4000-8000-000000000031',
+  '20000000-0000-4000-8000-000000000001',
+  100,
+  'Cost observability test fixture'
 );
 
 insert into public.opportunities (
@@ -72,14 +84,16 @@ values (
 );
 
 insert into public.image_assets (
-  id, post_draft_id, image_style, concept, status, model
+  id, organization_id, brand_id, post_draft_id, image_style, concept, status, model
 )
 values (
   '80000000-0000-4000-8000-000000000031',
+  '10000000-0000-4000-8000-000000000001',
+  '20000000-0000-4000-8000-000000000001',
   '70000000-0000-4000-8000-000000000031',
-  'editorial',
+  'editorial_hero',
   'A test concept',
-  'succeeded',
+  'generating',
   'gpt-image-2'
 );
 
@@ -167,6 +181,15 @@ values
     jsonb_build_object('model', 'deterministic-verifier-v1', 'costUsd', 0)
   );
 
+update public.generation_runs
+set created_at = '2099-01-01 00:00:00+00'::timestamptz
+where id in (
+  '90000000-0000-4000-8000-000000000031',
+  '90000000-0000-4000-8000-000000000032',
+  '90000000-0000-4000-8000-000000000033',
+  '90000000-0000-4000-8000-000000000034'
+);
+
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.role', 'authenticated', true);
@@ -175,7 +198,7 @@ select set_config('request.jwt.claim.sub', '40000000-0000-4000-8000-000000000031
 select is(
   (public.get_brand_ai_cost_observability(
     '20000000-0000-4000-8000-000000000001',
-    now() - interval '1 hour'
+    '2098-12-31 00:00:00+00'::timestamptz
   ) ->> 'totalCostUsd')::numeric,
   0.175::numeric,
   'brand total sums actual recorded AI costs without inflating zero-cost work'
@@ -183,7 +206,7 @@ select is(
 select is(
   (public.get_brand_ai_cost_observability(
     '20000000-0000-4000-8000-000000000001',
-    now() - interval '1 hour'
+    '2098-12-31 00:00:00+00'::timestamptz
   ) ->> 'paidRunCount')::integer,
   3,
   'paid run count excludes the deterministic zero-cost verification'
@@ -191,7 +214,7 @@ select is(
 select is(
   (public.get_brand_ai_cost_observability(
     '20000000-0000-4000-8000-000000000001',
-    now() - interval '1 hour'
+    '2098-12-31 00:00:00+00'::timestamptz
   ) ->> 'inputTokens')::integer,
   24200,
   'flat and nested input-token shapes are combined'
@@ -199,7 +222,7 @@ select is(
 select is(
   (public.get_brand_ai_cost_observability(
     '20000000-0000-4000-8000-000000000001',
-    now() - interval '1 hour'
+    '2098-12-31 00:00:00+00'::timestamptz
   ) ->> 'webSearchCalls')::integer,
   2,
   'research web-search usage remains visible'
@@ -207,7 +230,7 @@ select is(
 select is(
   (public.get_brand_ai_cost_observability(
     '20000000-0000-4000-8000-000000000001',
-    now() - interval '1 hour'
+    '2098-12-31 00:00:00+00'::timestamptz
   ) ->> 'generatedImages')::integer,
   1,
   'successful generated images are counted'
@@ -215,7 +238,7 @@ select is(
 select is(
   jsonb_array_length(public.get_brand_ai_cost_observability(
     '20000000-0000-4000-8000-000000000001',
-    now() - interval '1 hour'
+    '2098-12-31 00:00:00+00'::timestamptz
   ) -> 'byStage'),
   4,
   'stage breakdown includes paid and deterministic AI-related steps'
@@ -223,7 +246,7 @@ select is(
 select is(
   public.get_brand_ai_cost_observability(
     '20000000-0000-4000-8000-000000000001',
-    now() - interval '1 hour'
+    '2098-12-31 00:00:00+00'::timestamptz
   ) #>> '{bySourceType,0,key}',
   'rss',
   'source-type attribution follows the content package'
@@ -231,7 +254,7 @@ select is(
 select is(
   public.get_brand_ai_cost_observability(
     '20000000-0000-4000-8000-000000000001',
-    now() - interval '1 hour'
+    '2098-12-31 00:00:00+00'::timestamptz
   ) #>> '{byPackage,0,sourceTitle}',
   'Cost observability robotics source',
   'content-package attribution retains the source title'
@@ -240,7 +263,7 @@ select is(
   (
     public.get_brand_ai_cost_observability(
       '20000000-0000-4000-8000-000000000001',
-      now() - interval '1 hour'
+      '2098-12-31 00:00:00+00'::timestamptz
     ) #>> '{byPackage,0,reviewReadyCount}'
   )::integer,
   1,
@@ -250,7 +273,7 @@ select throws_ok(
   $$
     select public.get_brand_ai_cost_observability(
       '20000000-0000-4000-8000-000000000002',
-      now() - interval '1 hour'
+      '2098-12-31 00:00:00+00'::timestamptz
     )
   $$,
   '42501',

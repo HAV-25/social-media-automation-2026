@@ -5,6 +5,10 @@ packages:
 nodeLinker: hoisted
 packageImportMethod: copy
 
+overrides:
+  postcss: 8.5.18
+  sharp: 0.35.0
+
 allowBuilds:
   "@tailwindcss/oxide": true
   esbuild: true

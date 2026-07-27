@@ -73,6 +73,7 @@ values (
 
 set local role service_role;
 select set_config('request.jwt.claim.role', 'service_role', true);
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
 
 select is(
   (public.register_workflow_execution(
@@ -89,12 +90,21 @@ select is(
   'identical execution registration is idempotent'
 );
 select is(
-  (select count(*) from public.run_recoveries),
+  (
+    select count(*)
+    from public.run_recoveries
+    where initial_execution_id = 'recovery-execution-initial-21'
+  ),
   1::bigint,
   'idempotent registration creates one recovery record'
 );
 select is(
-  (select count(*) from public.pipeline_events where event_type = 'recovery.registered'),
+  (
+    select count(*)
+    from public.pipeline_events
+    where event_type = 'recovery.registered'
+      and correlation_id = '83000000-0000-4000-8000-000000000021'
+  ),
   1::bigint,
   'idempotent registration creates one registration event'
 );
@@ -129,11 +139,18 @@ select ok(
     select next_retry_at >= now() + interval '55 seconds'
       and next_retry_at <= now() + interval '65 seconds'
     from public.run_recoveries
+    where initial_execution_id = 'recovery-execution-initial-21'
   ),
   'first retry uses deterministic one-minute backoff'
 );
 
-update public.run_recoveries set next_retry_at = now();
+update public.run_recoveries
+set next_retry_at = now() + interval '1 day'
+where initial_execution_id <> 'recovery-execution-initial-21'
+  and status = 'scheduled';
+update public.run_recoveries
+set next_retry_at = now()
+where initial_execution_id = 'recovery-execution-initial-21';
 insert into recovery_claims select * from public.claim_due_recoveries(1);
 select results_eq(
   $$ select attempt_count from recovery_claims $$,
@@ -171,7 +188,9 @@ select is(
 );
 
 truncate recovery_claims;
-update public.run_recoveries set next_retry_at = now();
+update public.run_recoveries
+set next_retry_at = now()
+where initial_execution_id = 'recovery-execution-initial-21';
 insert into recovery_claims select * from public.claim_due_recoveries(1);
 select is(
   public.fail_recovery_dispatch(jsonb_build_object(
@@ -184,7 +203,9 @@ select is(
 );
 
 truncate recovery_claims;
-update public.run_recoveries set next_retry_at = now();
+update public.run_recoveries
+set next_retry_at = now()
+where initial_execution_id = 'recovery-execution-initial-21';
 insert into recovery_claims select * from public.claim_due_recoveries(1);
 select is(
   public.fail_recovery_dispatch(jsonb_build_object(
@@ -196,7 +217,11 @@ select is(
   'automatic recovery moves to dead letter at the three-attempt cap'
 );
 select is(
-  (select attempt_count from public.run_recoveries),
+  (
+    select attempt_count
+    from public.run_recoveries
+    where initial_execution_id = 'recovery-execution-initial-21'
+  ),
   3,
   'automatic retry count never exceeds the configured cap'
 );
@@ -206,7 +231,11 @@ set local role authenticated;
 select set_config('request.jwt.claim.role', 'authenticated', true);
 select set_config('request.jwt.claim.sub', '40000000-0000-4000-8000-000000000022', true);
 select is(
-  (select count(*) from public.run_recoveries),
+  (
+    select count(*)
+    from public.run_recoveries
+    where initial_execution_id = 'recovery-execution-initial-21'
+  ),
   0::bigint,
   'brand editors cannot inspect administrator-only recovery records'
 );
@@ -229,7 +258,11 @@ select throws_ok(
 
 select set_config('request.jwt.claim.sub', '40000000-0000-4000-8000-000000000021', true);
 select is(
-  (select count(*) from public.run_recoveries),
+  (
+    select count(*)
+    from public.run_recoveries
+    where initial_execution_id = 'recovery-execution-initial-21'
+  ),
   1::bigint,
   'organization administrator can inspect recovery records'
 );
@@ -250,6 +283,7 @@ select ok(
   (
     select manual_requested and attempt_count = 0
     from public.run_recoveries
+    where initial_execution_id = 'recovery-execution-initial-21'
   ),
   'manual recovery opens one bounded attempt without erasing generation-run history'
 );

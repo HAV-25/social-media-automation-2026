@@ -1,6 +1,10 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "sharp": ["../../node_modules/sharp/lib/index.d.ts"]
+    },
     "types": ["node", "vitest/globals"]
   },
   "include": ["src/**/*.ts"]
