@@ -378,6 +378,9 @@ describe("Milestone 7 image workflow", () => {
     expect(route).toContain("authenticateWorkflowRequest");
     expect(route).toContain("imageWorkflowRequestSchema");
     expect(route).toContain('await import("@/lib/image-workflows")');
+    expect(readFileSync(`${appDirectory}../lib/image-workflows.ts`, "utf8")).toContain(
+      "await preflightImageCompositor()",
+    );
     expect(route).toContain("Cache-Control");
     expect(source).toContain('"saveDataErrorExecution": "all"');
     expect(route).not.toMatch(/TODO|not implemented/i);

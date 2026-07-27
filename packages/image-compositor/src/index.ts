@@ -9,11 +9,21 @@ import {
   type ImageValidation,
 } from "@content-engine/contracts";
 import type { Font } from "opentype.js";
-import sharp from "sharp";
+import type { OverlayOptions } from "sharp";
 
 let opentypeRuntime: typeof import("opentype.js") | undefined;
+type SharpRuntime = typeof import("sharp");
+let sharpRuntime: SharpRuntime | undefined;
 const bundledFontRelativePath = "packages/image-compositor/assets/Inter-Bold.ttf";
 let bundledFont: Font | undefined;
+
+async function getSharpRuntime() {
+  const sharpModule = await import("sharp");
+  sharpRuntime ??=
+    (sharpModule as unknown as { default?: SharpRuntime }).default ??
+    (sharpModule as unknown as SharpRuntime);
+  return sharpRuntime;
+}
 
 function getOpenTypeRuntime() {
   opentypeRuntime ??= createRequire(import.meta.url)("opentype.js") as typeof import("opentype.js");
@@ -41,6 +51,21 @@ export const FACEBOOK_IMAGE_WIDTH = 1200;
 export const FACEBOOK_IMAGE_HEIGHT = 630;
 export const CANONICAL_IMAGE_WIDTH = 1536;
 export const CANONICAL_IMAGE_HEIGHT = 1024;
+
+export async function preflightImageCompositor() {
+  const sharp = await getSharpRuntime();
+  loadBundledFont();
+  await sharp({
+    create: {
+      width: 1,
+      height: 1,
+      channels: 4,
+      background: { red: 0, green: 0, blue: 0, alpha: 0 },
+    },
+  })
+    .png()
+    .toBuffer();
+}
 
 export type BrandImageTheme = {
   brandName: string;
@@ -308,6 +333,7 @@ export async function createDeterministicBaseImage(input: {
   width?: number;
   height?: number;
 }) {
+  const sharp = await getSharpRuntime();
   const width = input.width ?? CANONICAL_IMAGE_WIDTH;
   const height = input.height ?? CANONICAL_IMAGE_HEIGHT;
   const digest = createHash("sha256").update(input.seed).digest();
@@ -336,6 +362,7 @@ export async function validateBaseImage(
     focalSafeAreaClear?: boolean;
   } = {},
 ): Promise<ImageValidation> {
+  const sharp = await getSharpRuntime();
   const metadata = await sharp(image).metadata();
   const width = metadata.width ?? 0;
   const height = metadata.height ?? 0;
@@ -390,6 +417,7 @@ export async function validateBaseImage(
 }
 
 export async function composeBrandedImage(input: CompositionInput): Promise<CompositionResult> {
+  const sharp = await getSharpRuntime();
   const template = imageTemplateSchema.parse(input.template);
   const width = input.width ?? FACEBOOK_IMAGE_WIDTH;
   const height = input.height ?? FACEBOOK_IMAGE_HEIGHT;
@@ -416,7 +444,7 @@ export async function composeBrandedImage(input: CompositionInput): Promise<Comp
     textColor,
     sourceLabel: input.sourceLabel?.trim().slice(0, 120) ?? "",
   });
-  const composites: sharp.OverlayOptions[] = [{ input: overlay, top: 0, left: 0 }];
+  const composites: OverlayOptions[] = [{ input: overlay, top: 0, left: 0 }];
   if (input.theme.logo) {
     const logo = await sharp(input.theme.logo)
       .resize({ width: 150, height: 64, fit: "inside", withoutEnlargement: true })

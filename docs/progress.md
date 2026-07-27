@@ -1338,3 +1338,17 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   manually replayed. Final acceptance requires a fresh single RSS trigger to
   reach reviewable text-and-image packages through automatic workflow retries
   alone; human action may begin only at review and approval.
+- Production deployment `e447a29` passed the no-cost authenticated route-shell
+  probe. A fresh single RSS trigger at 10:53 UTC then autonomously reached
+  WF-05 and three WF-08 executions without manual handoffs, proving the
+  connected downstream dispatch. All three image executions failed in 1–3
+  seconds before a new image-generation run or cost record was created.
+- Durable recovery classified the opaque application `500` as a malformed
+  upstream response and dead-lettered the existing image runs without an
+  automatic retry. This run is recorded as failed autonomous UAT evidence, not
+  as a completed journey.
+- Sharp is now dynamically loaded and exercised with the bundled font through a
+  one-pixel local compositor preflight before any paid provider call. Native
+  runtime failures become typed, retryable infrastructure responses and cannot
+  spend image budget. All 13 test tasks (324 assertions), strict type checking,
+  and the optimized production build pass with the preflight.

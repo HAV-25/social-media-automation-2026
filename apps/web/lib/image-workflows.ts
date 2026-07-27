@@ -14,6 +14,7 @@ import {
   serverEnvSchema,
   type ImageWorkflowRequest,
 } from "@content-engine/contracts";
+import { preflightImageCompositor } from "@content-engine/image-compositor";
 import { z } from "zod";
 import { getBrandConfigurationForWorkflow } from "./brand-configuration";
 import { executeImageWorkflow } from "./image-workflow-core";
@@ -289,6 +290,7 @@ export async function generateWorkflowImage(rawInput: ImageWorkflowRequest) {
     provider = createProvider(brand.context);
   }
   try {
+    await preflightImageCompositor();
     return imageGenerationResultSchema.parse(
       await executeImageWorkflow(
         effectiveInput,
@@ -319,6 +321,17 @@ export async function generateWorkflowImage(rawInput: ImageWorkflowRequest) {
         error.code,
         error.message,
         error.code === "budget_exceeded" ? 422 : error.retryable ? 503 : 502,
+      );
+    }
+    if (
+      error instanceof Error &&
+      (error.name === "Error" || error.name === "TypeError") &&
+      /sharp|font|opentype|image-compositor/i.test(error.message)
+    ) {
+      throw new ImageWorkflowError(
+        "image_runtime_unavailable",
+        "The image composition runtime is temporarily unavailable.",
+        503,
       );
     }
     throw error;

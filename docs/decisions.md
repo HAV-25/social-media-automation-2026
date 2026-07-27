@@ -864,3 +864,17 @@ The image endpoint also authenticates and validates its typed request before
 loading the native image workflow. Unauthenticated traffic therefore cannot
 force Sharp or font initialization, and an optional image-runtime failure
 cannot prevent the route from returning the normal authenticated API contract.
+
+## ADR-062 — Paid image work requires a no-cost compositor preflight
+
+**Status:** Accepted, 2026-07-27
+
+The image workflow dynamically loads and exercises the native Sharp runtime and
+the bundled deterministic font before invoking a paid image provider. A
+missing native binary, deployment trace, or font therefore fails with the typed
+`image_runtime_unavailable` infrastructure error before model spend.
+
+The preflight renders only a one-pixel local PNG and does not persist an asset,
+call a provider, or modify editorial state. Successful preflight leaves image
+generation, validation, deterministic composition, provenance, cost recording,
+and human review unchanged.
