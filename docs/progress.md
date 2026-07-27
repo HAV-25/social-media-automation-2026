@@ -387,6 +387,9 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
       dashboards.
 - [ ] Feature 8.5: Retention controls, security/advisor suite, operating-limit
       load tests, and Milestone 8 release gate.
+  - [x] Brand-configurable non-destructive RSS inbox and resurfacing windows.
+  - [ ] Consolidated security/advisor remediation and operating-limit load
+        tests.
 
 ### Feature 8.1 evidence
 
@@ -1197,3 +1200,35 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   repository test tasks (313 assertions), the optimized production build, and
   all four Chromium regression journeys. No paid provider or Netlify build was
   invoked.
+
+### Configurable non-destructive archive controls
+
+- Added Settings → Retention & archive for the selected brand. Editors can
+  choose bounded 12-hour, 24-hour, 48-hour, 3-day, or 7-day active-inbox and
+  resurfaced-review windows; PostgreSQL independently enforces the supported
+  6-to-168-hour range.
+- Kept archival strictly non-destructive. Changing a window moves RSS items
+  between the active inbox and Archive without deleting or mutating sources,
+  scores, evidence, drafts, images, costs, feedback, runs, or audit history.
+  Resurfacing still creates no AI work, automatic reservation, approval,
+  schedule, or publication.
+- Separated three clocks that had previously shared one rolling timestamp:
+  RSS visibility uses the configured inbox window, resurfacing uses its own
+  configured review window, and daily source/research/selection arithmetic
+  resets at 00:00 UTC. A 48-hour inbox therefore cannot consume two days of
+  automatic capacity or mislabel 48-hour spend as today's spend.
+- Applied migration `brand_archive_policy` to Supabase project
+  `hqffgchxwtymyfwtkmdt`. Existing brand-profile RLS remains authoritative;
+  archive-policy updates run as authenticated invoker statements and an
+  after-update trigger records the previous and current policy atomically.
+- The live rollback-only eight-assertion pgTAP suite passed defaults, editor
+  update, persisted values, one audit event, audit metadata,
+  cross-organization denial, database bounds, and viewer denial. The
+  post-DDL advisors found no new archive-policy issue; existing private-schema
+  informational notices and the previously known leaked-password setting
+  remain part of the separate Feature 8.5 security review.
+- Release verification passed formatting, lint, strict type checking, all 13
+  repository test tasks (317 assertions), the optimized production build, and
+  all four Chromium regression journeys. The walking-skeleton journey changes
+  Klaank to a 48-hour inbox and 12-hour resurfacing window and verifies both on
+  Archive. No paid provider or Netlify build was invoked.

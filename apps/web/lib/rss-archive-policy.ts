@@ -1,14 +1,14 @@
-export const RSS_ACTIVE_WINDOW_MS = 24 * 60 * 60 * 1000;
-
 export function isRssItemActive(input: {
   firstSeenAt: string;
   resurfacedAt?: string | null;
+  resurfaceWindowStart?: string;
   windowStart: string;
 }) {
   const windowStart = Date.parse(input.windowStart);
+  const resurfaceWindowStart = Date.parse(input.resurfaceWindowStart ?? input.windowStart);
   return (
     Date.parse(input.firstSeenAt) >= windowStart ||
-    (input.resurfacedAt ? Date.parse(input.resurfacedAt) >= windowStart : false)
+    (input.resurfacedAt ? Date.parse(input.resurfacedAt) >= resurfaceWindowStart : false)
   );
 }
 

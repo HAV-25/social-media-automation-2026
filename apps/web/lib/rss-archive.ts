@@ -48,6 +48,7 @@ export type RssArchiveItem = {
 export async function getRssArchive(
   brandId: string,
   before: string,
+  resurfaceWindowStart: string,
   limit = 100,
 ): Promise<RssArchiveItem[]> {
   if (process.env.NEXT_PUBLIC_DEMO_MODE !== "false") return [];
@@ -127,6 +128,7 @@ export async function getRssArchive(
       return !isRssItemActive({
         firstSeenAt: item.first_seen_at,
         resurfacedAt,
+        resurfaceWindowStart,
         windowStart: before,
       });
     })

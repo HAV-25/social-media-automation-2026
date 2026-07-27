@@ -5,6 +5,8 @@ import { cookies } from "next/headers";
 import { cache } from "react";
 import { z } from "zod";
 import { parseDemoContentRecords } from "./demo-content-store";
+import { getBrandArchivePolicy } from "./brand-archive-policy";
+import { rollingWindowStart, utcDayStart } from "./brand-archive-policy-core";
 import { createSupabaseServerClient } from "./supabase/server";
 
 export type WorkspaceBrand = {
@@ -71,12 +73,15 @@ export const getWorkspaceSnapshot = cache(async function getWorkspaceSnapshot(
   requestedBrandId?: string,
 ) {
   const env = serverEnvSchema.parse(process.env);
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
   if (process.env.NEXT_PUBLIC_DEMO_MODE !== "false") {
     const fallbackBrand = demoBrands[0];
     if (!fallbackBrand) throw new Error("Demo mode requires at least one brand.");
     const activeBrand = demoBrands.find((brand) => brand.id === requestedBrandId) ?? fallbackBrand;
+    const archivePolicy = await getBrandArchivePolicy(activeBrand.id);
+    const now = new Date();
+    const rssWindowSince = rollingWindowStart(now, archivePolicy.inboxWindowHours);
+    const metricsSince = utcDayStart(now);
     const cookieStore = await cookies();
     const submitted = parseDemoContentRecords(cookieStore.get("demo-content-records")?.value)
       .filter((record) => record.brandId === activeBrand.id)
@@ -108,8 +113,10 @@ export const getWorkspaceSnapshot = cache(async function getWorkspaceSnapshot(
         deduplicatedToday: 0,
         processingToday: 0,
         completedToday: submitted.length,
-        since: since.toISOString(),
+        since: metricsSince,
       } satisfies DashboardMetrics,
+      archivePolicy,
+      rssWindowSince,
     };
   }
 
@@ -126,6 +133,10 @@ export const getWorkspaceSnapshot = cache(async function getWorkspaceSnapshot(
   if (!fallbackBrand) throw new Error("This account has no assigned brands.");
 
   const activeBrand = brands.find((brand) => brand.id === requestedBrandId) ?? fallbackBrand;
+  const archivePolicy = await getBrandArchivePolicy(activeBrand.id);
+  const now = new Date();
+  const rssWindowSince = rollingWindowStart(now, archivePolicy.inboxWindowHours);
+  const metricsSince = utcDayStart(now);
 
   const [
     { data: opportunities, error: opportunityError },
@@ -138,12 +149,12 @@ export const getWorkspaceSnapshot = cache(async function getWorkspaceSnapshot(
       )
       .eq("brand_id", activeBrand.id)
       .neq("status", "archived")
-      .gte("created_at", since.toISOString())
+      .gte("created_at", rssWindowSince)
       .order("opportunity_score", { ascending: false })
       .limit(20),
     supabase.rpc("get_brand_dashboard_metrics", {
       p_brand_id: activeBrand.id,
-      p_since: since.toISOString(),
+      p_since: metricsSince,
     }),
   ]);
 
@@ -186,7 +197,9 @@ export const getWorkspaceSnapshot = cache(async function getWorkspaceSnapshot(
       deduplicatedToday: metrics.deduplicated_today,
       processingToday: metrics.processing_today,
       completedToday: metrics.completed_today,
-      since: since.toISOString(),
+      since: metricsSince,
     } satisfies DashboardMetrics,
+    archivePolicy,
+    rssWindowSince,
   };
 });

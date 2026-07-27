@@ -1,5 +1,6 @@
 import { Archive, ArrowRight, Clock3, RotateCcw } from "lucide-react";
 import { cookies } from "next/headers";
+import { rollingWindowStart } from "@/lib/brand-archive-policy-core";
 import { getRssArchive } from "@/lib/rss-archive";
 import { getWorkspaceSnapshot } from "@/lib/workspace";
 import { resurfaceRssItem } from "./actions";
@@ -26,8 +27,11 @@ export default async function ArchivePage({
 }) {
   const [cookieStore, query] = await Promise.all([cookies(), searchParams]);
   const snapshot = await getWorkspaceSnapshot(cookieStore.get("active-brand")?.value);
-  const activeSince = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const items = await getRssArchive(snapshot.activeBrand.id, activeSince);
+  const items = await getRssArchive(
+    snapshot.activeBrand.id,
+    snapshot.rssWindowSince,
+    rollingWindowStart(new Date(), snapshot.archivePolicy.resurfaceWindowHours),
+  );
 
   return (
     <>
@@ -51,9 +55,10 @@ export default async function ArchivePage({
           </p>
           <h1 className="serif mt-2 text-4xl tracking-[-0.04em] sm:text-5xl">Article archive</h1>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--muted)]">
-            RSS articles leave the active inbox after 24 hours without being deleted. Their score,
-            editorial outcome and audit history remain available. Resurfacing returns a scored
-            article to the active review window for 24 hours; it does not bypass research,
+            RSS articles leave the active inbox after {snapshot.archivePolicy.inboxWindowHours}{" "}
+            hours without being deleted. Their score, editorial outcome and audit history remain
+            available. Resurfacing returns a scored article to the active review window for{" "}
+            {snapshot.archivePolicy.resurfaceWindowHours} hours; it does not bypass research,
             verification or human approval.
           </p>
         </div>
@@ -95,8 +100,8 @@ export default async function ArchivePage({
                   </div>
                   <h2 className="mt-2 text-base font-bold leading-6">{item.title}</h2>
                   <p className="mt-2 text-xs text-[var(--muted)]">
-                    Automatically archived after its 24-hour active window ·{" "}
-                    {actionSummary(item.postStatuses, item.opportunityStatus)}
+                    Automatically archived after its {snapshot.archivePolicy.inboxWindowHours}-hour
+                    active window · {actionSummary(item.postStatuses, item.opportunityStatus)}
                   </p>
                   {item.lastResurfacedAt ? (
                     <p className="mt-1 text-xs text-[var(--muted)]">
@@ -143,7 +148,8 @@ export default async function ArchivePage({
             <div className="rounded-2xl border border-dashed border-[var(--line)] bg-white/50 p-10 text-center">
               <h2 className="serif text-2xl">No archived RSS articles</h2>
               <p className="mt-2 text-sm text-[var(--muted)]">
-                Articles will appear here automatically after their rolling 24-hour inbox window.
+                Articles will appear here automatically after their rolling{" "}
+                {snapshot.archivePolicy.inboxWindowHours}-hour inbox window.
               </p>
             </div>
           ) : null}

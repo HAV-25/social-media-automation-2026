@@ -11,9 +11,18 @@ describe("RSS rolling archive policy", () => {
       isRssItemActive({
         firstSeenAt: "2026-07-20T00:00:00.000Z",
         resurfacedAt: "2026-07-26T08:00:00.000Z",
+        resurfaceWindowStart: "2026-07-26T00:00:00.000Z",
         windowStart,
       }),
     ).toBe(true);
+    expect(
+      isRssItemActive({
+        firstSeenAt: "2026-07-20T00:00:00.000Z",
+        resurfacedAt: "2026-07-25T23:59:59.999Z",
+        resurfaceWindowStart: "2026-07-26T00:00:00.000Z",
+        windowStart,
+      }),
+    ).toBe(false);
   });
 
   it("sorts resurfaced articles by the explicit review action", () => {

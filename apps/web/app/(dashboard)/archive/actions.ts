@@ -4,6 +4,7 @@ import { z } from "zod";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
+import { getBrandArchivePolicy } from "@/lib/brand-archive-policy";
 import { canReviewContent } from "@/lib/permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -60,6 +61,7 @@ export async function resurfaceRssItem(formData: FormData) {
   }
 
   const resurfacedAt = new Date().toISOString();
+  const archivePolicy = await getBrandArchivePolicy(parsed.data.brandId);
   const { error: stateError } = await supabase.from("rss_item_review_states").upsert(
     {
       organization_id: user.organizationId,
@@ -82,7 +84,10 @@ export async function resurfaceRssItem(formData: FormData) {
     entity_id: parsed.data.itemId,
     metadata: {
       opportunityId: parsed.data.opportunityId,
-      activeUntil: new Date(Date.parse(resurfacedAt) + 24 * 60 * 60 * 1000).toISOString(),
+      activeUntil: new Date(
+        Date.parse(resurfacedAt) + archivePolicy.resurfaceWindowHours * 60 * 60 * 1000,
+      ).toISOString(),
+      reviewWindowHours: archivePolicy.resurfaceWindowHours,
     },
   });
   if (auditError) {

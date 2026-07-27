@@ -71,6 +71,20 @@ test("plain text becomes an editable and approvable draft without paid services"
   await expect(teammateAccess.getByLabel("Organization role")).toHaveValue("editor");
   await expect(teammateAccess.locator('input[name="brandId"]:checked')).toHaveCount(4);
 
+  await page.goto("/settings");
+  await page.getByRole("link", { name: "Manage archive controls" }).click();
+  await expect(page.getByRole("heading", { name: "Archive controls" })).toBeVisible();
+  await page.getByLabel("Active inbox window").selectOption("48");
+  await page.getByLabel("Resurfaced review window").selectOption("12");
+  await page.getByRole("button", { name: "Save archive controls" }).click();
+  await expect(page).toHaveURL(/settings\/archive\?saved=true/);
+  await expect(page.getByText("Archive controls saved for Klaank.")).toBeVisible();
+  await expect(page.getByLabel("Active inbox window")).toHaveValue("48");
+  await expect(page.getByLabel("Resurfaced review window")).toHaveValue("12");
+  await page.goto("/archive");
+  await expect(page.getByText(/leave the active inbox after 48 hours/)).toBeVisible();
+  await expect(page.getByText(/active review window for 12 hours/)).toBeVisible();
+
   await page.goto("/inputs/new");
   await page.getByLabel("Source title").fill("E2E decision redesign observation");
   await page

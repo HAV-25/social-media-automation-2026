@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { cookies } from "next/headers";
 import { OpportunityCard } from "@/components/opportunity-card";
+import { rollingWindowStart } from "@/lib/brand-archive-policy-core";
 import { getRssDailyDecisions } from "@/lib/rss-daily-decisions";
 import { filterAndSortRssItems, rssFeedFilterSchema } from "@/lib/rss-feed-filters";
 import { getWorkspaceSnapshot } from "@/lib/workspace";
@@ -33,10 +34,13 @@ export default async function DashboardPage({
   searchParams: Promise<SearchParams>;
 }) {
   const [cookieStore, query] = await Promise.all([cookies(), searchParams]);
-  const { activeBrand, dashboardMetrics, opportunities } = await getWorkspaceSnapshot(
-    cookieStore.get("active-brand")?.value,
+  const { activeBrand, archivePolicy, dashboardMetrics, opportunities, rssWindowSince } =
+    await getWorkspaceSnapshot(cookieStore.get("active-brand")?.value);
+  const rssOverview = await getRssDailyDecisions(
+    activeBrand.id,
+    rssWindowSince,
+    rollingWindowStart(new Date(), archivePolicy.resurfaceWindowHours),
   );
-  const rssOverview = await getRssDailyDecisions(activeBrand.id, dashboardMetrics.since);
   const feedFilter = rssFeedFilterSchema.parse({
     q: first(query.q),
     view: first(query.view),
@@ -346,9 +350,9 @@ export default async function DashboardPage({
                 </p>
                 <h2 className="serif mt-1 text-2xl">Every RSS item and its decision</h2>
                 <p className="mt-2 max-w-3xl text-xs leading-5 text-[var(--muted)]">
-                  This rolling 24-hour view includes scored opportunities, brand-filtered articles,
-                  duplicates and items still processing. Older articles move automatically to the
-                  archive without being deleted.
+                  This rolling {archivePolicy.inboxWindowHours}-hour view includes scored
+                  opportunities, brand-filtered articles, duplicates and items still processing.
+                  Older articles move automatically to the archive without being deleted.
                 </p>
               </div>
               <div className="rounded-2xl bg-[var(--sage-soft)] px-4 py-3 text-xs text-[var(--sage)]">

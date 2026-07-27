@@ -602,15 +602,15 @@ preserving the opportunity identity, workflow state, and audit history.
 
 ## ADR-042 — RSS inbox retention is a rolling view, not destructive archival
 
-The selected-brand RSS inbox shows items first observed during the rolling
-24-hour window plus articles explicitly resurfaced during that window. Older
-items remain durable and move to the Archive view without changing or deleting
-their source, opportunity, evidence, draft, image, feedback, run, or audit
-records.
+The selected-brand RSS inbox shows items first observed during the brand's
+bounded rolling window, which defaults to 24 hours, plus articles explicitly
+resurfaced during the separately configurable review window. Older items remain
+durable and move to the Archive view without changing or deleting their source,
+opportunity, evidence, draft, image, feedback, run, cost, or audit records.
 
 Resurfacing stores one idempotent brand-and-item review state, records the actor
-and audit event, and returns the existing scored opportunity to the active view
-for 24 hours. It never changes the deterministic score, creates a draft,
+and audit event, and returns the existing scored opportunity for the configured
+review window. It never changes the deterministic score, creates a draft,
 bypasses the brand's automatic threshold, approves content, schedules content,
 or publishes content.
 
@@ -797,3 +797,18 @@ was approved or published.
 The reporting function is security-invoker and reads only RLS-visible rows. It
 accepts a bounded time window, exposes no raw feed/provider error, and has
 explicit authenticated execution with anonymous execution revoked.
+
+## ADR-058 — Archive visibility and daily automation use independent clocks
+
+**Status:** Accepted, 2026-07-27
+
+Each brand may configure its active RSS inbox and resurfaced-review windows from
+6 through 168 hours. The controls change visibility only and are audited
+atomically on the brand profile. Phase 1 does not destructively delete durable
+content or provenance because an organization-wide deletion period and backup
+policy have not yet been approved.
+
+The rolling inbox window must not change daily business arithmetic. Sources,
+research spend, and automatic opportunity capacity reset at 00:00 UTC, while
+RSS visibility uses the brand's rolling window. Resurfacing never consumes an
+automatic slot or triggers AI work by itself.

@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { utcDayStart } from "./brand-archive-policy-core";
 import { explainRssRouteFilter } from "./rss-routing-visibility";
 import { isRssItemActive, rssItemActivityTimestamp } from "./rss-archive-policy";
 import {
@@ -132,6 +133,7 @@ export type RssDailyOverview = {
 export async function getRssDailyDecisions(
   brandId: string,
   since: string,
+  resurfaceWindowStart = since,
 ): Promise<RssDailyOverview> {
   const emptyPolicy = {
     automaticSelection: false,
@@ -177,7 +179,7 @@ export async function getRssDailyDecisions(
     .from("rss_item_review_states")
     .select("rss_feed_item_id,resurfaced_at")
     .eq("brand_id", brandId)
-    .gte("resurfaced_at", since);
+    .gte("resurfaced_at", resurfaceWindowStart);
   if (resurfaceError) throw new Error("Unable to load resurfaced RSS items.");
   const resurfaceRows = z.array(resurfaceRowSchema).parse(rawResurfaceRows ?? []);
   const resurfacedAtByItem = new Map(
@@ -226,7 +228,8 @@ export async function getRssDailyDecisions(
         resurfacedAt: resurfacedAtByItem.get(left.id),
       }),
   );
-  const windowStart = new Date(since).getTime();
+  const dailySelectionStart = utcDayStart(new Date());
+  const dailySelectionStartMs = Date.parse(dailySelectionStart);
   const items = visibleItems;
   const sourceIds = visibleItems
     .map((item) => item.source_document_id)
@@ -270,8 +273,10 @@ export async function getRssDailyDecisions(
     .eq("run_type", "rss_opportunity_reservation")
     .eq("status", "succeeded");
   reservationQuery = opportunityIds.length
-    ? reservationQuery.or(`created_at.gte.${since},entity_id.in.(${opportunityIds.join(",")})`)
-    : reservationQuery.gte("created_at", since);
+    ? reservationQuery.or(
+        `created_at.gte.${dailySelectionStart},entity_id.in.(${opportunityIds.join(",")})`,
+      )
+    : reservationQuery.gte("created_at", dailySelectionStart);
   const { data: rawReservations, error: reservationError } = await reservationQuery;
   if (reservationError) throw new Error("Unable to load today's RSS selection decisions.");
   const reservations = z.array(reservationRowSchema).parse(rawReservations ?? []);
@@ -302,7 +307,7 @@ export async function getRssDailyDecisions(
     reservations
       .filter(
         (reservation) =>
-          new Date(reservation.created_at).getTime() >= windowStart &&
+          Date.parse(reservation.created_at) >= dailySelectionStartMs &&
           qualifiesUnderCurrentPolicy(reservation.entity_id),
       )
       .map((reservation) => reservation.entity_id),
@@ -390,6 +395,7 @@ export async function getRssDailyDecisions(
       inCurrentWindow: isRssItemActive({
         firstSeenAt: item.first_seen_at,
         resurfacedAt: resurfacedAtByItem.get(item.id),
+        resurfaceWindowStart,
         windowStart: since,
       }),
       resurfacedAt: resurfacedAtByItem.get(item.id) ?? null,

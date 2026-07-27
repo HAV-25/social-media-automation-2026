@@ -147,14 +147,17 @@ duplicate content or spend.
 
 ### UAT-12 — Archive and resurfacing
 
-1. After an item leaves the rolling 24-hour inbox, find it in Archive.
-2. Inspect its retained score and downstream outcome.
-3. Resurface one scored item.
-4. Confirm it returns to the inbox for 24 hours without changing its score,
+1. In Settings → Retention & archive, confirm the selected brand's active inbox
+   and resurfacing windows.
+2. After an item leaves the configured rolling inbox, find it in Archive.
+3. Inspect its retained score and downstream outcome.
+4. Resurface one scored item.
+5. Confirm it returns to the inbox for the configured review window without changing its score,
    automatically generating content, approving it, or consuming an automatic
    slot without an explicit reviewer action.
 
-Pass when archive is durable history rather than deletion.
+Pass when archive is durable history rather than deletion and changing the
+rolling window does not change the UTC daily-selection count or daily spend.
 
 ### UAT-13 — Isolation and prohibited behavior
 

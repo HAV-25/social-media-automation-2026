@@ -1,6 +1,14 @@
-import { ArrowRight, Building2, CircleUserRound, Settings2, UsersRound } from "lucide-react";
+import {
+  Archive,
+  ArrowRight,
+  Building2,
+  CircleUserRound,
+  Settings2,
+  UsersRound,
+} from "lucide-react";
 import { cookies } from "next/headers";
 import { getCurrentUser } from "@/lib/auth";
+import { canManageBrand } from "@/lib/permissions";
 import { getWorkspaceSnapshot } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
@@ -65,6 +73,23 @@ export default async function SettingsPage() {
               className="mt-5 flex items-center justify-between rounded-xl bg-[var(--ink)] px-4 py-3 text-sm font-bold text-white"
             >
               Manage team access <ArrowRight size={17} />
+            </a>
+          </article>
+        ) : null}
+
+        {user && canManageBrand(user.role) ? (
+          <article className="rounded-3xl border border-[var(--line)] bg-white p-6">
+            <Archive size={24} className="text-[var(--sage)]" />
+            <h2 className="serif mt-4 text-2xl">Retention &amp; archive</h2>
+            <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+              Configure the rolling inbox and resurfacing windows for {activeBrand.name}. Archive
+              remains non-destructive and preserves complete provenance.
+            </p>
+            <a
+              href="/settings/archive"
+              className="mt-5 flex items-center justify-between rounded-xl bg-[var(--ink)] px-4 py-3 text-sm font-bold text-white"
+            >
+              Manage archive controls <ArrowRight size={17} />
             </a>
           </article>
         ) : null}
