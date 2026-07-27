@@ -17,7 +17,12 @@ const bundledFontRelativePath = "packages/image-compositor/assets/Inter-Bold.ttf
 let bundledFont: Font | undefined;
 
 async function getSharpRuntime() {
-  const sharpModule = await import("sharp");
+  let sharpModule: unknown;
+  try {
+    sharpModule = await import("sharp");
+  } catch {
+    throw new Error("The image-compositor Sharp runtime is unavailable.");
+  }
   sharpRuntime ??=
     (sharpModule as unknown as { default?: SharpRuntime }).default ??
     (sharpModule as unknown as SharpRuntime);
@@ -26,27 +31,46 @@ async function getSharpRuntime() {
 
 async function getOpenTypeRuntime() {
   if (opentypeRuntime) return opentypeRuntime;
-  const opentypeModule = await import("opentype.js");
+  let opentypeModule: typeof import("opentype.js");
+  try {
+    opentypeModule = await import("opentype.js");
+  } catch {
+    throw new Error("The image-compositor OpenType runtime is unavailable.");
+  }
   opentypeRuntime =
     (opentypeModule as unknown as { default?: typeof import("opentype.js") }).default ??
     opentypeModule;
   return opentypeRuntime;
 }
 
+export function findBundledFontPath(startDirectory = process.cwd()) {
+  let directory = path.resolve(startDirectory);
+  for (let depth = 0; depth <= 8; depth += 1) {
+    const candidate = path.join(directory, bundledFontRelativePath);
+    if (existsSync(candidate)) return candidate;
+    const parent = path.dirname(directory);
+    if (parent === directory) break;
+    directory = parent;
+  }
+  return null;
+}
+
 async function loadBundledFont() {
   if (bundledFont) return bundledFont;
-  const bundledFontPath = [
-    path.join(process.cwd(), bundledFontRelativePath),
-    path.join(process.cwd(), "../..", bundledFontRelativePath),
-  ].find((candidate) => existsSync(candidate));
+  const bundledFontPath = findBundledFontPath();
   if (!bundledFontPath) throw new Error("The bundled image-compositor font is unavailable.");
   const bundledFontBuffer = readFileSync(bundledFontPath);
-  bundledFont = (await getOpenTypeRuntime()).parse(
-    bundledFontBuffer.buffer.slice(
-      bundledFontBuffer.byteOffset,
-      bundledFontBuffer.byteOffset + bundledFontBuffer.byteLength,
-    ),
-  );
+  try {
+    bundledFont = (await getOpenTypeRuntime()).parse(
+      bundledFontBuffer.buffer.slice(
+        bundledFontBuffer.byteOffset,
+        bundledFontBuffer.byteOffset + bundledFontBuffer.byteLength,
+      ),
+    );
+  } catch (error) {
+    if (error instanceof Error && /OpenType runtime/.test(error.message)) throw error;
+    throw new Error("The bundled image-compositor font could not be parsed.");
+  }
   return bundledFont;
 }
 
@@ -63,7 +87,7 @@ export async function preflightImageCompositor() {
       width: 1,
       height: 1,
       channels: 4,
-      background: { red: 0, green: 0, blue: 0, alpha: 0 },
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
     },
   })
     .png()

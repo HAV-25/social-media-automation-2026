@@ -931,3 +931,18 @@ The Phase 1 default remains three automatic selections per brand per UTC day.
 Klaank's pilot configuration is temporarily four; changing a brand policy must
 advance `brand_profiles.updated_at` so daily reservation idempotency reflects
 the new policy rather than replaying an earlier capacity decision.
+
+## ADR-066 — Compositor preflight must exercise the deployed Sharp contract
+
+**Status:** Accepted, 2026-07-27
+
+The no-cost compositor preflight uses Sharp's supported `r`, `g`, `b`, and
+`alpha` background-color keys. Long-form color keys are not accepted by the
+pinned Sharp 0.35 runtime and caused the safety check itself to fail before any
+provider request.
+
+The checked-in deterministic font is also explicitly included in Netlify
+function artifacts. Runtime lookup walks only the current directory and a
+bounded number of parents, allowing the same code to run from the repository,
+Next.js output, or Netlify's nested handler directory without scanning unrelated
+filesystem locations. Tests exercise the exact preflight and nested-path lookup.

@@ -1398,3 +1398,11 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   checking, all 13 repository test tasks (331 assertions), the optimized
   production build, and all four Chromium regression journeys. No paid model
   call or Netlify build was made during these checks.
+- Production verification of `0324bd7` confirmed the Ready-post date, state,
+  style, tone, and quality sorting controls and Klaank's daily maximum of four.
+  The Decision frame plus Insight split request reached the real image workflow
+  but stopped at the no-cost compositor preflight; no provider cost was incurred.
+- A new local regression reproduced the preflight failure against the pinned
+  Sharp 0.35 runtime. The preflight now uses Sharp's supported short-form color
+  keys, passes end to end, resolves its font from nested serverless directories,
+  and explicitly includes that font plus Sharp in Netlify's function bundle.

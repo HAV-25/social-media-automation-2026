@@ -5,3 +5,7 @@
 [build.environment]
   NODE_VERSION = "22"
   PNPM_FLAGS = "--shamefully-hoist"
+
+[functions]
+  included_files = ["packages/image-compositor/assets/Inter-Bold.ttf"]
+  external_node_modules = ["sharp"]

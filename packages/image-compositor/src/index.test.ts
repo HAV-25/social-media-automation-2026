@@ -1,10 +1,13 @@
 import { createHash } from "node:crypto";
+import path from "node:path";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import {
   composeBrandedImage,
   contrastRatio,
   createDeterministicBaseImage,
+  findBundledFontPath,
+  preflightImageCompositor,
   validateBaseImage,
   wrapHeadline,
 } from "./index";
@@ -17,6 +20,21 @@ const theme = {
 };
 
 describe("deterministic image compositor", () => {
+  it("finds its bundled font from nested serverless runtime directories", async () => {
+    const nestedRuntimeDirectory = path.join(
+      process.cwd(),
+      "apps",
+      "web",
+      ".netlify",
+      "functions-internal",
+      "___netlify-server-handler",
+    );
+    expect(findBundledFontPath(nestedRuntimeDirectory)).toMatch(
+      /packages[\\/]image-compositor[\\/]assets[\\/]Inter-Bold\.ttf$/,
+    );
+    await expect(preflightImageCompositor()).resolves.toBeUndefined();
+  });
+
   it("wraps and truncates headlines within explicit line limits", () => {
     const lines = wrapHeadline(
       "A deliberately long headline that must remain inside the branded image safe area",
