@@ -9,6 +9,7 @@ import { z, ZodError } from "zod";
 import { persistNormalizedSource } from "@/lib/persist-normalized-source";
 import { selectRssAnalysisSource } from "@/lib/rss-analysis-source";
 import { createDailyRssReservationIdentity } from "@/lib/rss-reservation-key";
+import { resolveRssReservationResult } from "@/lib/rss-reservation-result";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { authenticateWorkflowRequest, WorkflowAuthError } from "@/lib/workflow-auth";
 
@@ -57,6 +58,7 @@ const reservationRowSchema = z.object({
     "daily_limit",
     "inactive",
   ]),
+  duplicate: z.boolean(),
 });
 const internalFailureSchema = z.object({
   error: z.object({
@@ -252,7 +254,8 @@ export async function POST(request: NextRequest) {
             if (reservationError) throw reservationError;
             return reservationRowSchema.parse(rawReservation);
           })()
-        : ({ eligible: false, reason: "ingest_only" } as const);
+        : ({ eligible: false, reason: "ingest_only", duplicate: false } as const);
+      const reservationDecision = resolveRssReservationResult(reservation);
       results.push({
         actorId,
         brandId: route.brand_id,
@@ -261,8 +264,8 @@ export async function POST(request: NextRequest) {
         riskPenalty: opportunity.riskPenalty,
         duplicate: opportunity.duplicate,
         analysisBasis: analysisSource.analysisBasis,
-        researchEligible: reservation.eligible,
-        eligibilityReason: reservation.reason,
+        researchEligible: reservationDecision.researchEligible,
+        eligibilityReason: reservationDecision.eligibilityReason,
       });
     }
 

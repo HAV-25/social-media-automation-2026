@@ -990,3 +990,17 @@ The compositor renders text as deterministic OpenType paths rather than using
 Sharp's native text renderer, so the Wasm runtime's lack of native text
 rendering does not weaken typography or provenance. The provider remains behind
 the no-cost preflight, and both runtimes are pinned in the committed lockfile.
+
+## ADR-070 — An idempotent RSS reservation replay never redispatches research
+
+**Status:** Accepted, 2026-07-27
+
+The reservation transaction may return its original successful response when a
+stable reservation key is replayed. That response is marked `duplicate: true`.
+The RSS analysis boundary must therefore require both `eligible: true` and
+`duplicate: false` before dispatching research. A duplicate response is exposed
+as `already_prepared` and cannot consume provider budget or invoke downstream
+workflows again.
+
+This keeps the database transaction conventionally idempotent while making the
+workflow side effect exactly-once from the application's perspective.

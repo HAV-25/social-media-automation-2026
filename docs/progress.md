@@ -1450,3 +1450,10 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   while retaining the Linux binary as primary. Typography remains implemented
   as deterministic OpenType paths and does not depend on unsupported native
   text rendering.
+- The first scheduler tick after applying the distinct-reservation migration
+  exposed a consumer defect: the reservation RPC returned the cached successful
+  result with `duplicate: true`, but RSS analysis stripped that flag and
+  redispatched the opportunity. The analysis boundary now converts every
+  duplicate reservation to `already_prepared` with `researchEligible: false`.
+  Regression coverage proves a replay cannot invoke research while a new
+  reservation still dispatches once.
