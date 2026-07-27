@@ -31,6 +31,9 @@ const appDirectory = fileURLToPath(new URL("../../../apps/web/app/", import.meta
 const editorialWorkflowPath = fileURLToPath(
   new URL("../../../apps/web/lib/editorial-workflows.ts", import.meta.url),
 );
+const imageCompositorPath = fileURLToPath(
+  new URL("../../image-compositor/src/index.ts", import.meta.url),
+);
 const publisherPath = fileURLToPath(
   new URL("../../../scripts/publish-n8n-workflows.mjs", import.meta.url),
 );
@@ -383,6 +386,9 @@ describe("Milestone 7 image workflow", () => {
     expect(readFileSync(`${appDirectory}../lib/image-workflows.ts`, "utf8")).toContain(
       "await preflightImageCompositor()",
     );
+    const compositor = readFileSync(imageCompositorPath, "utf8");
+    expect(compositor).toContain('await import("opentype.js")');
+    expect(compositor).not.toContain("createRequire(import.meta.url)");
     expect(route).toContain("Cache-Control");
     expect(source).toContain('"saveDataErrorExecution": "all"');
     expect(route).not.toMatch(/TODO|not implemented/i);

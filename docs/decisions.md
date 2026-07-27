@@ -881,3 +881,18 @@ The preflight renders only a one-pixel local PNG and does not persist an asset,
 call a provider, or modify editorial state. Successful preflight leaves image
 generation, validation, deterministic composition, provenance, cost recording,
 and human review unchanged.
+
+## ADR-063 — Deployment tracing must see the OpenType runtime
+
+**Status:** Accepted, 2026-07-27
+
+The deterministic compositor loads OpenType with a direct dynamic import.
+Loading it through a runtime-created CommonJS `require` hid the dependency from
+Next.js output-file tracing, so the optimized server function could contain the
+font file while omitting the parser required to open it.
+
+The asynchronous import is visible to the production bundler and remains lazy:
+non-image functions still do not load OpenType, while the image preflight
+verifies Sharp, the traced font, and the traced parser before any provider call.
+Typography, composition rules, checksums, and the human-review boundary remain
+unchanged.

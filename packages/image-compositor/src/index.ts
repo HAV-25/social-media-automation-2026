@@ -1,6 +1,5 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import path from "node:path";
 import {
   imageTemplateSchema,
@@ -25,12 +24,16 @@ async function getSharpRuntime() {
   return sharpRuntime;
 }
 
-function getOpenTypeRuntime() {
-  opentypeRuntime ??= createRequire(import.meta.url)("opentype.js") as typeof import("opentype.js");
+async function getOpenTypeRuntime() {
+  if (opentypeRuntime) return opentypeRuntime;
+  const opentypeModule = await import("opentype.js");
+  opentypeRuntime =
+    (opentypeModule as unknown as { default?: typeof import("opentype.js") }).default ??
+    opentypeModule;
   return opentypeRuntime;
 }
 
-function loadBundledFont() {
+async function loadBundledFont() {
   if (bundledFont) return bundledFont;
   const bundledFontPath = [
     path.join(process.cwd(), bundledFontRelativePath),
@@ -38,7 +41,7 @@ function loadBundledFont() {
   ].find((candidate) => existsSync(candidate));
   if (!bundledFontPath) throw new Error("The bundled image-compositor font is unavailable.");
   const bundledFontBuffer = readFileSync(bundledFontPath);
-  bundledFont = getOpenTypeRuntime().parse(
+  bundledFont = (await getOpenTypeRuntime()).parse(
     bundledFontBuffer.buffer.slice(
       bundledFontBuffer.byteOffset,
       bundledFontBuffer.byteOffset + bundledFontBuffer.byteLength,
@@ -54,7 +57,7 @@ export const CANONICAL_IMAGE_HEIGHT = 1024;
 
 export async function preflightImageCompositor() {
   const sharp = await getSharpRuntime();
-  loadBundledFont();
+  await loadBundledFont();
   await sharp({
     create: {
       width: 1,
@@ -187,13 +190,13 @@ function templateRules(template: ImageTemplate) {
   }
 }
 
-function fontForTheme(theme: BrandImageTheme) {
+async function fontForTheme(theme: BrandImageTheme) {
   if (!theme.fontDataBase64) return loadBundledFont();
   if (!/^[A-Za-z0-9+/=]+$/.test(theme.fontDataBase64)) {
     throw new Error("Brand font data must be valid base64.");
   }
   const fontBuffer = Buffer.from(theme.fontDataBase64, "base64");
-  return getOpenTypeRuntime().parse(
+  return (await getOpenTypeRuntime()).parse(
     fontBuffer.buffer.slice(fontBuffer.byteOffset, fontBuffer.byteOffset + fontBuffer.byteLength),
   );
 }
@@ -237,7 +240,7 @@ function headlineText(
     .join("");
 }
 
-function overlaySvg(input: {
+async function overlaySvg(input: {
   width: number;
   height: number;
   template: ImageTemplate;
@@ -251,7 +254,7 @@ function overlaySvg(input: {
   const primary = assertHexColor(theme.primaryColor, "Primary color");
   const secondary = assertHexColor(theme.secondaryColor, "Secondary color");
   const accent = assertHexColor(theme.accentColor, "Accent color");
-  const font = fontForTheme(theme);
+  const font = await fontForTheme(theme);
   let shapes = "";
   let headline = "";
   if (template === "editorial_overlay") {
@@ -434,7 +437,7 @@ export async function composeBrandedImage(input: CompositionInput): Promise<Comp
   if (contrastRatio(textColor, background) < 4.5) {
     throw new Error("No accessible text color is available for this template.");
   }
-  const overlay = overlaySvg({
+  const overlay = await overlaySvg({
     width,
     height,
     template,

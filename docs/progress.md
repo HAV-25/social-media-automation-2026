@@ -1360,3 +1360,12 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   numeric status structurally. Cross-chunk runtime identity is no longer part of
   the error contract, so n8n and durable recovery receive the actual bounded
   failure classification instead of a generic application `500`.
+- Production commit `399b75b` exposed the bounded failure as HTTP 503 during
+  the no-cost image preflight. The single untouched RSS journey reached WF-05
+  and three WF-08 branches; all three stopped before new image spend, so
+  autonomous UAT remains incomplete.
+- The optimized image-route trace contained Sharp and the checked-in font but
+  omitted OpenType because a runtime-created CommonJS `require` was invisible
+  to dependency tracing. The compositor now uses a lazy direct dynamic import,
+  and the built server chunk contains the OpenType runtime. A contract
+  regression prevents the opaque loader from returning.
