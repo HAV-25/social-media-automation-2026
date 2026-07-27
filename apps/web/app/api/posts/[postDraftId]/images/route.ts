@@ -13,6 +13,26 @@ function failure(status: number, code: string, message: string) {
   return NextResponse.json({ error: { code, message } }, { status });
 }
 
+function typedImageFailure(error: unknown) {
+  if (
+    typeof error !== "object" ||
+    error === null ||
+    !("code" in error) ||
+    !("message" in error) ||
+    !("status" in error)
+  ) {
+    return null;
+  }
+  const candidate = error as { code?: unknown; message?: unknown; status?: unknown };
+  return typeof candidate.code === "string" &&
+    typeof candidate.message === "string" &&
+    typeof candidate.status === "number" &&
+    candidate.status >= 400 &&
+    candidate.status <= 599
+    ? { code: candidate.code, message: candidate.message, status: candidate.status }
+    : null;
+}
+
 export async function POST(
   request: NextRequest,
   context: { params: Promise<{ postDraftId: string }> },
@@ -52,6 +72,8 @@ export async function POST(
     });
     return NextResponse.json(result, { status: result.duplicate ? 200 : 201 });
   } catch (error) {
+    const typed = typedImageFailure(error);
+    if (typed) return failure(typed.status, typed.code, typed.message);
     const message = error instanceof Error ? error.message : "The image action failed.";
     const stale = /changed|stale/i.test(message);
     return failure(

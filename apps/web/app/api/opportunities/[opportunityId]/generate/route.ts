@@ -2,6 +2,7 @@ import {
   EditorialProviderError,
   FakeEditorialProvider,
   OpenAIEditorialProvider,
+  buildEditorialPromptSnapshot,
 } from "@content-engine/ai";
 import {
   draftGenerationRequestSchema,
@@ -158,20 +159,22 @@ export async function POST(
           maxCostUsd: env.AI_WRITE_PER_RUN_BUDGET_USD,
           maxRetries: env.AI_PROVIDER_MAX_RETRIES,
         });
+  const generationRequest = {
+    opportunityId,
+    sourceTitle: opportunity.title,
+    valueNucleus: opportunity.valueNucleus,
+    contentStyle: parsed.data.contentStyle,
+    tone: parsed.data.tone,
+    brandContext: brandConfiguration.context,
+    evidencePackage: research.evidencePackage,
+    sourceText: opportunity.cleanText,
+    recentSameBrandPosts,
+    crossBrandPosts,
+  };
+  const promptSnapshot = buildEditorialPromptSnapshot(generationRequest);
   let output;
   try {
-    output = await provider.generateDraft({
-      opportunityId,
-      sourceTitle: opportunity.title,
-      valueNucleus: opportunity.valueNucleus,
-      contentStyle: parsed.data.contentStyle,
-      tone: parsed.data.tone,
-      brandContext: brandConfiguration.context,
-      evidencePackage: research.evidencePackage,
-      sourceText: opportunity.cleanText,
-      recentSameBrandPosts,
-      crossBrandPosts,
-    });
+    output = await provider.generateDraft(generationRequest);
   } catch (error) {
     if (error instanceof EditorialProviderError) {
       return errorResponse(
@@ -189,6 +192,7 @@ export async function POST(
       contentStyle: parsed.data.contentStyle,
       tone: parsed.data.tone,
       promptVersion: output.promptVersion,
+      promptChecksum: promptSnapshot.checksum,
     }),
   );
 
@@ -284,6 +288,7 @@ export async function POST(
           provider: env.AI_PROVIDER,
           model: output.model,
           promptVersion: output.promptVersion,
+          promptSnapshot,
           responseId: output.responseId,
           usage: output.usage,
           costUsd: output.usage.estimatedCostUsd,

@@ -1,11 +1,37 @@
 import "server-only";
 import { postContentSchema } from "@content-engine/contracts";
 import { cookies } from "next/headers";
-import { z } from "zod";
 import { parseDemoDraftRecords } from "./demo-content-store";
+import {
+  readyPostFiltersSchema,
+  readyPostStatusSchema,
+  readyPostWindowStart,
+  type ReadyPostFilters,
+  type ReadyPostStatus,
+} from "./ready-post-filters";
 import { createSupabaseServerClient } from "./supabase/server";
 
-const readyPostStatusSchema = z.enum(["ready_for_review", "changes_requested"]);
+function filterAndSortReadyPosts(posts: ReadyPost[], filters: ReadyPostFilters) {
+  const start = readyPostWindowStart(filters.window);
+  return posts
+    .filter(
+      (post) =>
+        (!start || Date.parse(post.updatedAt) >= start.getTime()) &&
+        (filters.status === "all" || post.status === filters.status) &&
+        (filters.style === "all" || post.contentStyle === filters.style) &&
+        (filters.tone === "all" || post.tone === filters.tone),
+    )
+    .sort((left, right) => {
+      if (filters.sort === "quality_desc" || filters.sort === "quality_asc") {
+        if (left.qualityScore === null) return 1;
+        if (right.qualityScore === null) return -1;
+        const direction = filters.sort === "quality_desc" ? -1 : 1;
+        return direction * (left.qualityScore - right.qualityScore);
+      }
+      const direction = filters.sort === "updated_desc" ? -1 : 1;
+      return direction * (Date.parse(left.updatedAt) - Date.parse(right.updatedAt));
+    });
+}
 
 export type ReadyPost = {
   id: string;
@@ -13,7 +39,7 @@ export type ReadyPost = {
   sourceTitle: string;
   contentStyle: string;
   tone: string;
-  status: z.infer<typeof readyPostStatusSchema>;
+  status: ReadyPostStatus;
   qualityScore: number | null;
   versionNumber: number;
   hook: string;
@@ -21,40 +47,56 @@ export type ReadyPost = {
   updatedAt: string;
 };
 
-export async function getReadyPosts(brandId: string): Promise<ReadyPost[]> {
+export async function getReadyPosts(
+  brandId: string,
+  rawFilters: ReadyPostFilters = readyPostFiltersSchema.parse({}),
+): Promise<ReadyPost[]> {
+  const filters = readyPostFiltersSchema.parse(rawFilters);
   if (process.env.NEXT_PUBLIC_DEMO_MODE !== "false") {
     const cookieStore = await cookies();
-    return parseDemoDraftRecords(cookieStore.get("demo-draft-records")?.value)
-      .filter(
-        (draft) =>
-          draft.brandId === brandId &&
-          (draft.status === "ready_for_review" || draft.status === "changes_requested"),
-      )
-      .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))
-      .map((draft) => ({
-        id: draft.postDraftId,
-        opportunityId: draft.opportunityId,
-        sourceTitle: "Generated from submitted source",
-        contentStyle: draft.contentStyle,
-        tone: draft.tone,
-        status: readyPostStatusSchema.parse(draft.status),
-        qualityScore: draft.evaluation.qualityScore,
-        versionNumber: draft.versionNumber,
-        hook: draft.content.hook,
-        excerpt: draft.content.body.slice(0, 220),
-        updatedAt: draft.createdAt,
-      }));
+    return filterAndSortReadyPosts(
+      parseDemoDraftRecords(cookieStore.get("demo-draft-records")?.value)
+        .filter(
+          (draft) =>
+            draft.brandId === brandId &&
+            (draft.status === "ready_for_review" || draft.status === "changes_requested"),
+        )
+        .map((draft) => ({
+          id: draft.postDraftId,
+          opportunityId: draft.opportunityId,
+          sourceTitle: "Generated from submitted source",
+          contentStyle: draft.contentStyle,
+          tone: draft.tone,
+          status: readyPostStatusSchema.parse(draft.status),
+          qualityScore: draft.evaluation.qualityScore,
+          versionNumber: draft.versionNumber,
+          hook: draft.content.hook,
+          excerpt: draft.content.body.slice(0, 220),
+          updatedAt: draft.createdAt,
+        })),
+      filters,
+    );
   }
 
   const supabase = await createSupabaseServerClient();
-  const { data: drafts, error: draftError } = await supabase
+  let draftQuery = supabase
     .from("post_drafts")
     .select(
       "id,opportunity_id,content_style,tone,status,quality_score,current_version_id,updated_at,opportunities(source_documents(title))",
     )
     .eq("brand_id", brandId)
-    .in("status", ["ready_for_review", "changes_requested"])
-    .order("updated_at", { ascending: false });
+    .in("status", ["ready_for_review", "changes_requested"]);
+  if (filters.status !== "all") draftQuery = draftQuery.eq("status", filters.status);
+  if (filters.style !== "all") draftQuery = draftQuery.eq("content_style", filters.style);
+  if (filters.tone !== "all") draftQuery = draftQuery.eq("tone", filters.tone);
+  const start = readyPostWindowStart(filters.window);
+  if (start) draftQuery = draftQuery.gte("updated_at", start.toISOString());
+  const sortColumn = filters.sort.startsWith("quality") ? "quality_score" : "updated_at";
+  const ascending = filters.sort.endsWith("_asc");
+  const { data: drafts, error: draftError } = await draftQuery.order(sortColumn, {
+    ascending,
+    nullsFirst: false,
+  });
   if (draftError) throw new Error(`Unable to load ready posts: ${draftError.message}`);
   if (!drafts?.length) return [];
 

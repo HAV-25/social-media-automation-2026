@@ -1190,18 +1190,18 @@ export const imageReviewActionRequestSchema = z
   })
   .strict()
   .superRefine((value, context) => {
-    if (value.action === "select_concept" && !value.conceptKey) {
+    if (["generate", "select_concept"].includes(value.action) && !value.conceptKey) {
       context.addIssue({
         code: "custom",
         path: ["conceptKey"],
-        message: "Selecting a concept requires its concept key.",
+        message: "Generating or selecting a concept requires its concept key.",
       });
     }
-    if (value.action === "change_template" && !value.template) {
+    if (["generate", "change_template"].includes(value.action) && !value.template) {
       context.addIssue({
         code: "custom",
         path: ["template"],
-        message: "Changing a template requires the template.",
+        message: "Generating or changing an image requires its template.",
       });
     }
   });
@@ -1215,7 +1215,7 @@ export const imageReviewActionResultSchema = z
     imageAssetId: z.uuid(),
     selectedConceptKey: z.string().regex(/^concept_[a-z0-9]{6,40}$/),
     template: imageTemplateSchema,
-    status: z.literal("ready"),
+    status: z.enum(["validation_required", "ready"]),
     duplicate: z.boolean(),
   })
   .strict();

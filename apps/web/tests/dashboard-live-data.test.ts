@@ -3,6 +3,10 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const dashboardPage = readFileSync(resolve(process.cwd(), "app/(dashboard)/page.tsx"), "utf8");
+const brandActions = readFileSync(
+  resolve(process.cwd(), "app/(dashboard)/brands/actions.ts"),
+  "utf8",
+);
 const workspace = readFileSync(resolve(process.cwd(), "lib/workspace.ts"), "utf8");
 
 describe("live dashboard presentation", () => {
@@ -19,5 +23,9 @@ describe("live dashboard presentation", () => {
   it("uses assignment order rather than a hard-coded brand default", () => {
     expect(workspace).toContain('.order("created_at")');
     expect(workspace).not.toContain('brand.name === "Business of AI"');
+  });
+
+  it("versions automatic selection when an administrator changes the brand policy", () => {
+    expect(brandActions).toContain("updated_at: new Date().toISOString()");
   });
 });

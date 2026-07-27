@@ -1369,3 +1369,32 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   to dependency tracing. The compositor now uses a lazy direct dynamic import,
   and the built server chunk contains the OpenType runtime. A contract
   regression prevents the opaque loader from returning.
+
+### Klaank review controls and exact prompt provenance
+
+- Raised Klaank's configured UTC automatic-selection maximum from three to four
+  through the authenticated brand settings surface. Corrected brand-profile
+  saves to advance the policy revision timestamp, allowing unchanged recent
+  opportunities to be reconsidered under a genuinely changed daily limit.
+- Reproduced the reviewer failure for “New flapping robot swims and flies like
+  a diving bird” with Decision frame plus Insight split. Initial generation now
+  submits both selected values, uses the same current-version concept identity
+  as WF-08, and invokes the real production image workflow instead of the local
+  fake renderer. Typed image failures remain visible at the API boundary.
+- Added exact post-prompt capture: system prompt, rendered user prompt, prompt
+  version, and SHA-256 checksum are written to the generation run and copied by
+  a private non-exposed trigger to the immutable post version. Reviewers can
+  inspect both exact prompts in Model provenance. Historical versions are
+  explicitly labeled when capture predates them.
+- Added Ready-post controls for 24-hour, 7-day, 30-day, or all-time windows;
+  ready/change-requested state; three standard styles; five tone overlays; and
+  update-time or quality sorting. Production filtering remains server-side and
+  brand-scoped.
+- Targeted verification passed 37 AI tests, 151 contract/migration tests, 90
+  web tests, and strict web type checking. Local database execution is pending
+  because Docker Desktop is not running; production migration and autonomous
+  UAT remain release gates rather than being inferred from static tests.
+- Consolidated release verification passed formatting, lint, strict type
+  checking, all 13 repository test tasks (331 assertions), the optimized
+  production build, and all four Chromium regression journeys. No paid model
+  call or Netlify build was made during these checks.

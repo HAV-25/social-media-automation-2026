@@ -3,6 +3,7 @@ import type { NormalizedBrandContext } from "@content-engine/brand-memory";
 import { evidencePackageSchema } from "@content-engine/contracts";
 import type OpenAI from "openai";
 import {
+  buildEditorialPromptSnapshot,
   FakeEditorialProvider,
   FACEBOOK_WRITER_SYSTEM_PROMPT,
   generateEditorialDraftBatch,
@@ -96,6 +97,27 @@ const evidence = evidencePackageSchema.parse({
 });
 
 describe("fake editorial provider", () => {
+  it("captures the exact post prompts with a stable checksum", () => {
+    const request = {
+      opportunityId: "opportunity-a",
+      sourceTitle: "AI adoption note",
+      valueNucleus: "Teams gain more when they redesign decisions.",
+      contentStyle: "newsworthy_authority" as const,
+      tone: "thoughtful" as const,
+      brandContext: context,
+      evidencePackage: evidence,
+      sourceText: "Teams gain more when they redesign decisions.",
+    };
+    const first = buildEditorialPromptSnapshot(request);
+    const second = buildEditorialPromptSnapshot(request);
+
+    expect(first.systemPrompt).toBe(FACEBOOK_WRITER_SYSTEM_PROMPT);
+    expect(first.userPrompt).toContain("SOURCE_DATA");
+    expect(first.userPrompt).toContain("Teams gain more when they redesign decisions.");
+    expect(first.checksum).toMatch(/^[a-f0-9]{64}$/);
+    expect(second).toEqual(first);
+  });
+
   it("runs the bounded style batch concurrently while preserving request order", async () => {
     const fake = new FakeEditorialProvider();
     let active = 0;

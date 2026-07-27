@@ -3,6 +3,7 @@ import {
   EditorialProviderError,
   FakeEditorialProvider,
   OpenAIEditorialProvider,
+  buildEditorialPromptSnapshot,
   evaluateEditorialDraft,
   generateEditorialDraftBatch,
   selectivelyRegeneratePost,
@@ -273,23 +274,22 @@ export async function generateWorkflowDrafts(input: EditorialWorkflowRequest) {
 
   let generatedDrafts;
   try {
-    const outputs = await generateEditorialDraftBatch(
-      provider,
-      reusePlan.missingStyles.map((contentStyle) => ({
-        opportunityId: input.opportunityId,
-        sourceTitle: opportunity.title,
-        valueNucleus: opportunity.valueNucleus,
-        contentStyle,
-        tone: input.tone,
-        brandContext: brand.context,
-        evidencePackage: research.evidencePackage,
-        sourceText: opportunity.cleanText,
-        ...similarity,
-      })),
-    );
+    const generationRequests = reusePlan.missingStyles.map((contentStyle) => ({
+      opportunityId: input.opportunityId,
+      sourceTitle: opportunity.title,
+      valueNucleus: opportunity.valueNucleus,
+      contentStyle,
+      tone: input.tone,
+      brandContext: brand.context,
+      evidencePackage: research.evidencePackage,
+      sourceText: opportunity.cleanText,
+      ...similarity,
+    }));
+    const outputs = await generateEditorialDraftBatch(provider, generationRequests);
     generatedDrafts = outputs.map((output, index) => ({
       contentStyle: reusePlan.missingStyles[index]!,
       output,
+      promptSnapshot: buildEditorialPromptSnapshot(generationRequests[index]!),
     }));
   } catch (error) {
     if (error instanceof EditorialProviderError) {
@@ -302,7 +302,7 @@ export async function generateWorkflowDrafts(input: EditorialWorkflowRequest) {
     throw error;
   }
 
-  for (const { contentStyle, output } of generatedDrafts) {
+  for (const { contentStyle, output, promptSnapshot } of generatedDrafts) {
     const styleIdempotencyKey = sha256Hex(`${input.idempotencyKey}:${contentStyle}`);
     const requestHash = sha256Hex(
       JSON.stringify({
@@ -312,6 +312,7 @@ export async function generateWorkflowDrafts(input: EditorialWorkflowRequest) {
         contentStyle,
         tone: input.tone,
         promptVersion: output.promptVersion,
+        promptChecksum: promptSnapshot.checksum,
       }),
     );
     const { data, error } = await supabase
@@ -334,6 +335,7 @@ export async function generateWorkflowDrafts(input: EditorialWorkflowRequest) {
             provider: serverEnvSchema.parse(process.env).AI_PROVIDER,
             model: output.model,
             promptVersion: output.promptVersion,
+            promptSnapshot,
             responseId: output.responseId,
             usage: output.usage,
             costUsd: output.usage.estimatedCostUsd,

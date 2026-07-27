@@ -59,8 +59,8 @@ export function PostImageReview({
           idempotencyKey: `image:${action}:${crypto.randomUUID()}`,
           expectedVersionId: state.postVersionId,
           action,
-          ...(action === "select_concept" ? { conceptKey } : {}),
-          ...(action === "change_template" ? { template } : {}),
+          ...(["generate", "select_concept"].includes(action) ? { conceptKey } : {}),
+          ...(["generate", "change_template"].includes(action) ? { template } : {}),
         }),
       });
       const body = (await response.json().catch(() => null)) as {

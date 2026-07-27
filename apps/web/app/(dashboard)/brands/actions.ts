@@ -184,6 +184,7 @@ export async function saveBrandProfile(brandId: string, formData: FormData) {
       automatic_opportunity_selection: policy.data.automaticSelection,
       minimum_opportunity_score: policy.data.minimumScore,
       daily_draft_limit: policy.data.dailyDraftLimit,
+      updated_at: new Date().toISOString(),
     }),
   ]);
   const mutationError = brandError ?? profileError;

@@ -4,6 +4,7 @@ import {
   editorialWorkflowRequestSchema,
   evidencePackageSchema,
   fakeDraftOutputSchema,
+  imageReviewActionRequestSchema,
   manualInputRequestSchema,
   organizationRoleSchema,
   postActionWorkflowRequestSchema,
@@ -35,6 +36,30 @@ describe("shared contracts", () => {
   it("accepts every Phase 1 role and content style", () => {
     expect(organizationRoleSchema.parse("reviewer")).toBe("reviewer");
     expect(contentStyleSchema.parse("perspective_conversation")).toBe("perspective_conversation");
+  });
+
+  it("binds initial image generation to the selected concept and template", () => {
+    const request = {
+      contractVersion: "1.0",
+      action: "generate",
+      idempotencyKey: "image-review-request-0001",
+      expectedVersionId: "00000000-0000-4000-8000-000000000001",
+      conceptKey: "concept_abcdef123456",
+      template: "insight_split",
+    };
+    expect(imageReviewActionRequestSchema.safeParse(request).success).toBe(true);
+    expect(
+      imageReviewActionRequestSchema.safeParse({
+        ...request,
+        conceptKey: undefined,
+      }).success,
+    ).toBe(false);
+    expect(
+      imageReviewActionRequestSchema.safeParse({
+        ...request,
+        template: undefined,
+      }).success,
+    ).toBe(false);
   });
 
   it("rejects a retriable workflow request without an idempotency key", () => {

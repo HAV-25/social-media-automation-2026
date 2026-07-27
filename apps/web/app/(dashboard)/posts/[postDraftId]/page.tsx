@@ -336,6 +336,35 @@ export default async function PostReviewPage({
                     {post.provenance.promptVersion ?? "Not recorded"}
                   </dd>
                 </div>
+                {post.provenance.promptSnapshot ? (
+                  <>
+                    <div>
+                      <dt className="text-[var(--muted)]">Prompt checksum</dt>
+                      <dd className="mt-1 break-all font-mono">
+                        {post.provenance.promptSnapshot.checksum}
+                      </dd>
+                    </div>
+                    <details className="rounded-xl border border-[var(--line)] bg-stone-50 p-3">
+                      <summary className="cursor-pointer font-bold">Exact system prompt</summary>
+                      <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap font-mono text-[11px] leading-5">
+                        {post.provenance.promptSnapshot.systemPrompt}
+                      </pre>
+                    </details>
+                    <details className="rounded-xl border border-[var(--line)] bg-stone-50 p-3">
+                      <summary className="cursor-pointer font-bold">
+                        Exact generation prompt
+                      </summary>
+                      <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap font-mono text-[11px] leading-5">
+                        {post.provenance.promptSnapshot.userPrompt}
+                      </pre>
+                    </details>
+                  </>
+                ) : (
+                  <p className="rounded-xl bg-stone-50 p-3 text-[var(--muted)]">
+                    Exact prompt capture was not available when this historical version was
+                    generated.
+                  </p>
+                )}
                 <div>
                   <dt className="text-[var(--muted)]">Response ID</dt>
                   <dd className="mt-1 break-all font-mono">

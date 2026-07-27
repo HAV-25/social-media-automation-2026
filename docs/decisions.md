@@ -896,3 +896,38 @@ non-image functions still do not load OpenType, while the image preflight
 verifies Sharp, the traced font, and the traced parser before any provider call.
 Typography, composition rules, checksums, and the human-review boundary remain
 unchanged.
+
+## ADR-064 — Exact generation prompts are immutable version provenance
+
+**Status:** Accepted, 2026-07-27
+
+Every newly generated post version stores the exact system prompt and user
+prompt sent to the writing provider, the registered prompt version, and a
+SHA-256 checksum. The same snapshot remains in the generation run's model
+record for cost/run diagnosis; a private trigger copies it onto the current
+post version created by that run.
+
+The snapshot is captured at generation time rather than reconstructed from
+mutable brand, source, or research state. Historical versions without a
+snapshot are labeled as unavailable instead of presenting a reconstruction as
+exact. Existing post-version RLS remains authoritative, and the private trigger
+helper is security-invoker with no Data API execution grant.
+
+Image assets continue to store their exact generated prompt in
+`image_assets.prompt`. Reviewer-triggered image generation must use the same
+real provider, persistence, validation, composition, and cost path as autonomous
+WF-08; a production-only fake image is not valid provenance.
+
+## ADR-065 — Review queues are filtered server-side within brand scope
+
+**Status:** Accepted, 2026-07-27
+
+Ready posts may be filtered by a bounded date window, editorial state, standard
+content style, and tone, then sorted by update time or quality. URL inputs use
+strict enums with safe defaults, and production filters are applied to the
+brand-scoped RLS query before version details are loaded.
+
+The Phase 1 default remains three automatic selections per brand per UTC day.
+Klaank's pilot configuration is temporarily four; changing a brand policy must
+advance `brand_profiles.updated_at` so daily reservation idempotency reflects
+the new policy rather than replaying an earlier capacity decision.

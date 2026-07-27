@@ -11,6 +11,12 @@ import { parseDemoContentRecords, parseDemoDraftRecords } from "./demo-content-s
 import { createSupabaseServerClient } from "./supabase/server";
 
 const postStatusSchema = z.enum(["ready_for_review", "changes_requested", "approved", "rejected"]);
+const promptSnapshotSchema = z.object({
+  promptVersion: z.string().min(1),
+  systemPrompt: z.string().min(1),
+  userPrompt: z.string().min(1),
+  checksum: z.string().regex(/^[a-f0-9]{64}$/),
+});
 
 export type PostDetail = {
   id: string;
@@ -50,6 +56,7 @@ export type PostDetail = {
     inputTokens: number;
     outputTokens: number;
     costUsd: number;
+    promptSnapshot: z.infer<typeof promptSnapshotSchema> | null;
   };
   feedback: Array<{
     eventType: string;
@@ -108,6 +115,7 @@ export async function getPostDetail(postDraftId: string): Promise<PostDetail | n
         inputTokens: draft.inputTokens,
         outputTokens: draft.outputTokens,
         costUsd: 0,
+        promptSnapshot: null,
       },
       feedback: draft.feedback,
     };
@@ -134,7 +142,7 @@ export async function getPostDetail(postDraftId: string): Promise<PostDetail | n
     supabase
       .from("post_versions")
       .select(
-        "id,version_number,hook,body,closing,full_text,generation_type,model,prompt_version,created_at",
+        "id,version_number,hook,body,closing,full_text,generation_type,model,prompt_version,prompt_snapshot,created_at",
       )
       .eq("id", draft.current_version_id)
       .maybeSingle(),
@@ -179,6 +187,7 @@ export async function getPostDetail(postDraftId: string): Promise<PostDetail | n
         })
         .default({ inputTokens: 0, outputTokens: 0 }),
       costUsd: z.number().nonnegative().default(0),
+      promptSnapshot: promptSnapshotSchema.nullable().optional(),
     })
     .parse(runs?.[0]?.model_usage ?? {});
   const editorialMetadata = z
@@ -238,6 +247,10 @@ export async function getPostDetail(postDraftId: string): Promise<PostDetail | n
       inputTokens: usage.usage.inputTokens,
       outputTokens: usage.usage.outputTokens,
       costUsd: usage.costUsd,
+      promptSnapshot:
+        promptSnapshotSchema.safeParse(version.prompt_snapshot).data ??
+        usage.promptSnapshot ??
+        null,
     },
     feedback: (feedback ?? []).map((item) => ({
       eventType: item.event_type,

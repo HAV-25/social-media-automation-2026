@@ -1,7 +1,6 @@
 import "server-only";
-import { buildImageGenerationPrompt, sanitizeImageDisplayText } from "@content-engine/ai/image";
+import { buildImageGenerationPrompt } from "@content-engine/ai/image";
 import {
-  generatedImageSchema,
   imageDirectionSchema,
   imageReviewActionRequestSchema,
   imageReviewActionResultSchema,
@@ -12,7 +11,6 @@ import {
   type ImageTemplate,
   type ImageValidation,
 } from "@content-engine/contracts";
-import { composeBrandedImage, validateBaseImage } from "@content-engine/image-compositor";
 import { sha256Hex } from "@content-engine/security";
 import { cookies } from "next/headers";
 import { z } from "zod";
@@ -28,10 +26,8 @@ import {
   renderReviewImage,
   selectImageConcept,
   templateForStyle,
-  themeFromBrandContext,
 } from "./image-review-core";
-import { persistGeneratedImage, type PersistGeneratedImageInput } from "./image-asset-persistence";
-import { SupabaseImageAssetPersistencePort } from "./image-asset-supabase";
+import { generateWorkflowImage } from "./image-workflows";
 import type { PostDetail } from "./post-detail";
 import { createSupabaseServerClient } from "./supabase/server";
 
@@ -162,7 +158,7 @@ async function defaultDirection(post: PostDetail) {
   return {
     brand,
     direction: createReviewImageDirection({
-      directionSeed: post.id,
+      directionSeed: post.currentVersion.id,
       postText: post.currentVersion.content.fullText,
       valueNucleus: post.valueNucleus,
       contentStyle: post.contentStyle,
@@ -199,67 +195,6 @@ export async function getPostImageReviewState(post: PostDetail): Promise<PostIma
     : pendingState(post, direction);
 }
 
-async function readPersistentRow(imageAssetId: string) {
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("image_assets")
-    .select(
-      "id,post_version_id,concept_key,concept_direction,template,validation,base_image_path,final_image_path,status,model,prompt,prompt_version,provider_response_id,metadata,created_at",
-    )
-    .eq("id", imageAssetId)
-    .maybeSingle();
-  if (error || !data) throw new Error("The current image asset is unavailable.");
-  return persistentImageRowSchema.parse(data);
-}
-
-async function reusePersistentBase(input: {
-  row: PersistentImageRow;
-  direction: ImageDirection;
-  template: ImageTemplate;
-  post: PostDetail;
-  brandContext: Awaited<ReturnType<typeof defaultDirection>>["brand"]["context"];
-}) {
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.storage
-    .from("generated-images")
-    .download(input.row.base_image_path);
-  if (error) throw new Error("The current base image could not be read.");
-  const baseImage = Buffer.from(await data.arrayBuffer());
-  const validation = await validateBaseImage(baseImage);
-  const concept = input.direction.concepts.find(
-    (candidate) => candidate.conceptKey === input.direction.selectedConceptKey,
-  )!;
-  const composition = await composeBrandedImage({
-    baseImage,
-    template: input.template,
-    headline: sanitizeImageDisplayText(
-      concept.headlineOverlay || input.post.currentVersion.content.hook,
-      200,
-    ),
-    sourceLabel: sanitizeImageDisplayText(concept.sourceLabel || input.post.sourceTitle, 200),
-    theme: themeFromBrandContext(input.brandContext),
-  });
-  return {
-    direction: input.direction,
-    concept,
-    template: input.template,
-    baseImage,
-    finalImage: composition.image,
-    validation,
-    generated: generatedImageSchema.parse({
-      contractVersion: "1.0",
-      imageBase64: baseImage.toString("base64"),
-      mimeType: "image/png",
-      width: validation.width,
-      height: validation.height,
-      model: input.row.model,
-      providerResponseId: input.row.provider_response_id,
-      promptVersion: input.row.prompt_version,
-      usage: { inputTokens: 0, outputTokens: 0, estimatedCostUsd: 0 },
-    }),
-  };
-}
-
 export async function performPostImageAction(input: {
   actorId: string;
   organizationId: string;
@@ -275,7 +210,7 @@ export async function performPostImageAction(input: {
   const regeneratedDirection =
     request.action === "regenerate_concept"
       ? createReviewImageDirection({
-          directionSeed: `${input.post.id}:${request.idempotencyKey}`,
+          directionSeed: `${input.post.currentVersion.id}:${request.idempotencyKey}`,
           postText: input.post.currentVersion.content.fullText,
           valueNucleus: input.post.valueNucleus,
           contentStyle: input.post.contentStyle,
@@ -284,131 +219,110 @@ export async function performPostImageAction(input: {
       : (current.direction ?? fallbackDirection);
   const direction = selectImageConcept(
     regeneratedDirection,
-    request.action === "select_concept" ? request.conceptKey : undefined,
+    ["generate", "select_concept"].includes(request.action) ? request.conceptKey : undefined,
   );
   const selected = direction.concepts.find(
     (concept) => concept.conceptKey === direction.selectedConceptKey,
   )!;
   const template =
-    request.action === "change_template"
+    ["generate", "change_template"].includes(request.action) && request.template
       ? imageTemplateSchema.parse(request.template)
       : current.status === "concept_pending"
         ? templateForStyle(selected.imageStyle)
         : current.template;
+  if (process.env.NEXT_PUBLIC_DEMO_MODE === "false") {
+    const result = await generateWorkflowImage({
+      contractVersion: "1.0",
+      actorId: input.actorId,
+      brandId: input.post.brandId,
+      correlationId: uuidFromDeterministicHash(
+        sha256Hex(`correlation:${input.organizationId}:${request.idempotencyKey}`),
+      ),
+      idempotencyKey: request.idempotencyKey,
+      requestedAt: new Date().toISOString(),
+      postDraftId: input.post.id,
+      expectedVersionId: input.post.currentVersion.id,
+      action: request.action === "select_concept" ? "regenerate_base" : request.action,
+      imageStyle: selected.imageStyle,
+      template,
+      conceptKey: direction.selectedConceptKey,
+    });
+    return imageReviewActionResultSchema.parse({
+      contractVersion: "1.0",
+      postDraftId: input.post.id,
+      postVersionId: input.post.currentVersion.id,
+      imageAssetId: result.imageAssetId,
+      selectedConceptKey: direction.selectedConceptKey,
+      template,
+      status: result.status,
+      duplicate: result.duplicate,
+    });
+  }
+
   const baseSeed =
     request.action === "change_template" && current.status === "ready"
-      ? process.env.NEXT_PUBLIC_DEMO_MODE !== "false"
-        ? (parseDemoImageRecords((await cookies()).get(DEMO_IMAGE_COOKIE)?.value).find(
-            (record) => record.imageAssetId === current.imageAssetId,
-          )?.baseSeed ?? request.idempotencyKey)
-        : request.idempotencyKey
+      ? (parseDemoImageRecords((await cookies()).get(DEMO_IMAGE_COOKIE)?.value).find(
+          (record) => record.imageAssetId === current.imageAssetId,
+        )?.baseSeed ?? request.idempotencyKey)
       : request.idempotencyKey;
-
-  const artifact =
-    request.action === "change_template" &&
-    current.status === "ready" &&
-    process.env.NEXT_PUBLIC_DEMO_MODE === "false" &&
-    current.imageAssetId
-      ? await reusePersistentBase({
-          row: await readPersistentRow(current.imageAssetId),
-          direction,
-          template,
-          post: input.post,
-          brandContext: brand.context,
-        })
-      : await renderReviewImage({
-          direction,
-          selectedConceptKey: direction.selectedConceptKey,
-          template,
-          baseSeed,
-          headline: input.post.currentVersion.content.hook,
-          sourceLabel: input.post.sourceTitle,
-          brandContext: brand.context,
-        });
+  const artifact = await renderReviewImage({
+    direction,
+    selectedConceptKey: direction.selectedConceptKey,
+    template,
+    baseSeed,
+    headline: input.post.currentVersion.content.hook,
+    sourceLabel: input.post.sourceTitle,
+    brandContext: brand.context,
+  });
 
   const identitySeed = sha256Hex(
     `${input.organizationId}:${input.post.id}:${request.idempotencyKey}`,
   );
   const imageAssetId = uuidFromDeterministicHash(identitySeed);
-  const correlationId = uuidFromDeterministicHash(sha256Hex(`correlation:${identitySeed}`));
 
-  if (process.env.NEXT_PUBLIC_DEMO_MODE !== "false") {
-    const cookieStore = await cookies();
-    const records = parseDemoImageRecords(cookieStore.get(DEMO_IMAGE_COOKIE)?.value);
-    const duplicate = records.some((record) => record.imageAssetId === imageAssetId);
-    if (!duplicate) {
-      const record: DemoImageRecord = {
-        postDraftId: input.post.id,
-        postVersionId: input.post.currentVersion.id,
-        imageAssetId,
-        imageDirection: artifact.direction,
-        selectedConceptKey: artifact.direction.selectedConceptKey,
-        template,
-        baseSeed,
-        validation: artifact.validation,
-        model: artifact.generated.model,
-        promptVersion: artifact.generated.promptVersion,
-        providerResponseId: artifact.generated.providerResponseId,
-        estimatedCostUsd: artifact.generated.usage.estimatedCostUsd,
-        createdAt: new Date().toISOString(),
-      };
-      cookieStore.set(
-        DEMO_IMAGE_COOKIE,
-        serializeDemoImageRecords([
-          record,
-          ...records.filter((item) => item.postDraftId !== input.post.id),
-        ]),
-        {
-          httpOnly: true,
-          sameSite: "lax",
-          secure: process.env.NODE_ENV === "production",
-          path: "/",
-          maxAge: 60 * 60 * 8,
-        },
-      );
-    }
-    return imageReviewActionResultSchema.parse({
-      contractVersion: "1.0",
+  const cookieStore = await cookies();
+  const records = parseDemoImageRecords(cookieStore.get(DEMO_IMAGE_COOKIE)?.value);
+  const duplicate = records.some((record) => record.imageAssetId === imageAssetId);
+  if (!duplicate) {
+    const record: DemoImageRecord = {
       postDraftId: input.post.id,
       postVersionId: input.post.currentVersion.id,
       imageAssetId,
-      selectedConceptKey: artifact.direction.selectedConceptKey,
-      template,
-      status: "ready",
-      duplicate,
-    });
-  }
-
-  const persisted = await persistGeneratedImage(
-    {
-      actorId: input.actorId,
-      organizationId: input.organizationId,
-      brandId: input.post.brandId,
-      postDraftId: input.post.id,
-      postVersionId: input.post.currentVersion.id,
-      imageAssetId,
-      correlationId,
-      idempotencyKey: request.idempotencyKey,
       imageDirection: artifact.direction,
       selectedConceptKey: artifact.direction.selectedConceptKey,
       template,
+      baseSeed,
       validation: artifact.validation,
-      baseImage: artifact.baseImage,
-      finalImage: artifact.finalImage,
-      provider: artifact.generated,
-      prompt: buildImageGenerationPrompt(artifact.concept),
-    } satisfies PersistGeneratedImageInput,
-    new SupabaseImageAssetPersistencePort(),
-  );
+      model: artifact.generated.model,
+      promptVersion: artifact.generated.promptVersion,
+      providerResponseId: artifact.generated.providerResponseId,
+      estimatedCostUsd: artifact.generated.usage.estimatedCostUsd,
+      createdAt: new Date().toISOString(),
+    };
+    cookieStore.set(
+      DEMO_IMAGE_COOKIE,
+      serializeDemoImageRecords([
+        record,
+        ...records.filter((item) => item.postDraftId !== input.post.id),
+      ]),
+      {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        maxAge: 60 * 60 * 8,
+      },
+    );
+  }
   return imageReviewActionResultSchema.parse({
     contractVersion: "1.0",
     postDraftId: input.post.id,
     postVersionId: input.post.currentVersion.id,
-    imageAssetId: persisted.imageAssetId,
+    imageAssetId,
     selectedConceptKey: artifact.direction.selectedConceptKey,
     template,
     status: "ready",
-    duplicate: persisted.duplicate,
+    duplicate,
   });
 }
 

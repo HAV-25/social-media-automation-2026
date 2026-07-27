@@ -82,6 +82,47 @@ export interface EditorialProvider {
   generateDraft(request: DraftRequest): Promise<FakeDraftOutput>;
 }
 
+export type EditorialPromptSnapshot = {
+  promptVersion: typeof FACEBOOK_WRITER_PROMPT_VERSION;
+  systemPrompt: string;
+  userPrompt: string;
+  checksum: string;
+};
+
+export function buildEditorialPromptSnapshot(rawRequest: DraftRequest): EditorialPromptSnapshot {
+  const parsed = draftRequestSchema.parse(rawRequest);
+  const userPrompt = `Create exactly three ranked, materially different angles and one final Facebook post for the requested style and tone. Internally critique and revise no more than twice.
+
+REQUEST
+Style: ${parsed.contentStyle}
+Tone: ${parsed.tone}
+Opportunity ID: ${parsed.opportunityId}
+END_REQUEST
+
+SOURCE_DATA
+Title: ${parsed.sourceTitle}
+Value nucleus: ${parsed.valueNucleus}
+Text: ${rawRequest.sourceText}
+END_SOURCE_DATA
+
+RESEARCH_DATA
+${JSON.stringify(rawRequest.evidencePackage)}
+END_RESEARCH_DATA
+
+BRAND_CONTEXT
+${JSON.stringify(rawRequest.brandContext)}
+END_BRAND_CONTEXT`;
+
+  return {
+    promptVersion: FACEBOOK_WRITER_PROMPT_VERSION,
+    systemPrompt: FACEBOOK_WRITER_SYSTEM_PROMPT,
+    userPrompt,
+    checksum: createHash("sha256")
+      .update(`${FACEBOOK_WRITER_SYSTEM_PROMPT}\n${userPrompt}`)
+      .digest("hex"),
+  };
+}
+
 export async function generateEditorialDraftBatch(
   provider: EditorialProvider,
   requests: DraftRequest[],
@@ -253,27 +294,8 @@ export class OpenAIEditorialProvider implements EditorialProvider {
 
   async generateDraft(rawRequest: DraftRequest): Promise<FakeDraftOutput> {
     const parsed = draftRequestSchema.parse(rawRequest);
-    const input = `Create exactly three ranked, materially different angles and one final Facebook post for the requested style and tone. Internally critique and revise no more than twice.
-
-REQUEST
-Style: ${parsed.contentStyle}
-Tone: ${parsed.tone}
-Opportunity ID: ${parsed.opportunityId}
-END_REQUEST
-
-SOURCE_DATA
-Title: ${parsed.sourceTitle}
-Value nucleus: ${parsed.valueNucleus}
-Text: ${rawRequest.sourceText}
-END_SOURCE_DATA
-
-RESEARCH_DATA
-${JSON.stringify(rawRequest.evidencePackage)}
-END_RESEARCH_DATA
-
-BRAND_CONTEXT
-${JSON.stringify(rawRequest.brandContext)}
-END_BRAND_CONTEXT`;
+    const promptSnapshot = buildEditorialPromptSnapshot(rawRequest);
+    const input = promptSnapshot.userPrompt;
     const preflightCost = estimateEditorialCost(
       {
         inputTokens: words(input),
@@ -296,7 +318,7 @@ END_BRAND_CONTEXT`;
         {
           model: this.config.model,
           reasoning: { effort: this.config.reasoningEffort },
-          instructions: FACEBOOK_WRITER_SYSTEM_PROMPT,
+          instructions: promptSnapshot.systemPrompt,
           input,
           text: {
             format: zodTextFormat(editorialGenerationSchema, "editorial_generation"),

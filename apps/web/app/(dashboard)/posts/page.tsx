@@ -1,5 +1,6 @@
 import { ArrowRight, CheckCircle2, FileClock, Sparkles } from "lucide-react";
 import { cookies } from "next/headers";
+import { parseReadyPostFilters } from "@/lib/ready-post-filters";
 import { getReadyPosts } from "@/lib/ready-posts";
 import { getWorkspaceSnapshot } from "@/lib/workspace";
 
@@ -10,10 +11,15 @@ const statusLabel = {
   changes_requested: "Changes requested",
 };
 
-export default async function ReadyPostsPage() {
+export default async function ReadyPostsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const cookieStore = await cookies();
   const { activeBrand } = await getWorkspaceSnapshot(cookieStore.get("active-brand")?.value);
-  const posts = await getReadyPosts(activeBrand.id);
+  const filters = parseReadyPostFilters(await searchParams);
+  const posts = await getReadyPosts(activeBrand.id, filters);
 
   return (
     <>
@@ -29,11 +35,94 @@ export default async function ReadyPostsPage() {
       </header>
 
       <section className="px-6 py-8 lg:px-10 lg:py-10">
-        <div className="mb-6 flex items-center gap-2 text-sm text-[var(--muted)]">
-          <CheckCircle2 size={17} className="text-[var(--sage)]" />
-          <strong className="text-[var(--ink)]">{posts.length}</strong> post
-          {posts.length === 1 ? "" : "s"} awaiting editorial action
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-sm text-[var(--muted)]">
+            <CheckCircle2 size={17} className="text-[var(--sage)]" />
+            <strong className="text-[var(--ink)]">{posts.length}</strong> post
+            {posts.length === 1 ? "" : "s"} match the current review filters
+          </div>
+          <a href="/posts" className="text-xs font-bold text-[var(--sage)]">
+            Reset filters
+          </a>
         </div>
+
+        <form
+          method="get"
+          className="mb-6 grid gap-3 rounded-2xl border border-[var(--line)] bg-white p-4 md:grid-cols-2 xl:grid-cols-6"
+        >
+          <label className="text-xs font-bold text-[var(--muted)]">
+            Date
+            <select
+              name="window"
+              defaultValue={filters.window}
+              className="mt-1 block w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm text-[var(--ink)]"
+            >
+              <option value="all">Any time</option>
+              <option value="24h">Last 24 hours</option>
+              <option value="7d">Last 7 days</option>
+              <option value="30d">Last 30 days</option>
+            </select>
+          </label>
+          <label className="text-xs font-bold text-[var(--muted)]">
+            Editorial state
+            <select
+              name="status"
+              defaultValue={filters.status}
+              className="mt-1 block w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm text-[var(--ink)]"
+            >
+              <option value="all">All states</option>
+              <option value="ready_for_review">Ready for review</option>
+              <option value="changes_requested">Changes requested</option>
+            </select>
+          </label>
+          <label className="text-xs font-bold text-[var(--muted)]">
+            Style
+            <select
+              name="style"
+              defaultValue={filters.style}
+              className="mt-1 block w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm text-[var(--ink)]"
+            >
+              <option value="all">All styles</option>
+              <option value="newsworthy_authority">Newsworthy</option>
+              <option value="educational_breakdown">Educational</option>
+              <option value="perspective_conversation">Perspective</option>
+            </select>
+          </label>
+          <label className="text-xs font-bold text-[var(--muted)]">
+            Tone
+            <select
+              name="tone"
+              defaultValue={filters.tone}
+              className="mt-1 block w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm text-[var(--ink)]"
+            >
+              <option value="all">All tones</option>
+              <option value="authoritative">Authoritative</option>
+              <option value="conversational">Conversational</option>
+              <option value="bold">Bold</option>
+              <option value="thoughtful">Thoughtful</option>
+              <option value="witty">Witty</option>
+            </select>
+          </label>
+          <label className="text-xs font-bold text-[var(--muted)]">
+            Sort
+            <select
+              name="sort"
+              defaultValue={filters.sort}
+              className="mt-1 block w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm text-[var(--ink)]"
+            >
+              <option value="updated_desc">Newest updated</option>
+              <option value="updated_asc">Oldest updated</option>
+              <option value="quality_desc">Quality: high to low</option>
+              <option value="quality_asc">Quality: low to high</option>
+            </select>
+          </label>
+          <button
+            type="submit"
+            className="self-end rounded-xl bg-[var(--ink)] px-4 py-2.5 text-sm font-bold text-white"
+          >
+            Apply filters
+          </button>
+        </form>
 
         <div className="space-y-4">
           {posts.map((post) => (
