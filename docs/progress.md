@@ -1352,3 +1352,11 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   runtime failures become typed, retryable infrastructure responses and cannot
   spend image budget. All 13 test tasks (324 assertions), strict type checking,
   and the optimized production build pass with the preflight.
+- A second untouched RSS run at 11:06 UTC again autonomously reached three
+  WF-08 executions with no new recorded image cost. The image route still
+  flattened the typed failure because its structural guard retained an
+  `instanceof Error` prerequisite across the dynamically loaded server chunk.
+- The image error boundary now recognizes the versioned code, message, and
+  numeric status structurally. Cross-chunk runtime identity is no longer part of
+  the error contract, so n8n and durable recovery receive the actual bounded
+  failure classification instead of a generic application `500`.

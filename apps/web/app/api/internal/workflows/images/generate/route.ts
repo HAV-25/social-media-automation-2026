@@ -10,11 +10,16 @@ function failure(status: number, code: string, message: string) {
   return NextResponse.json({ error: { code, message } }, { status });
 }
 
-function isImageWorkflowError(error: unknown): error is Error & { code: string; status: number } {
+function isImageWorkflowError(
+  error: unknown,
+): error is { code: string; message: string; status: number } {
   return (
-    error instanceof Error &&
+    typeof error === "object" &&
+    error !== null &&
     "code" in error &&
     typeof error.code === "string" &&
+    "message" in error &&
+    typeof error.message === "string" &&
     "status" in error &&
     typeof error.status === "number"
   );

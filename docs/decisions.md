@@ -864,6 +864,9 @@ The image endpoint also authenticates and validates its typed request before
 loading the native image workflow. Unauthenticated traffic therefore cannot
 force Sharp or font initialization, and an optional image-runtime failure
 cannot prevent the route from returning the normal authenticated API contract.
+Typed errors crossing that dynamically loaded module boundary are recognized
+structurally by their code, message, and status. Runtime identity through
+`instanceof` is not an API contract and cannot be used to classify them.
 
 ## ADR-062 — Paid image work requires a no-cost compositor preflight
 
