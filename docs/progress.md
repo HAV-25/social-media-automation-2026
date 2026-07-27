@@ -1323,3 +1323,18 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
 - Release verification passed formatting, lint, strict type checking, all 13
   repository test tasks (323 assertions), and the optimized production build.
   No successful provider call or Netlify build was made during diagnosis.
+- Production verification after `5e23981` confirmed that research, writing,
+  verification, and content-action functions start normally. The image
+  function still failed during cold start before invoking `gpt-image-2`.
+  OpenType initialization is now lazy, and the image route authenticates and
+  validates before dynamically loading native image dependencies. The image
+  provider and deterministic compositor behavior are otherwise unchanged.
+- The contract suite now asserts the connected unattended WF-05 path from the
+  decoded research result through three-style drafting, verification, and
+  branded-image dispatch. Formatting, lint, strict type checking, all 13 test
+  tasks (324 assertions), and the optimized production build pass.
+- The partially recovered production journey is component evidence only. It
+  does not satisfy autonomous UAT because two missing style branches were
+  manually replayed. Final acceptance requires a fresh single RSS trigger to
+  reach reviewable text-and-image packages through automatic workflow retries
+  alone; human action may begin only at review and approval.

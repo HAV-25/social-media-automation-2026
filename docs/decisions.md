@@ -859,3 +859,8 @@ The font remains a checked-in, traced deployment asset and is explicitly
 included for nested API functions. Lazy loading changes startup isolation only;
 it does not change typography, dimensions, checksums, validation, branding, or
 the human-review boundary.
+
+The image endpoint also authenticates and validates its typed request before
+loading the native image workflow. Unauthenticated traffic therefore cannot
+force Sharp or font initialization, and an optional image-runtime failure
+cannot prevent the route from returning the normal authenticated API contract.

@@ -11,11 +11,14 @@ import {
 import type { Font } from "opentype.js";
 import sharp from "sharp";
 
-const opentypeRuntime = createRequire(import.meta.url)(
-  "opentype.js",
-) as typeof import("opentype.js");
+let opentypeRuntime: typeof import("opentype.js") | undefined;
 const bundledFontRelativePath = "packages/image-compositor/assets/Inter-Bold.ttf";
 let bundledFont: Font | undefined;
+
+function getOpenTypeRuntime() {
+  opentypeRuntime ??= createRequire(import.meta.url)("opentype.js") as typeof import("opentype.js");
+  return opentypeRuntime;
+}
 
 function loadBundledFont() {
   if (bundledFont) return bundledFont;
@@ -25,7 +28,7 @@ function loadBundledFont() {
   ].find((candidate) => existsSync(candidate));
   if (!bundledFontPath) throw new Error("The bundled image-compositor font is unavailable.");
   const bundledFontBuffer = readFileSync(bundledFontPath);
-  bundledFont = opentypeRuntime.parse(
+  bundledFont = getOpenTypeRuntime().parse(
     bundledFontBuffer.buffer.slice(
       bundledFontBuffer.byteOffset,
       bundledFontBuffer.byteOffset + bundledFontBuffer.byteLength,
@@ -165,7 +168,7 @@ function fontForTheme(theme: BrandImageTheme) {
     throw new Error("Brand font data must be valid base64.");
   }
   const fontBuffer = Buffer.from(theme.fontDataBase64, "base64");
-  return opentypeRuntime.parse(
+  return getOpenTypeRuntime().parse(
     fontBuffer.buffer.slice(fontBuffer.byteOffset, fontBuffer.byteOffset + fontBuffer.byteLength),
   );
 }

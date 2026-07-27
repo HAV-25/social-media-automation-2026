@@ -275,6 +275,27 @@ describe("Milestone 5 research workflow", () => {
       "draftSets.flatMap((draftSet) => draftSet.drafts).map((draft) =>",
     );
   });
+
+  it("connects the unattended research-to-image path without a human handoff", () => {
+    const workflow = workflowSchema.parse(
+      JSON.parse(readFileSync(`${workflowDirectory}wf-05-research.json`, "utf8")),
+    );
+    const connectionSchema = z.object({
+      main: z.array(z.array(z.object({ node: z.string() }))),
+    });
+    const targetNames = (sourceName: string) =>
+      connectionSchema
+        .parse(workflow.connections[sourceName])
+        .main.flat()
+        .map((connection) => connection.node);
+
+    expect(targetNames("Decode Research Result")).toEqual(["Sign Three-style Draft Request"]);
+    expect(targetNames("Sign Three-style Draft Request")).toEqual(["Generate Three Draft Styles"]);
+    expect(targetNames("Decode Draft Set")).toEqual(["Sign Draft Verification Requests"]);
+    expect(targetNames("Sign Draft Verification Requests")).toEqual(["Verify Drafts"]);
+    expect(targetNames("Decode Verification Results")).toEqual(["Sign Ready Draft Image Requests"]);
+    expect(targetNames("Sign Ready Draft Image Requests")).toEqual(["Generate Branded Images"]);
+  });
 });
 
 describe("Milestone 6 editorial workflows", () => {
@@ -356,6 +377,7 @@ describe("Milestone 7 image workflow", () => {
 
     expect(route).toContain("authenticateWorkflowRequest");
     expect(route).toContain("imageWorkflowRequestSchema");
+    expect(route).toContain('await import("@/lib/image-workflows")');
     expect(route).toContain("Cache-Control");
     expect(source).toContain('"saveDataErrorExecution": "all"');
     expect(route).not.toMatch(/TODO|not implemented/i);
