@@ -962,3 +962,17 @@ for the current UTC day. Downstream failures are retried through durable
 recovery; they do not create another selection reservation. The content-inbox
 counter uses the same distinct-opportunity definition even when an older
 opportunity has moved outside the rolling feed window.
+
+## ADR-068 — Netlify packages Sharp's complete native runtime
+
+**Status:** Accepted, 2026-07-27
+
+Next.js output tracing identifies Sharp's JavaScript entrypoint, but Sharp 0.35
+loads its Linux binary and libvips payload from optional `@img` packages at
+runtime. Netlify's single generated Next.js handler must therefore explicitly
+include the complete installed `sharp` and `@img` directories, in addition to
+the deterministic compositor font.
+
+The provider remains behind the local compositor preflight, so a packaging
+failure cannot incur image cost. A configuration contract test prevents a
+future deployment from silently dropping these native runtime files.

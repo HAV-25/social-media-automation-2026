@@ -1433,3 +1433,14 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   audit with no known vulnerabilities. The n8n publication plan reports all
   ten workflows unchanged and active; its runtime bridge preflight confirms
   every required variable without disclosing values.
+- Production verification of `8b11ee6` confirmed the corrected distinct daily
+  counter, 75 automatic threshold, 60–74 review band, daily maximum four,
+  Ready-post filters, and the current authenticated Klaank data. The 82.98
+  candidate remained unreserved after the 16:15 UTC poll, proving that the
+  accompanying database migration had not yet been applied.
+- The reviewer image action for the flapping robot reproduced the bounded
+  compositor-runtime failure before provider spend. Next's trace contains
+  Sharp's JavaScript but its Linux binary and libvips payload are optional
+  `@img` packages. Netlify now explicitly includes the installed Sharp and
+  `@img` runtime trees, with a regression contract alongside the existing
+  font, OpenType, and no-cost preflight checks.

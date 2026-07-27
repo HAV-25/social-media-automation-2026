@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
@@ -20,6 +21,18 @@ const theme = {
 };
 
 describe("deterministic image compositor", () => {
+  it("packages the complete native Sharp runtime for Netlify", () => {
+    const netlifyConfig = readFileSync(
+      path.resolve(process.cwd(), "../../apps/web/netlify.toml"),
+      "utf8",
+    );
+
+    expect(netlifyConfig).toContain('"node_modules/sharp/**/*"');
+    expect(netlifyConfig).toContain('"node_modules/@img/**/*"');
+    expect(netlifyConfig).toContain('"packages/image-compositor/assets/Inter-Bold.ttf"');
+    expect(netlifyConfig).toContain('external_node_modules = ["sharp"]');
+  });
+
   it("finds its bundled font from nested serverless runtime directories", async () => {
     const nestedRuntimeDirectory = path.join(
       process.cwd(),

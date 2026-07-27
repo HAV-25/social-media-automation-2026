@@ -7,5 +7,12 @@
   PNPM_FLAGS = "--shamefully-hoist"
 
 [functions]
-  included_files = ["packages/image-compositor/assets/Inter-Bold.ttf"]
+  # Next's trace includes Sharp's JavaScript entrypoint, but the native binary
+  # and libvips payload live in optional @img packages. Force the complete
+  # Linux runtime into Netlify's single Next.js handler alongside the font.
+  included_files = [
+    "packages/image-compositor/assets/Inter-Bold.ttf",
+    "node_modules/sharp/**/*",
+    "node_modules/@img/**/*",
+  ]
   external_node_modules = ["sharp"]
