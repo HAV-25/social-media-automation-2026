@@ -201,6 +201,8 @@ describe("Milestone 4 n8n workflow package", () => {
     expect(rssAnalyze).toContain("actorId,");
     expect(rssAnalyze).toContain("originalUrl: source.canonical_url");
     expect(rssAnalyze).toContain("new Date(source.published_at).toISOString()");
+    expect(rssAnalyze).toContain("createDailyRssReservationIdentity");
+    expect(rssAnalyze).toContain("requestHash: reservationIdentity.requestHash");
     expect(rssAnalyze).toContain("internalFailureSchema.safeParse");
     expect(rssAnalyze).toContain("persisted.status");
   });

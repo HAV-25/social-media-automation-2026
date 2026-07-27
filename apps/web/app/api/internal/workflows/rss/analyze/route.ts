@@ -3,12 +3,12 @@ import {
   rssSourceAnalysisRequestSchema,
   rssSourceAnalysisResultSchema,
 } from "@content-engine/contracts";
-import { sha256Hex } from "@content-engine/security";
 import { fetchAndExtractUrl } from "@content-engine/source-processing";
 import { type NextRequest, NextResponse } from "next/server";
 import { z, ZodError } from "zod";
 import { persistNormalizedSource } from "@/lib/persist-normalized-source";
 import { selectRssAnalysisSource } from "@/lib/rss-analysis-source";
+import { createDailyRssReservationIdentity } from "@/lib/rss-reservation-key";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { authenticateWorkflowRequest, WorkflowAuthError } from "@/lib/workflow-auth";
 
@@ -215,11 +215,16 @@ export async function POST(request: NextRequest) {
         );
       }
       const opportunity = manualInputResultSchema.parse(await persisted.json());
-      const policyVersion = sha256Hex(profile.updated_at).slice(0, 16);
+      const reservationIdentity = createDailyRssReservationIdentity({
+        sourceDocumentId: source.id,
+        brandId: route.brand_id,
+        profileUpdatedAt: profile.updated_at,
+        requestedAt: payload.requestedAt,
+      });
       const reservationPayload = {
         contractVersion: "1.0",
         correlationId: payload.correlationId,
-        idempotencyKey: `rss-reserve-v2:${source.id}:${route.brand_id}:${policyVersion}`,
+        idempotencyKey: reservationIdentity.idempotencyKey,
         feedId: feed.id,
         brandId: route.brand_id,
         sourceDocumentId: source.id,
@@ -227,22 +232,13 @@ export async function POST(request: NextRequest) {
         opportunityScore: opportunity.score,
         requestedAt: payload.requestedAt,
       };
-      const reservationRequestHash = sha256Hex(
-        [
-          reservationPayload.feedId,
-          reservationPayload.brandId,
-          reservationPayload.sourceDocumentId,
-          reservationPayload.opportunityId,
-          profile.updated_at,
-        ].join(":"),
-      );
       const reservation = analysisSource.automaticPreparationAllowed
         ? await (async () => {
             const { data: rawReservation, error: reservationError } = await supabase
               .rpc("reserve_rss_generation", {
                 payload: {
                   ...reservationPayload,
-                  requestHash: reservationRequestHash,
+                  requestHash: reservationIdentity.requestHash,
                 },
               })
               .single();

@@ -1275,3 +1275,26 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   repository test tasks (320 assertions), the optimized production build, and
   all four Chromium regression journeys. No paid provider call or Netlify
   build was made.
+
+### UTC daily reservation rollover correction
+
+- Production deployment verification confirmed the consolidated 27 July
+  application, real Klaank authentication/selection, five healthy feeds, the
+  75+ automatic threshold, 60–74 Review band, daily maximum three, Archive,
+  Styles, Performance, Activity, Ready posts, and exact cost ledger.
+- A real one-off poll at `2026-07-27T09:11Z` succeeded for all five Klaank feeds
+  with zero consecutive failures. It correctly deduplicated every observed
+  entry, but exposed that today's zero used slots did not reconsider the
+  eligible 80.64 opportunity still marked Awaiting selection.
+- Root cause: source intake, normalization, scoring, and the former reservation
+  identity were intentionally stable across polls. The latter also replayed a
+  previous day's reservation response, preventing the UTC daily limit from
+  resetting operationally.
+- Added a versioned daily reservation identity using UTC date, source, brand,
+  and brand-policy version. Repeated polls on one day remain idempotent; the
+  first poll after a UTC rollover may deterministically reconsider eligible,
+  unprepared opportunities. Existing downstream research, per-style draft, and
+  image idempotency continues to prevent duplicate content or spend.
+- Corrected Runs & errors copy to describe the actual autonomous preparation
+  boundary: qualifying opportunities proceed through research, three styles,
+  verification, and branded images before stopping for human review.

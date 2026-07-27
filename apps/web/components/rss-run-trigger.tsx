@@ -67,7 +67,8 @@ export function RssRunTrigger({ brandId, brandName }: { brandId: string; brandNa
           <h2 className="serif mt-1 text-xl">Run this brand’s RSS intake now</h2>
           <p className="mt-1 max-w-2xl text-xs leading-5 text-[var(--muted)]">
             Fetches only active feeds routed to {brandName}, then normalizes, deduplicates, clusters
-            and scores their items. Research and generation remain human-triggered.
+            and scores their items. Qualifying opportunities are prepared automatically through
+            research, three styles, verification and branded images, then stop for human review.
           </p>
         </div>
         <button

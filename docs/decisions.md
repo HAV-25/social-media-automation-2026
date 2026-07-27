@@ -830,3 +830,19 @@ Release capacity is tested with deterministic fake providers so performance
 verification never consumes paid credits or depends on provider latency.
 External research, writing, and image calls retain independent token, query,
 timeout, retry, idempotency, and cost bounds.
+
+## ADR-060 — RSS reservation idempotency resets with the UTC operating day
+
+**Status:** Accepted, 2026-07-27
+
+An RSS opportunity's automatic-reservation identity includes the UTC date as
+well as source, brand, and brand-policy version.
+
+Feed polling deliberately revisits recent entries, while source intake and
+scoring remain durably idempotent. A reservation key that survived across UTC
+days replayed yesterday's `daily_limit` or `reserved` response and could leave
+today's open capacity unused. A daily reservation identity lets an eligible,
+still-unprepared opportunity in the rolling inbox compete for the first three
+slots after 00:00 UTC without duplicating its source, opportunity, research,
+drafts, or images. The database's brand-row lock and daily run count remain the
+authoritative concurrent quota controls.
