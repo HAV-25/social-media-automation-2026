@@ -976,3 +976,17 @@ the deterministic compositor font.
 The provider remains behind the local compositor preflight, so a packaging
 failure cannot incur image cost. A configuration contract test prevents a
 future deployment from silently dropping these native runtime files.
+
+## ADR-069 — Serverless image composition has a pinned Wasm fallback
+
+**Status:** Accepted, 2026-07-27
+
+The Netlify handler retains Sharp's faster Linux x64 binary as its primary
+runtime and also installs Sharp 0.35's official `@img/sharp-wasm32` fallback.
+This follows Sharp's documented serverless guidance for environments where a
+platform binary is unavailable after function bundling.
+
+The compositor renders text as deterministic OpenType paths rather than using
+Sharp's native text renderer, so the Wasm runtime's lack of native text
+rendering does not weaken typography or provenance. The provider remains behind
+the no-cost preflight, and both runtimes are pinned in the committed lockfile.

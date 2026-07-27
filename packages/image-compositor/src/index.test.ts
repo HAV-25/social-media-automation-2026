@@ -31,6 +31,11 @@ describe("deterministic image compositor", () => {
     expect(netlifyConfig).toContain('"node_modules/@img/**/*"');
     expect(netlifyConfig).toContain('"packages/image-compositor/assets/Inter-Bold.ttf"');
     expect(netlifyConfig).toContain('external_node_modules = ["sharp"]');
+    expect(
+      JSON.parse(readFileSync(path.resolve(process.cwd(), "package.json"), "utf8")).dependencies[
+        "@img/sharp-wasm32"
+      ],
+    ).toBe("0.35.0");
   });
 
   it("finds its bundled font from nested serverless runtime directories", async () => {

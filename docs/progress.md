@@ -1444,3 +1444,9 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   `@img` packages. Netlify now explicitly includes the installed Sharp and
   `@img` runtime trees, with a regression contract alongside the existing
   font, OpenType, and no-cost preflight checks.
+- After deployment, the compositor-specific response disappeared but the
+  serverless handler still terminated before creating an image run or recording
+  provider cost. Added Sharp 0.35's official, pinned Wasm runtime as a fallback
+  while retaining the Linux binary as primary. Typography remains implemented
+  as deterministic OpenType paths and does not depend on unsupported native
+  text rendering.
