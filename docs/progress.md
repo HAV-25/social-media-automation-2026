@@ -1526,5 +1526,8 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   exists, while the database function rejected every unsupported/disputed core
   claim. Added a migration that excludes only `do_not_use` claims from that
   readiness veto while retaining them in the claims ledger.
-- Production migration application, durable recovery, and the resulting
+- The migration also requeues only dead-lettered research recoveries tied to the
+  corrected `23514` persistence failure. WF-10 can therefore resume the original
+  autonomous journey without a reviewer replaying research.
+- Production migration application, the resulting WF-10 retry, and the
   three-style/image Ready-post package remain verification gates.

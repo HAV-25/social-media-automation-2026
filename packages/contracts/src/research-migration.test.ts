@@ -130,5 +130,10 @@ describe("research evidence ledger migration", () => {
     expect(quarantinedClaimIntegrityMigration).toContain(
       "Expected unqualified research readiness blocker was not found",
     );
+    expect(quarantinedClaimIntegrityMigration).toContain("persistence.error ->> 'code' = '23514'");
+    expect(quarantinedClaimIntegrityMigration).toContain(
+      "error_code = 'research_integrity_corrected'",
+    );
+    expect(quarantinedClaimIntegrityMigration).toContain("'recovery.requeued_after_integrity_fix'");
   });
 });

@@ -1051,6 +1051,8 @@ allowing it to be written would weaken safety. Excluding only `do_not_use` claim
 from the readiness veto preserves both evidence history and the safety boundary.
 
 **Consequences:** The existing failed run is not silently mutated or charged
-again. After this migration is applied, durable recovery may create a new
-idempotent attempt. Provider cost remains attributable to the new attempt, and
-human approval is still mandatory before any package leaves the platform.
+again. The migration narrowly requeues a dead-lettered research recovery only
+when a related persistence run contains the corrected PostgreSQL `23514`.
+WF-10 then creates a new idempotent attempt. Provider cost remains attributable
+to that attempt, and human approval is still mandatory before any package
+leaves the platform.
