@@ -21,6 +21,15 @@ const freshReplayMigration = readFileSync(
   ),
   "utf8",
 );
+const secretKeyReplayMigration = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../../../supabase/migrations/20260728162110_support_secret_keys_for_recovery_replays.sql",
+      import.meta.url,
+    ),
+  ),
+  "utf8",
+);
 
 describe("run recovery database contract", () => {
   it("commits a tenant-scoped RLS-protected recovery state machine", () => {
@@ -61,5 +70,18 @@ describe("run recovery database contract", () => {
     expect(freshReplayMigration).toContain("recovery.fresh_replay_started");
     expect(freshReplayMigration).toContain("workflow_execution_contexts_activate_replay");
     expect(freshReplayMigration).not.toContain("N8N_API_KEY");
+  });
+
+  it("authorizes opaque Supabase secret keys before entering the definer", () => {
+    expect(secretKeyReplayMigration).toContain("if current_user <> 'service_role'");
+    expect(secretKeyReplayMigration).toContain(
+      "set_config('request.jwt.claim.role', 'service_role', true)",
+    );
+    expect(secretKeyReplayMigration).toContain(
+      "from private.claim_due_recovery_replays(requested_limit)",
+    );
+    expect(secretKeyReplayMigration).toContain("from public, anon, authenticated");
+    expect(secretKeyReplayMigration).toContain("to service_role");
+    expect(secretKeyReplayMigration).not.toContain("security definer");
   });
 });

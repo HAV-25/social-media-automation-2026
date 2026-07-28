@@ -1544,3 +1544,12 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   typed request payload and starts the target webhook with a fresh HMAC
   timestamp and nonce. A private context trigger binds the new n8n execution to
   the existing bounded recovery and audit trail.
+- Production commit `20af351` and its replay migration were confirmed live.
+  The audited Enigma recovery was queued once, but WF-10 executions `14017` and
+  `14018` exposed a separate credential-format compatibility defect: the
+  recovery claim RPC rejected Supabase's opaque secret key before mutating any
+  recovery state. Added a database-only invoker authorization wrapper for
+  `service_role`, with transaction-local legacy-claim compatibility and
+  explicit denial for `PUBLIC`, `anon`, and `authenticated`. The targeted
+  recovery contract passes all five assertions. Production application of the
+  migration and the resulting autonomous replay remain release gates.

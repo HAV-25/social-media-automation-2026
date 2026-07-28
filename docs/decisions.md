@@ -1077,3 +1077,25 @@ Tenant isolation, idempotency, the three-attempt cap, leases, dead-lettering,
 and audit events remain authoritative. n8n API credentials may remain
 configured for operational inspection but are no longer part of automatic
 content recovery.
+
+## ADR-074: Authorize opaque Supabase keys at the recovery RPC boundary
+
+**Date:** 2026-07-28
+
+**Decision:** The public recovery-claim RPC verifies `current_user` is
+`service_role` before entering the private `SECURITY DEFINER` implementation.
+For compatibility with existing private authorization, it sets the legacy
+`request.jwt.claim.role` value only for the current transaction. Execution
+remains revoked from `PUBLIC`, `anon`, and `authenticated`.
+
+**Why:** Supabase opaque `sb_secret_…` keys are mapped to the `service_role`
+database role but do not populate the legacy JWT claim setting. Production
+WF-10 therefore received a 503 before claiming any due recovery even though its
+credential was valid. Authorization must be evaluated while the wrapper still
+runs with invoker identity; checking `current_user` inside the definer would
+instead observe the function owner.
+
+**Consequences:** Both opaque secret keys and legacy service-role JWTs can use
+the bounded recovery RPC. No browser client gains access, the private
+implementation stays outside the exposed schema, and the compatibility claim
+cannot escape the request transaction.
