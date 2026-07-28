@@ -9,58 +9,73 @@ afterEach(() => {
 });
 
 describe("n8n recovery client", () => {
-  it("retries the exact encoded execution with the server API key", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ id: 4321 }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      }),
-    );
-    vi.stubGlobal("fetch", fetchMock);
-    const client = new N8nRecoveryClient({
-      apiUrl: "https://n8n.example.test/",
-      apiKey: "server-key",
-    });
-
-    await expect(client.retryExecution("exec/id")).resolves.toBe("4321");
-    expect(fetchMock).toHaveBeenCalledWith(
-      "https://n8n.example.test/api/v1/executions/exec%2Fid/retry",
-      expect.objectContaining({
-        method: "POST",
-        headers: expect.objectContaining({ "X-N8N-API-KEY": "server-key" }),
-      }),
-    );
-  });
-
-  it("tolerates already-stopped executions but classifies other stop failures", async () => {
+  it("replays the typed workflow from its webhook with a fresh signature", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(new Response("{}", { status: 409 }))
-      .mockResolvedValueOnce(new Response("{}", { status: 500 }));
+      .mockResolvedValue(new Response(JSON.stringify({ accepted: true }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
     const client = new N8nRecoveryClient({
-      apiUrl: "https://n8n.example.test",
-      apiKey: "server-key",
+      webhookBaseUrl: "https://n8n.example.test/",
+      hmacSecret: "test-recovery-secret-with-32-bytes",
     });
 
-    await expect(client.stopExecution("already-stopped")).resolves.toBeUndefined();
-    await expect(client.stopExecution("failed-stop")).rejects.toMatchObject({
-      code: "n8n_stop_failed",
-    });
+    await expect(
+      client.replayWorkflow("research", {
+        contractVersion: "1.0",
+        correlationId: "10000000-0000-4000-8000-000000000001",
+        idempotencyKey: "recovery-research-request-0001",
+        actorId: "10000000-0000-4000-8000-000000000002",
+        brandId: "10000000-0000-4000-8000-000000000003",
+        opportunityId: "10000000-0000-4000-8000-000000000004",
+        requestedAt: "2026-07-28T15:45:00.000Z",
+      }),
+    ).resolves.toEqual({ accepted: true, status: 200 });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://n8n.example.test/webhook/research-v1",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          "x-workflow-name": "WF-10 Error and Recovery",
+          "x-workflow-signature": expect.stringMatching(/^sha256=/),
+        }),
+      }),
+    );
   });
 
-  it("fails closed when recovery credentials are absent or retry output is invalid", async () => {
-    expect(() => new N8nRecoveryClient({ apiUrl: "", apiKey: "" })).toThrowError(N8nRecoveryError);
+  it("rejects an invalid typed replay before contacting n8n", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new N8nRecoveryClient({
+      webhookBaseUrl: "https://n8n.example.test",
+      hmacSecret: "test-recovery-secret-with-32-bytes",
+    });
+
+    await expect(client.replayWorkflow("research", {})).rejects.toThrow();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when credentials are absent or n8n rejects the replay", async () => {
+    expect(() => new N8nRecoveryClient({ webhookBaseUrl: "", hmacSecret: "" })).toThrowError(
+      N8nRecoveryError,
+    );
     vi.stubGlobal(
       "fetch",
-      vi
-        .fn()
-        .mockResolvedValue(new Response(JSON.stringify({ unexpected: true }), { status: 200 })),
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: true }), { status: 401 })),
     );
     const client = new N8nRecoveryClient({
-      apiUrl: "https://n8n.example.test",
-      apiKey: "server-key",
+      webhookBaseUrl: "https://n8n.example.test",
+      hmacSecret: "test-recovery-secret-with-32-bytes",
     });
-    await expect(client.retryExecution("execution")).rejects.toThrow();
+    await expect(
+      client.replayWorkflow("research", {
+        contractVersion: "1.0",
+        correlationId: "10000000-0000-4000-8000-000000000001",
+        idempotencyKey: "recovery-research-request-0002",
+        actorId: "10000000-0000-4000-8000-000000000002",
+        brandId: "10000000-0000-4000-8000-000000000003",
+        opportunityId: "10000000-0000-4000-8000-000000000004",
+        requestedAt: "2026-07-28T15:45:00.000Z",
+      }),
+    ).rejects.toMatchObject({ code: "n8n_replay_rejected" });
   });
 });

@@ -1056,3 +1056,24 @@ when a related persistence run contains the corrected PostgreSQL `23514`.
 WF-10 then creates a new idempotent attempt. Provider cost remains attributable
 to that attempt, and human approval is still mandatory before any package
 leaves the platform.
+
+## ADR-073: Recover signed workflows from immutable request context
+
+**Date:** 2026-07-28
+
+**Decision:** Do not use n8n's failed-execution retry endpoint for WF-05 through
+WF-09. WF-10 claims the immutable, typed request payload stored in
+`private.workflow_execution_contexts` and starts the target webhook from the
+beginning with a fresh timestamp, nonce, body digest, and HMAC signature.
+
+**Why:** Production execution `13955` proved that n8n retries a failed HTTP node
+with its saved input. That input contains a five-minute workflow signature, so
+the application correctly rejects it when replayed later. Extending the
+signature window would weaken replay protection.
+
+**Consequences:** A private database trigger binds the new n8n execution ID to
+the existing bounded recovery attempt when the workflow registers its context.
+Tenant isolation, idempotency, the three-attempt cap, leases, dead-lettering,
+and audit events remain authoritative. n8n API credentials may remain
+configured for operational inspection but are no longer part of automatic
+content recovery.

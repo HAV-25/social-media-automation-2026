@@ -1,61 +1,91 @@
 import "server-only";
-import { serverEnvSchema } from "@content-engine/contracts";
-import { z } from "zod";
-
-const retryResponseSchema = z.object({
-  id: z.union([z.string().min(1).max(200), z.number().int().nonnegative()]).transform(String),
-});
+import {
+  serverEnvSchema,
+  workflowRecoveryExecutionSchema,
+  type RecoveryTarget,
+} from "@content-engine/contracts";
+import { randomUUID } from "node:crypto";
+import { signWorkflowRequest } from "@content-engine/security";
 
 export class N8nRecoveryError extends Error {
-  constructor(readonly code: "n8n_recovery_unavailable" | "n8n_stop_failed" | "n8n_retry_failed") {
+  constructor(readonly code: "n8n_recovery_unavailable" | "n8n_replay_rejected") {
     super("The n8n recovery operation could not be completed.");
   }
 }
 
-export class N8nRecoveryClient {
-  private readonly apiUrl: string;
-  private readonly apiKey: string;
+const replayConfiguration = {
+  research: {
+    path: "/webhook/research-v1",
+    workflowName: "WF-05 Research",
+  },
+  editorial_generation: {
+    path: "/webhook/editorial-generation-v1",
+    workflowName: "WF-06 Angle and Post Generation",
+  },
+  post_verification: {
+    path: "/webhook/post-verification-v1",
+    workflowName: "WF-07 Post Verification",
+  },
+  image_generation: {
+    path: "/webhook/image-generation-v1",
+    workflowName: "WF-08 Image Generation",
+  },
+  content_action: {
+    path: "/webhook/content-actions-v1",
+    workflowName: "WF-09 Content Actions",
+  },
+} as const satisfies Record<RecoveryTarget, { path: string; workflowName: string }>;
 
-  constructor(configuration?: { apiUrl: string; apiKey: string }) {
+export class N8nRecoveryClient {
+  private readonly webhookBaseUrl: string;
+  private readonly hmacSecret: string;
+
+  constructor(configuration?: { webhookBaseUrl: string; hmacSecret: string }) {
     const env = configuration ?? serverEnvSchema.parse(process.env);
-    const apiUrl = "apiUrl" in env ? env.apiUrl : env.N8N_API_URL;
-    const apiKey = "apiKey" in env ? env.apiKey : env.N8N_API_KEY;
-    if (!apiUrl || !apiKey) throw new N8nRecoveryError("n8n_recovery_unavailable");
-    this.apiUrl = apiUrl.replace(/\/+$/, "");
-    this.apiKey = apiKey;
+    const webhookBaseUrl = "webhookBaseUrl" in env ? env.webhookBaseUrl : env.N8N_WEBHOOK_BASE_URL;
+    const hmacSecret = "hmacSecret" in env ? env.hmacSecret : env.WORKFLOW_HMAC_SECRET;
+    if (!webhookBaseUrl || !hmacSecret) {
+      throw new N8nRecoveryError("n8n_recovery_unavailable");
+    }
+    this.webhookBaseUrl = webhookBaseUrl.replace(/\/+$/, "");
+    this.hmacSecret = hmacSecret;
   }
 
-  private async request(path: string, method: "POST") {
-    const response = await fetch(`${this.apiUrl}/api/v1${path}`, {
-      method,
+  async replayWorkflow(target: RecoveryTarget, rawPayload: unknown) {
+    const configuration = replayConfiguration[target];
+    const parsed = workflowRecoveryExecutionSchema.parse({
+      contractVersion: "1.0",
+      workflowExecutionId: "fresh-recovery-replay",
+      workflowName: configuration.workflowName,
+      target,
+      requestPayload: rawPayload,
+    });
+    const body = JSON.stringify(parsed.requestPayload);
+    const timestamp = String(Math.floor(Date.now() / 1_000));
+    const nonce = randomUUID();
+    const response = await fetch(`${this.webhookBaseUrl}${configuration.path}`, {
+      method: "POST",
       headers: {
         "content-type": "application/json",
-        "X-N8N-API-KEY": this.apiKey,
+        "x-workflow-name": "WF-10 Error and Recovery",
+        "x-workflow-nonce": nonce,
+        "x-workflow-timestamp": timestamp,
+        "x-workflow-signature": signWorkflowRequest(
+          {
+            body,
+            method: "POST",
+            nonce,
+            path: configuration.path,
+            timestamp,
+          },
+          this.hmacSecret,
+        ),
       },
-      body: "{}",
-      signal: AbortSignal.timeout(15_000),
+      body,
+      signal: AbortSignal.timeout(180_000),
       cache: "no-store",
     });
-    const body = await response.json().catch(() => ({}));
-    return { body, ok: response.ok, status: response.status };
-  }
-
-  async stopExecution(executionId: string) {
-    const response = await this.request(
-      `/executions/${encodeURIComponent(executionId)}/stop`,
-      "POST",
-    );
-    if (!response.ok && ![404, 409].includes(response.status)) {
-      throw new N8nRecoveryError("n8n_stop_failed");
-    }
-  }
-
-  async retryExecution(executionId: string) {
-    const response = await this.request(
-      `/executions/${encodeURIComponent(executionId)}/retry`,
-      "POST",
-    );
-    if (!response.ok) throw new N8nRecoveryError("n8n_retry_failed");
-    return retryResponseSchema.parse(response.body).id;
+    if (!response.ok) throw new N8nRecoveryError("n8n_replay_rejected");
+    return { accepted: true as const, status: response.status };
   }
 }

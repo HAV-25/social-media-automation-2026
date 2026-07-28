@@ -1537,3 +1537,10 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   structural replacement, accepts an already-corrected definition, and still
   aborts unless the final function contains the intended adjacent
   importance/usage-guidance/verification-state predicate.
+- Production recovery reached n8n after its server-only API credentials were
+  deployed, but n8n execution `13955` proved that retrying a failed execution
+  reuses the original time-bounded HTTP-node signature. The application
+  correctly rejected that expired signature. Recovery now claims the immutable
+  typed request payload and starts the target webhook with a fresh HMAC
+  timestamp and nonce. A private context trigger binds the new n8n execution to
+  the existing bounded recovery and audit trail.

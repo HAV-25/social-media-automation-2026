@@ -20,8 +20,14 @@ const registrationResultSchema = z.object({
 const claimSchema = z.object({
   recovery_id: z.uuid(),
   generation_run_id: z.uuid(),
-  execution_id: z.string().min(1).max(200),
-  stop_before_retry: z.boolean(),
+  target: z.enum([
+    "research",
+    "editorial_generation",
+    "post_verification",
+    "image_generation",
+    "content_action",
+  ]),
+  request_payload: z.unknown(),
   attempt_count: z.number().int().min(1).max(3),
 });
 
@@ -169,7 +175,7 @@ export async function recordWorkflowFailure(input: WorkflowRecoveryFailure) {
 
 export async function dispatchDueRecoveries(limit: number) {
   const supabase = createSupabaseServiceClient();
-  const { data, error } = await supabase.rpc("claim_due_recoveries", {
+  const { data, error } = await supabase.rpc("claim_due_recovery_replays", {
     requested_limit: limit,
   });
   if (error) throw new Error("Due recoveries could not be claimed.");
@@ -178,19 +184,13 @@ export async function dispatchDueRecoveries(limit: number) {
   for (const claim of claims) {
     try {
       const client = new N8nRecoveryClient();
-      if (claim.stop_before_retry) await client.stopExecution(claim.execution_id);
-      const executionId = await client.retryExecution(claim.execution_id);
-      const { data: persisted, error: persistenceError } = await supabase
-        .rpc("mark_recovery_dispatched", {
-          payload: {
-            recoveryId: claim.recovery_id,
-            generationRunId: claim.generation_run_id,
-            workflowExecutionId: executionId,
-          },
-        })
-        .single();
-      if (persistenceError) throw new Error("Recovery dispatch could not be persisted.");
-      results.push({ recoveryId: claim.recovery_id, status: "retrying", executionId, persisted });
+      const replay = await client.replayWorkflow(claim.target, claim.request_payload);
+      results.push({
+        recoveryId: claim.recovery_id,
+        status: "replay_accepted",
+        attemptCount: claim.attempt_count,
+        replay,
+      });
     } catch (error) {
       const code =
         error instanceof N8nRecoveryError ? error.code : "recovery_dispatch_persistence_failed";

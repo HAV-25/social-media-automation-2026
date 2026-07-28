@@ -12,6 +12,15 @@ const databaseTest = readFileSync(
   fileURLToPath(new URL("../../../supabase/tests/database/run_recovery.test.sql", import.meta.url)),
   "utf8",
 );
+const freshReplayMigration = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../../../supabase/migrations/20260728154533_replay_recoveries_with_fresh_signatures.sql",
+      import.meta.url,
+    ),
+  ),
+  "utf8",
+);
 
 describe("run recovery database contract", () => {
   it("commits a tenant-scoped RLS-protected recovery state machine", () => {
@@ -43,5 +52,14 @@ describe("run recovery database contract", () => {
     expect(databaseTest).toContain("brand editors cannot inspect");
     expect(databaseTest).toContain("administrator can queue one audited manual recovery");
     expect(databaseTest).toContain("rollback;");
+  });
+
+  it("replays immutable typed requests with fresh workflow signatures", () => {
+    expect(freshReplayMigration).toContain("private.claim_due_recovery_replays");
+    expect(freshReplayMigration).toContain("context.request_payload");
+    expect(freshReplayMigration).toContain("for update skip locked");
+    expect(freshReplayMigration).toContain("recovery.fresh_replay_started");
+    expect(freshReplayMigration).toContain("workflow_execution_contexts_activate_replay");
+    expect(freshReplayMigration).not.toContain("N8N_API_KEY");
   });
 });
