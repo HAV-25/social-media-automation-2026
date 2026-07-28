@@ -9,16 +9,17 @@ begin
   select pg_get_functiondef('private.persist_research_evidence(jsonb)'::regprocedure)
   into definition;
 
-  corrected := replace(
+  corrected := pg_catalog.regexp_replace(
     definition,
-    E'where claim.value ->> ''importance'' = ''core''\n        and claim.value ->> ''verificationState'' in (''unsupported'', ''disputed'')',
-    E'where claim.value ->> ''importance'' = ''core''\n        and claim.value ->> ''usageGuidance'' <> ''do_not_use''\n        and claim.value ->> ''verificationState'' in (''unsupported'', ''disputed'')'
+    $pattern$(claim\.value[[:space:]]*->>[[:space:]]*'importance'[[:space:]]*=[[:space:]]*'core'[[:space:]]+and[[:space:]]+)(claim\.value[[:space:]]*->>[[:space:]]*'verificationState'[[:space:]]+in[[:space:]]*\([[:space:]]*'unsupported'[[:space:]]*,[[:space:]]*'disputed'[[:space:]]*\))$pattern$,
+    E'\\1claim.value ->> ''usageGuidance'' <> ''do_not_use''\n        and \\2'
   );
-  if corrected = definition then
-    raise exception 'Expected unqualified research readiness blocker was not found';
-  end if;
 
-  execute corrected;
+  if corrected <> definition then
+    execute corrected;
+  elsif definition !~ $pattern$claim\.value[[:space:]]*->>[[:space:]]*'importance'[[:space:]]*=[[:space:]]*'core'[[:space:]]+and[[:space:]]+claim\.value[[:space:]]*->>[[:space:]]*'usageGuidance'[[:space:]]*<>[[:space:]]*'do_not_use'[[:space:]]+and[[:space:]]+claim\.value[[:space:]]*->>[[:space:]]*'verificationState'[[:space:]]+in[[:space:]]*\([[:space:]]*'unsupported'[[:space:]]*,[[:space:]]*'disputed'[[:space:]]*\)$pattern$ then
+    raise exception 'Research readiness blocker could not be aligned safely';
+  end if;
 end
 $migration$;
 

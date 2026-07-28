@@ -125,10 +125,11 @@ describe("research evidence ledger migration", () => {
       "claim.value ->> ''usageGuidance'' <> ''do_not_use''",
     );
     expect(quarantinedClaimIntegrityMigration).toContain(
-      "claim.value ->> ''verificationState'' in (''unsupported'', ''disputed'')",
+      "claim\\.value[[:space:]]*->>[[:space:]]*'verificationState'",
     );
+    expect(quarantinedClaimIntegrityMigration).toContain("pg_catalog.regexp_replace");
     expect(quarantinedClaimIntegrityMigration).toContain(
-      "Expected unqualified research readiness blocker was not found",
+      "Research readiness blocker could not be aligned safely",
     );
     expect(quarantinedClaimIntegrityMigration).toContain("persistence.error ->> 'code' = '23514'");
     expect(quarantinedClaimIntegrityMigration).toContain(

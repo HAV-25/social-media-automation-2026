@@ -1531,3 +1531,9 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   autonomous journey without a reviewer replaying research.
 - Production migration application, the resulting WF-10 retry, and the
   three-style/image Ready-post package remain verification gates.
+- The first production SQL-editor attempt stopped before mutation because
+  `pg_get_functiondef` rendered the live function with different whitespace
+  from the checked-in source. The migration now uses a whitespace-tolerant
+  structural replacement, accepts an already-corrected definition, and still
+  aborts unless the final function contains the intended adjacent
+  importance/usage-guidance/verification-state predicate.
