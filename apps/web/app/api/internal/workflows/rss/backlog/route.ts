@@ -5,6 +5,7 @@ import {
 import { NextResponse } from "next/server";
 import { z, ZodError } from "zod";
 import {
+  classifyDeferredRssProgress,
   deferredOpportunityRowSchema,
   selectDeferredRssCandidates,
 } from "@/lib/rss-deferred-candidates";
@@ -28,8 +29,11 @@ const profileRowSchema = z.object({
 const opportunityIdRowSchema = z.object({
   opportunity_id: z.uuid(),
 });
-const reservationEntityRowSchema = z.object({
+const generationRunRowSchema = z.object({
+  id: z.uuid(),
   entity_id: z.uuid(),
+  run_type: z.string().min(1).max(100),
+  status: z.enum(["queued", "running", "succeeded", "failed", "cancelled"]),
 });
 const feedItemRowSchema = z.object({
   source_document_id: z.uuid(),
@@ -136,28 +140,25 @@ export async function POST(request: Request) {
       const sourceDocumentIds = opportunities.map((opportunity) => opportunity.source_document_id);
       const [
         { data: rawDrafts, error: draftError },
-        { data: rawReservations, error: reservationError },
+        { data: rawRuns, error: runError },
         { data: rawFeedItems, error: feedItemError },
       ] = await Promise.all([
         supabase.from("post_drafts").select("opportunity_id").in("opportunity_id", opportunityIds),
         supabase
           .from("generation_runs")
-          .select("entity_id")
+          .select("id,entity_id,run_type,status")
           .eq("brand_id", profile.brand_id)
-          .eq("run_type", "rss_opportunity_reservation")
-          .eq("workflow_name", "WF-04 Cluster and Score")
-          .eq("status", "succeeded")
           .in("entity_id", opportunityIds),
         supabase
           .from("rss_feed_items")
           .select("source_document_id,rss_feed_id")
           .in("source_document_id", sourceDocumentIds),
       ]);
-      if (draftError || reservationError || feedItemError) {
-        throw draftError ?? reservationError ?? feedItemError;
+      if (draftError || runError || feedItemError) {
+        throw draftError ?? runError ?? feedItemError;
       }
       const drafts = z.array(opportunityIdRowSchema).parse(rawDrafts ?? []);
-      const reservations = z.array(reservationEntityRowSchema).parse(rawReservations ?? []);
+      const runs = z.array(generationRunRowSchema).parse(rawRuns ?? []);
       const feedItems = z.array(feedItemRowSchema).parse(rawFeedItems ?? []);
       const feedIds = [...new Set(feedItems.map((item) => item.rss_feed_id))];
       if (!feedIds.length) continue;
@@ -185,10 +186,11 @@ export async function POST(request: Request) {
           .filter((item) => eligibleFeedIds.has(item.rss_feed_id))
           .map((item) => item.source_document_id),
       );
-      const blockedOpportunityIds = new Set([
-        ...drafts.map((draft) => draft.opportunity_id),
-        ...reservations.map((reservation) => reservation.entity_id),
-      ]);
+      const { blockedOpportunityIds, existingReservationByOpportunity } =
+        classifyDeferredRssProgress({
+          draftedOpportunityIds: drafts.map((draft) => draft.opportunity_id),
+          runs,
+        });
       const candidates = selectDeferredRssCandidates({
         opportunities,
         blockedOpportunityIds,
@@ -197,6 +199,17 @@ export async function POST(request: Request) {
       });
 
       for (const candidate of candidates) {
+        const existingReservationRunId = existingReservationByOpportunity.get(candidate.id);
+        if (existingReservationRunId) {
+          selections.push({
+            actorId: actor.user_id,
+            brandId: profile.brand_id,
+            opportunityId: candidate.id,
+            reservationRunId: existingReservationRunId,
+            score: candidate.opportunity_score,
+          });
+          continue;
+        }
         const feedItem = feedItems.find(
           (item) =>
             item.source_document_id === candidate.source_document_id &&

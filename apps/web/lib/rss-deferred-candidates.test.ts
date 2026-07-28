@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { selectDeferredRssCandidates } from "./rss-deferred-candidates";
+import {
+  classifyDeferredRssProgress,
+  selectDeferredRssCandidates,
+} from "./rss-deferred-candidates";
 
 const requestedAt = "2026-07-28T09:30:00.000Z";
 const sourceA = "00000000-0000-4000-8000-000000000001";
@@ -7,6 +10,37 @@ const sourceB = "00000000-0000-4000-8000-000000000002";
 const sourceC = "00000000-0000-4000-8000-000000000003";
 
 describe("deferred RSS candidate selection", () => {
+  it("retries a reserved opportunity only before downstream work has started", () => {
+    const reservedOpportunityId = "10000000-0000-4000-8000-000000000001";
+    const downstreamOpportunityId = "10000000-0000-4000-8000-000000000002";
+    const draftedOpportunityId = "10000000-0000-4000-8000-000000000003";
+    const reservationRunId = "20000000-0000-4000-8000-000000000001";
+    const progress = classifyDeferredRssProgress({
+      draftedOpportunityIds: [draftedOpportunityId],
+      runs: [
+        {
+          id: reservationRunId,
+          entity_id: reservedOpportunityId,
+          run_type: "rss_opportunity_reservation",
+          status: "succeeded",
+        },
+        {
+          id: "20000000-0000-4000-8000-000000000002",
+          entity_id: downstreamOpportunityId,
+          run_type: "research",
+          status: "failed",
+        },
+      ],
+    });
+
+    expect(progress.existingReservationByOpportunity.get(reservedOpportunityId)).toBe(
+      reservationRunId,
+    );
+    expect(progress.blockedOpportunityIds.has(reservedOpportunityId)).toBe(false);
+    expect(progress.blockedOpportunityIds.has(downstreamOpportunityId)).toBe(true);
+    expect(progress.blockedOpportunityIds.has(draftedOpportunityId)).toBe(true);
+  });
+
   it("returns recent unprepared RSS opportunities in deterministic score order", () => {
     const result = selectDeferredRssCandidates({
       requestedAt,

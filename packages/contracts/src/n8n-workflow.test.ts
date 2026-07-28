@@ -51,6 +51,7 @@ describe("WF-01 RSS Intake workflow", () => {
       "Fetch Active Feed Plan",
       "Sign Deferred Opportunity Sweep",
       "Claim Deferred Opportunities",
+      "Decode Deferred Opportunity Sweep",
       "Prepare Deferred Opportunities",
       "Research Deferred Draft Verify and Image",
       "Restore Feed Plan",
@@ -107,7 +108,10 @@ describe("WF-01 RSS Intake workflow", () => {
       '"Fetch Active Feed Plan":{"main":[[{"node":"Sign Deferred Opportunity Sweep"',
     );
     expect(serializedConnections).toContain(
-      '"Claim Deferred Opportunities":{"main":[[{"node":"Prepare Deferred Opportunities"',
+      '"Claim Deferred Opportunities":{"main":[[{"node":"Decode Deferred Opportunity Sweep"',
+    );
+    expect(serializedConnections).toContain(
+      '"Decode Deferred Opportunity Sweep":{"main":[[{"node":"Prepare Deferred Opportunities"',
     );
     expect(serializedConnections).toContain('"node":"Restore Feed Plan"');
     expect(serializedConnections).toContain('"Restore Feed Plan":{"main":[[{"node":"Split Feeds"');
@@ -171,6 +175,8 @@ describe("WF-01 RSS Intake workflow", () => {
     expect(route).toContain('eq("generation_policy", "score_then_research")');
     expect(route).toContain('eq("automatic_opportunity_selection", true)');
     expect(route).toContain("selectDeferredRssCandidates");
+    expect(route).toContain("classifyDeferredRssProgress");
+    expect(route).toContain("existingReservationRunId");
     expect(selector).toContain("blockedOpportunityIds");
     expect(selector).toContain("rssSourceDocumentIds");
     expect(selector).toContain("maximumAgeHours ?? 24");

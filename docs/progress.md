@@ -1495,3 +1495,14 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   sandboxed browser launch was denied by Windows process policy; the approved
   unsandboxed rerun passed all four journeys. These checks used no paid model
   call and no Netlify build.
+- Production commit `70fb8bd` was confirmed live through the authenticated
+  content inbox. The 12:00 Berlin scheduler tick correctly claimed the deferred
+  82.98 Enigma opportunity and committed one real daily reservation. n8n 2.21.7
+  then exposed the new POST response as a stream despite JSON response mode, so
+  WF-01 stopped before research with zero provider cost.
+- WF-01 now downloads and decodes the deferred-sweep response through the same
+  built-in Extract From File boundary used by its other non-terminal Netlify
+  calls. The application also permits a previously committed RSS reservation
+  to be redispatched only when it has neither a draft nor any downstream
+  generation run; this repairs the reservation-to-dispatch failure window
+  without creating a second reservation or competing with durable recovery.

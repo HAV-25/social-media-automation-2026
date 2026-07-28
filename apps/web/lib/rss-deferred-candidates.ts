@@ -10,6 +10,31 @@ export const deferredOpportunityRowSchema = z.object({
 
 type DeferredOpportunityRow = z.infer<typeof deferredOpportunityRowSchema>;
 
+type DeferredGenerationRun = {
+  id: string;
+  entity_id: string;
+  run_type: string;
+  status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
+};
+
+export function classifyDeferredRssProgress(input: {
+  draftedOpportunityIds: Iterable<string>;
+  runs: DeferredGenerationRun[];
+}) {
+  const existingReservationByOpportunity = new Map(
+    input.runs
+      .filter((run) => run.run_type === "rss_opportunity_reservation" && run.status === "succeeded")
+      .map((run) => [run.entity_id, run.id]),
+  );
+  const blockedOpportunityIds = new Set(input.draftedOpportunityIds);
+  for (const run of input.runs) {
+    if (run.run_type !== "rss_opportunity_reservation") {
+      blockedOpportunityIds.add(run.entity_id);
+    }
+  }
+  return { blockedOpportunityIds, existingReservationByOpportunity };
+}
+
 export function selectDeferredRssCandidates(input: {
   opportunities: DeferredOpportunityRow[];
   blockedOpportunityIds: ReadonlySet<string>;

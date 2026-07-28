@@ -1015,12 +1015,17 @@ within the bounded per-feed catch-up window, so feed polling alone is not a
 complete retry mechanism.
 
 Before processing newly fetched feed items, WF-01 now asks a signed application
-endpoint to reconsider unprepared, unreserved RSS opportunities created within
-the brand's rolling 24-hour inbox window. Candidates must still come from an
-active feed with `score_then_research`, meet the current brand threshold, and
-pass the existing transactional daily-limit reservation. Selection is
-deterministic by score descending, then creation time and ID. Existing drafts
-and successful reservations are excluded, and the stable downstream research
+endpoint to reconsider unprepared RSS opportunities created within the brand's
+rolling 24-hour inbox window. Candidates must still come from an active feed
+with `score_then_research`, meet the current brand threshold, and pass the
+existing transactional daily-limit reservation. Selection is deterministic by
+score descending, then creation time and ID.
+
+An existing successful RSS reservation is retryable only while no draft and no
+downstream generation run exists. This closes the narrow failure window between
+committing the reservation and dispatching research without consuming another
+daily slot. Once any downstream run exists, durable recovery owns retries.
+Existing drafts are always excluded, and the stable downstream research
 idempotency key remains opportunity-scoped.
 
 The carry-over claim happens before new articles can consume the day's slots.

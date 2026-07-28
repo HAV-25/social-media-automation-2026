@@ -149,7 +149,8 @@
           "response": {
             "response": {
               "neverError": false,
-              "responseFormat": "json"
+              "responseFormat": "file",
+              "outputPropertyName": "data"
             }
           },
           "timeout": 30000
@@ -163,7 +164,18 @@
     },
     {
       "parameters": {
-        "jsCode": "const crypto = require('crypto');\nconst sweep = $json;\nif (sweep?.contractVersion !== '1.0' || !Array.isArray(sweep.selections)) throw new Error('Deferred RSS sweep contract is invalid');\nconst secret = $env.WORKFLOW_HMAC_SECRET;\nconst baseUrl = $env.N8N_WEBHOOK_BASE_URL;\nif (!secret || !baseUrl) throw new Error('Automatic preparation environment is not configured');\nconst path = '/webhook/research-v1';\nreturn sweep.selections.map((item) => {\n  if (!item.actorId || !item.brandId || !item.opportunityId || !item.reservationRunId) throw new Error('Deferred RSS selection is missing preparation context');\n  const payload = {\n    contractVersion: '1.0',\n    correlationId: crypto.randomUUID(),\n    idempotencyKey: `rss-auto-research:${item.opportunityId}`,\n    actorId: item.actorId,\n    brandId: item.brandId,\n    opportunityId: item.opportunityId,\n    allowedDomains: [],\n    requestedAt: new Date().toISOString(),\n  };\n  const body = JSON.stringify(payload);\n  const timestamp = String(Math.floor(Date.now() / 1000));\n  const nonce = crypto.randomUUID();\n  const digest = crypto.createHash('sha256').update(body, 'utf8').digest('hex');\n  const canonical = [timestamp, nonce, 'POST', path, digest].join('\\n');\n  const signature = `sha256=${crypto.createHmac('sha256', secret).update(canonical, 'utf8').digest('hex')}`;\n  return { json: { body, nonce, signature, timestamp, url: `${baseUrl}${path}` } };\n});"
+        "operation": "fromJson",
+        "options": {}
+      },
+      "id": "f24d824a-ea5c-4b55-b0f3-acde65873226",
+      "name": "Decode Deferred Opportunity Sweep",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [160, -40]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst sweep = $json.data;\nif (sweep?.contractVersion !== '1.0' || !Array.isArray(sweep.selections)) throw new Error('Deferred RSS sweep contract is invalid');\nconst secret = $env.WORKFLOW_HMAC_SECRET;\nconst baseUrl = $env.N8N_WEBHOOK_BASE_URL;\nif (!secret || !baseUrl) throw new Error('Automatic preparation environment is not configured');\nconst path = '/webhook/research-v1';\nreturn sweep.selections.map((item) => {\n  if (!item.actorId || !item.brandId || !item.opportunityId || !item.reservationRunId) throw new Error('Deferred RSS selection is missing preparation context');\n  const payload = {\n    contractVersion: '1.0',\n    correlationId: crypto.randomUUID(),\n    idempotencyKey: `rss-auto-research:${item.opportunityId}`,\n    actorId: item.actorId,\n    brandId: item.brandId,\n    opportunityId: item.opportunityId,\n    allowedDomains: [],\n    requestedAt: new Date().toISOString(),\n  };\n  const body = JSON.stringify(payload);\n  const timestamp = String(Math.floor(Date.now() / 1000));\n  const nonce = crypto.randomUUID();\n  const digest = crypto.createHash('sha256').update(body, 'utf8').digest('hex');\n  const canonical = [timestamp, nonce, 'POST', path, digest].join('\\n');\n  const signature = `sha256=${crypto.createHmac('sha256', secret).update(canonical, 'utf8').digest('hex')}`;\n  return { json: { body, nonce, signature, timestamp, url: `${baseUrl}${path}` } };\n});"
       },
       "id": "f24d824a-ea5c-4b55-b0f3-acde65873223",
       "name": "Prepare Deferred Opportunities",
@@ -632,6 +644,17 @@
       ]
     },
     "Claim Deferred Opportunities": {
+      "main": [
+        [
+          {
+            "node": "Decode Deferred Opportunity Sweep",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decode Deferred Opportunity Sweep": {
       "main": [
         [
           {
