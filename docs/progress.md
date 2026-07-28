@@ -1576,3 +1576,18 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   `service_role` with both legacy JWT claim settings empty, rather than merely
   searching migration text. Runtime preflight also treats inactive remote
   workflows as failures and reports `N8N_BLOCK_ENV_ACCESS_IN_NODE`.
+- Production migration `20260728162110` was applied successfully. The
+  non-mutating opaque-key probe now reaches the bounded input validator with
+  PostgreSQL `22023`, and the scheduled WF-10 poll autonomously claimed and
+  dispatched the Enigma recovery at 19:12 UTC.
+- The fresh webhook passed HMAC verification, proving the signature replay fix,
+  but WF-05 execution `14326` returned `research_already_running`. Durable run
+  and recovery records show the replay reused the failed attempt's mutation
+  idempotency key and was therefore correctly treated as a duplicate without a
+  completed result.
+- Recovery replay now derives an attempt-specific deterministic idempotency key
+  at both the database claim boundary and the typed n8n recovery client. The
+  accompanying migration narrowly requeues only dead letters proven to contain
+  this historical conflict. Targeted recovery tests, strict web TypeScript,
+  lint, and formatting checks pass. Production migration/deployment and the
+  resumed research-to-package journey remain release gates.

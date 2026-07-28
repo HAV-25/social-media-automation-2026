@@ -1120,3 +1120,25 @@ the Runs & errors view continues to expose unresolved work. A temporary
 application or network outage no longer creates a self-amplifying n8n failure
 loop. Runtime preflight now fails for inactive workflows and explicitly reports
 the environment-access setting required by n8n Code nodes.
+
+## ADR-076: Recovery attempts receive fresh deterministic idempotency keys
+
+**Date:** 2026-07-28
+
+**Decision:** Preserve the original correlation and immutable request payload
+when WF-10 replays a failed workflow, but replace its mutation idempotency key
+with `wf10-replay:<recovery-id>:<attempt>`. Apply the transformation at the
+durable recovery-claim RPC and again at the typed application client boundary.
+
+**Why:** Production WF-10 successfully claimed and replayed the Enigma research
+request after opaque-key authorization was corrected. WF-05 then returned
+`research_already_running` because the replay reused the failed attempt's
+idempotency key. A retry is a distinct bounded mutation attempt; treating it as
+a duplicate prevents it from progressing, while an unbounded random identity
+would weaken deterministic deduplication.
+
+**Consequences:** Repeated delivery within one recovery attempt remains
+idempotent, subsequent attempts can reserve and persist new provider work, and
+the three-attempt recovery cap remains authoritative. A narrow data correction
+requeues only dead letters whose active run proves this exact historical
+`research_already_running` defect; unrelated dead letters remain untouched.

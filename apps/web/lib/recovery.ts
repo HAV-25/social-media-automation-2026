@@ -184,7 +184,10 @@ export async function dispatchDueRecoveries(limit: number) {
   for (const claim of claims) {
     try {
       const client = new N8nRecoveryClient();
-      const replay = await client.replayWorkflow(claim.target, claim.request_payload);
+      const replay = await client.replayWorkflow(claim.target, claim.request_payload, {
+        recoveryId: claim.recovery_id,
+        attemptCount: claim.attempt_count,
+      });
       results.push({
         recoveryId: claim.recovery_id,
         status: "replay_accepted",

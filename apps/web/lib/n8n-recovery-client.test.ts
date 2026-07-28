@@ -2,7 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-import { N8nRecoveryClient, N8nRecoveryError } from "./n8n-recovery-client";
+import {
+  buildRecoveryReplayIdempotencyKey,
+  N8nRecoveryClient,
+  N8nRecoveryError,
+} from "./n8n-recovery-client";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -40,6 +44,41 @@ describe("n8n recovery client", () => {
         }),
       }),
     );
+  });
+
+  it("gives each bounded recovery attempt a deterministic fresh idempotency key", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ accepted: true }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new N8nRecoveryClient({
+      webhookBaseUrl: "https://n8n.example.test",
+      hmacSecret: "test-recovery-secret-with-32-bytes",
+    });
+    const identity = {
+      recoveryId: "10000000-0000-4000-8000-000000000005",
+      attemptCount: 2,
+    };
+
+    await client.replayWorkflow(
+      "research",
+      {
+        contractVersion: "1.0",
+        correlationId: "10000000-0000-4000-8000-000000000001",
+        idempotencyKey: "original-research-request-0001",
+        actorId: "10000000-0000-4000-8000-000000000002",
+        brandId: "10000000-0000-4000-8000-000000000003",
+        opportunityId: "10000000-0000-4000-8000-000000000004",
+        requestedAt: "2026-07-28T15:45:00.000Z",
+      },
+      identity,
+    );
+
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(JSON.parse(String(request.body))).toMatchObject({
+      idempotencyKey: buildRecoveryReplayIdempotencyKey(identity),
+      correlationId: "10000000-0000-4000-8000-000000000001",
+    });
   });
 
   it("rejects an invalid typed replay before contacting n8n", async () => {

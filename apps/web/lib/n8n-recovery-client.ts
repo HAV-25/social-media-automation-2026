@@ -13,6 +13,15 @@ export class N8nRecoveryError extends Error {
   }
 }
 
+export type RecoveryReplayIdentity = {
+  recoveryId: string;
+  attemptCount: number;
+};
+
+export function buildRecoveryReplayIdempotencyKey(identity: RecoveryReplayIdentity) {
+  return `wf10-replay:${identity.recoveryId}:${identity.attemptCount}`;
+}
+
 const replayConfiguration = {
   research: {
     path: "/webhook/research-v1",
@@ -51,15 +60,28 @@ export class N8nRecoveryClient {
     this.hmacSecret = hmacSecret;
   }
 
-  async replayWorkflow(target: RecoveryTarget, rawPayload: unknown) {
+  async replayWorkflow(
+    target: RecoveryTarget,
+    rawPayload: unknown,
+    identity?: RecoveryReplayIdentity,
+  ) {
     const configuration = replayConfiguration[target];
-    const parsed = workflowRecoveryExecutionSchema.parse({
+    const original = workflowRecoveryExecutionSchema.parse({
       contractVersion: "1.0",
       workflowExecutionId: "fresh-recovery-replay",
       workflowName: configuration.workflowName,
       target,
       requestPayload: rawPayload,
     });
+    const parsed = identity
+      ? workflowRecoveryExecutionSchema.parse({
+          ...original,
+          requestPayload: {
+            ...original.requestPayload,
+            idempotencyKey: buildRecoveryReplayIdempotencyKey(identity),
+          },
+        })
+      : original;
     const body = JSON.stringify(parsed.requestPayload);
     const timestamp = String(Math.floor(Date.now() / 1_000));
     const nonce = randomUUID();

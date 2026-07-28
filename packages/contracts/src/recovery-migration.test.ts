@@ -30,6 +30,15 @@ const secretKeyReplayMigration = readFileSync(
   ),
   "utf8",
 );
+const freshIdempotencyMigration = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../../../supabase/migrations/20260728212000_refresh_recovery_idempotency_keys.sql",
+      import.meta.url,
+    ),
+  ),
+  "utf8",
+);
 
 describe("run recovery database contract", () => {
   it("commits a tenant-scoped RLS-protected recovery state machine", () => {
@@ -86,5 +95,18 @@ describe("run recovery database contract", () => {
     expect(secretKeyReplayMigration).toContain("from public, anon, authenticated");
     expect(secretKeyReplayMigration).toContain("to service_role");
     expect(secretKeyReplayMigration).not.toContain("security definer");
+  });
+
+  it("gives each recovery attempt a fresh bounded idempotency identity", () => {
+    expect(freshIdempotencyMigration).toContain("format(\n          'wf10-replay:%s:%s'");
+    expect(freshIdempotencyMigration).toContain("claimed.recovery_id");
+    expect(freshIdempotencyMigration).toContain("claimed.attempt_count");
+    expect(freshIdempotencyMigration).toContain(
+      "active_run.error ->> 'code' = 'research_already_running'",
+    );
+    expect(freshIdempotencyMigration).toContain("recovery.attempt_count < recovery.max_attempts");
+    expect(freshIdempotencyMigration).toContain("from public, anon, authenticated");
+    expect(freshIdempotencyMigration).toContain("to service_role");
+    expect(freshIdempotencyMigration).not.toContain("security definer");
   });
 });
