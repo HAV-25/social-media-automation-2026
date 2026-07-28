@@ -1032,3 +1032,25 @@ The carry-over claim happens before new articles can consume the day's slots.
 It does not expand the daily limit, reopen archived items, auto-publish, or
 introduce a second source of truth; Supabase remains authoritative for every
 selection and state transition.
+
+## ADR-072: Quarantined evidence remains visible without blocking usable research
+
+**Date:** 2026-07-28
+
+**Decision:** Keep every researched claim in the immutable claims ledger, including
+unsupported or disputed claims marked `do_not_use`. A writing-ready evidence
+package may proceed only when it contains a separately usable core claim and has
+no unsupported or disputed core claim that is still permitted for writing. The
+PostgreSQL integrity function and the versioned TypeScript contract enforce the
+same rule.
+
+**Why:** Production research for a real 82.98 opportunity passed the application
+contract, then failed with PostgreSQL `23514` because the database treated a
+quarantined claim as a writing blocker. Deleting that claim would lose provenance;
+allowing it to be written would weaken safety. Excluding only `do_not_use` claims
+from the readiness veto preserves both evidence history and the safety boundary.
+
+**Consequences:** The existing failed run is not silently mutated or charged
+again. After this migration is applied, durable recovery may create a new
+idempotent attempt. Provider cost remains attributable to the new attempt, and
+human approval is still mandatory before any package leaves the platform.

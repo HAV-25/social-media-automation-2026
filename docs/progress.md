@@ -1506,3 +1506,25 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   to be redispatched only when it has neither a draft nor any downstream
   generation run; this repairs the reservation-to-dispatch failure window
   without creating a second reservation or competing with durable recovery.
+
+### 2026-07-28 admin decision states and research-integrity correction
+
+- Verified the authenticated production inbox for Klaank. Every feed now shows
+  Completed, Failed, or Pending beside its poll timestamp, and the Daily
+  opportunity feed defaults to Highest score.
+- Confirmed the 64.57 Kraken opportunity is intentionally in the 60–74 manual
+  review band. It incurs no automatic AI spend; an administrator may inspect its
+  source, scoring dimensions, risk, and value nucleus, then either leave it
+  stored or explicitly start bounded research.
+- Confirmed the 82.98 Enigma opportunity was selected automatically on
+  28 July, reserved one of four daily slots, and transitioned to
+  `research_pending`. It did not create a Ready post because its research
+  persistence attempt failed with PostgreSQL `23514`; no research cost was
+  recorded.
+- Root cause was a contract mismatch: the TypeScript evidence validator permits
+  an immutable quarantined `do_not_use` core claim when another usable core claim
+  exists, while the database function rejected every unsupported/disputed core
+  claim. Added a migration that excludes only `do_not_use` claims from that
+  readiness veto while retaining them in the claims ledger.
+- Production migration application, durable recovery, and the resulting
+  three-style/image Ready-post package remain verification gates.

@@ -36,6 +36,15 @@ const readinessRepairMigration = readFileSync(
   ),
   "utf8",
 );
+const quarantinedClaimIntegrityMigration = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../../../supabase/migrations/20260728102202_align_quarantined_research_claim_integrity.sql",
+      import.meta.url,
+    ),
+  ),
+  "utf8",
+);
 
 describe("research evidence ledger migration", () => {
   it("adds a normalized conflict ledger with immediate RLS", () => {
@@ -106,5 +115,20 @@ describe("research evidence ledger migration", () => {
     );
     expect(readinessRepairMigration).toContain("set status = 'ready_to_generate'");
     expect(readinessRepairMigration).toContain("'research.readiness_recomputed'");
+  });
+
+  it("does not let quarantined claims veto separately usable research evidence", () => {
+    expect(quarantinedClaimIntegrityMigration).toContain(
+      "'private.persist_research_evidence(jsonb)'::regprocedure",
+    );
+    expect(quarantinedClaimIntegrityMigration).toContain(
+      "claim.value ->> ''usageGuidance'' <> ''do_not_use''",
+    );
+    expect(quarantinedClaimIntegrityMigration).toContain(
+      "claim.value ->> ''verificationState'' in (''unsupported'', ''disputed'')",
+    );
+    expect(quarantinedClaimIntegrityMigration).toContain(
+      "Expected unqualified research readiness blocker was not found",
+    );
   });
 });
