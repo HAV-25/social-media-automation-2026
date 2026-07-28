@@ -17,6 +17,8 @@ import {
   rssManualRunRequestSchema,
   rssManualRunResultSchema,
   rssGenerationReservationRequestSchema,
+  rssDeferredSweepRequestSchema,
+  rssDeferredSweepResultSchema,
   rssSourceAnalysisRequestSchema,
   rssSourceAnalysisResultSchema,
   sourceAdapterResultSchema,
@@ -209,6 +211,37 @@ describe("shared contracts", () => {
         ],
       }).success,
     ).toBe(true);
+  });
+
+  it("bounds a deferred RSS sweep and its durable selections", () => {
+    const request = rssDeferredSweepRequestSchema.parse({
+      contractVersion: "1.0",
+      correlationId: "00000000-0000-4000-8000-000000000001",
+      idempotencyKey: "rss-deferred-sweep:2026-07-28",
+      requestedAt: "2026-07-28T09:30:00.000Z",
+      brandId: "00000000-0000-4000-8000-000000000002",
+    });
+    expect(request.brandId).toBe("00000000-0000-4000-8000-000000000002");
+
+    const result = rssDeferredSweepResultSchema.parse({
+      contractVersion: "1.0",
+      selections: [
+        {
+          actorId: "00000000-0000-4000-8000-000000000003",
+          brandId: "00000000-0000-4000-8000-000000000002",
+          opportunityId: "00000000-0000-4000-8000-000000000004",
+          reservationRunId: "00000000-0000-4000-8000-000000000005",
+          score: 82.98,
+        },
+      ],
+    });
+    expect(result.selections[0]?.score).toBe(82.98);
+    expect(
+      rssDeferredSweepResultSchema.safeParse({
+        ...result,
+        selections: Array.from({ length: 401 }, () => result.selections[0]),
+      }).success,
+    ).toBe(false);
   });
 
   it("validates the plain-text input boundary and its idempotency key", () => {

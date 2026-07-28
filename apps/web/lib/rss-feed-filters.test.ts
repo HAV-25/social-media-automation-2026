@@ -35,6 +35,17 @@ const items = [
 ];
 
 describe("RSS feed filters", () => {
+  it("shows the highest-scoring opportunities first by default", () => {
+    const filter = rssFeedFilterSchema.parse({});
+    expect(filter.sort).toBe("score_desc");
+    expect(filterAndSortRssItems(items, filter, 75).map((value) => value.itemId)).toEqual([
+      "summary-only-high-score",
+      "priority",
+      "review",
+      "filtered",
+    ]);
+  });
+
   it("separates automatic-priority and manual-review bands", () => {
     expect(
       filterAndSortRssItems(items, rssFeedFilterSchema.parse({ view: "priority" }), 75).map(
@@ -45,7 +56,7 @@ describe("RSS feed filters", () => {
       filterAndSortRssItems(items, rssFeedFilterSchema.parse({ view: "review" }), 75).map(
         (value) => value.itemId,
       ),
-    ).toEqual(["review", "summary-only-high-score"]);
+    ).toEqual(["summary-only-high-score", "review"]);
   });
 
   it("excludes high-scoring summary-only items from automatic Priority", () => {

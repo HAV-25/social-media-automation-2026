@@ -14,6 +14,7 @@ import { OpportunityCard } from "@/components/opportunity-card";
 import { rollingWindowStart } from "@/lib/brand-archive-policy-core";
 import { getRssDailyDecisions } from "@/lib/rss-daily-decisions";
 import { filterAndSortRssItems, rssFeedFilterSchema } from "@/lib/rss-feed-filters";
+import { deriveRssPollStatus } from "@/lib/rss-poll-status";
 import { getWorkspaceSnapshot } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
@@ -270,73 +271,81 @@ export default async function DashboardPage({
               </a>
             </div>
             <div className="mt-5 grid gap-3 xl:grid-cols-3">
-              {rssOverview.feeds.map((decision) => (
-                <article
-                  key={decision.feedId}
-                  className="rounded-2xl border border-[var(--line)] bg-white p-4"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="font-bold">{decision.feedName}</h3>
-                      <p className="mt-1 text-[10px] text-[var(--muted)]">
-                        {decision.lastSuccessAt
-                          ? `Polled ${new Date(decision.lastSuccessAt).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}`
-                          : "Not successfully polled yet"}
-                      </p>
-                    </div>
-                    {decision.lastError ? (
-                      <span className="rounded-full bg-red-50 px-2 py-1 text-[9px] font-bold text-red-700">
-                        Error
+              {rssOverview.feeds.map((decision) => {
+                const pollStatus = deriveRssPollStatus(decision);
+                return (
+                  <article
+                    key={decision.feedId}
+                    className="rounded-2xl border border-[var(--line)] bg-white p-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="font-bold">{decision.feedName}</h3>
+                        <p className="mt-1 text-[10px] text-[var(--muted)]">
+                          {decision.lastSuccessAt
+                            ? `Polled ${new Date(decision.lastSuccessAt).toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}`
+                            : "Not successfully polled yet"}
+                        </p>
+                      </div>
+                      <span
+                        className={`flex items-center gap-1 rounded-full px-2 py-1 text-[9px] font-bold ${
+                          pollStatus === "Completed"
+                            ? "bg-emerald-50 text-emerald-800"
+                            : pollStatus === "Failed"
+                              ? "bg-red-50 text-red-700"
+                              : "bg-amber-50 text-amber-800"
+                        }`}
+                      >
+                        {pollStatus === "Completed" ? <CheckCircle2 size={11} /> : null}
+                        {pollStatus}
                       </span>
+                    </div>
+                    <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                      <div className="rounded-xl bg-stone-50 p-2">
+                        <strong>{decision.itemsSeen}</strong>
+                        <p className="text-[9px] text-[var(--muted)] uppercase">New</p>
+                      </div>
+                      <div className="rounded-xl bg-[var(--sage-soft)] p-2">
+                        <strong>{decision.scored}</strong>
+                        <p className="text-[9px] text-[var(--sage)] uppercase">Scored</p>
+                      </div>
+                      <div className="rounded-xl bg-stone-50 p-2">
+                        <strong>{decision.filtered}</strong>
+                        <p className="text-[9px] text-[var(--muted)] uppercase">Filtered</p>
+                      </div>
+                    </div>
+                    {decision.latestItem ? (
+                      <div className="mt-4 border-t border-[var(--line)] pt-3">
+                        <p className="line-clamp-2 text-xs font-semibold leading-5">
+                          {decision.latestItem.title}
+                        </p>
+                        <p className="mt-1.5 flex items-center gap-1.5 text-[10px] leading-4 text-[var(--muted)]">
+                          <Radio size={11} />
+                          {decision.latestItem.explanation}
+                          {decision.latestItem.score !== null
+                            ? ` · ${decision.latestItem.score.toFixed(0)}/100`
+                            : ""}
+                        </p>
+                        {decision.latestItem.opportunityId ? (
+                          <a
+                            href={`/opportunities/${decision.latestItem.opportunityId}`}
+                            className="mt-2 inline-flex text-xs font-bold text-[var(--sage)]"
+                          >
+                            Inspect score →
+                          </a>
+                        ) : null}
+                      </div>
                     ) : (
-                      <CheckCircle2 size={17} className="text-emerald-700" />
+                      <p className="mt-4 border-t border-[var(--line)] pt-3 text-xs text-[var(--muted)]">
+                        No new item since 00:00 UTC.
+                      </p>
                     )}
-                  </div>
-                  <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-                    <div className="rounded-xl bg-stone-50 p-2">
-                      <strong>{decision.itemsSeen}</strong>
-                      <p className="text-[9px] text-[var(--muted)] uppercase">New</p>
-                    </div>
-                    <div className="rounded-xl bg-[var(--sage-soft)] p-2">
-                      <strong>{decision.scored}</strong>
-                      <p className="text-[9px] text-[var(--sage)] uppercase">Scored</p>
-                    </div>
-                    <div className="rounded-xl bg-stone-50 p-2">
-                      <strong>{decision.filtered}</strong>
-                      <p className="text-[9px] text-[var(--muted)] uppercase">Filtered</p>
-                    </div>
-                  </div>
-                  {decision.latestItem ? (
-                    <div className="mt-4 border-t border-[var(--line)] pt-3">
-                      <p className="line-clamp-2 text-xs font-semibold leading-5">
-                        {decision.latestItem.title}
-                      </p>
-                      <p className="mt-1.5 flex items-center gap-1.5 text-[10px] leading-4 text-[var(--muted)]">
-                        <Radio size={11} />
-                        {decision.latestItem.explanation}
-                        {decision.latestItem.score !== null
-                          ? ` · ${decision.latestItem.score.toFixed(0)}/100`
-                          : ""}
-                      </p>
-                      {decision.latestItem.opportunityId ? (
-                        <a
-                          href={`/opportunities/${decision.latestItem.opportunityId}`}
-                          className="mt-2 inline-flex text-xs font-bold text-[var(--sage)]"
-                        >
-                          Inspect score →
-                        </a>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <p className="mt-4 border-t border-[var(--line)] pt-3 text-xs text-[var(--muted)]">
-                      No new item since 00:00 UTC.
-                    </p>
-                  )}
-                </article>
-              ))}
+                  </article>
+                );
+              })}
             </div>
           </section>
         ) : null}
@@ -380,7 +389,7 @@ export default async function DashboardPage({
                   below_threshold: "Below score threshold",
                   daily_limit: "Daily maximum reached",
                   ingest_only: "Scoring only",
-                  awaiting_selection: "Awaiting selection",
+                  awaiting_selection: "Queued for automatic preparation",
                   not_applicable: item.state.replaceAll("_", " "),
                 } as const;
                 return (

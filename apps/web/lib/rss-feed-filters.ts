@@ -7,7 +7,7 @@ export const rssFeedFilterSchema = z.object({
   feed: z.union([z.literal("all"), z.uuid()]).catch("all"),
   state: z.enum(["all", "scored", "filtered", "duplicate", "pending"]).catch("all"),
   minScore: z.coerce.number().min(0).max(100).optional().catch(undefined),
-  sort: z.enum(["newest", "score_desc", "score_asc", "feed"]).catch("newest"),
+  sort: z.enum(["newest", "score_desc", "score_asc", "feed"]).catch("score_desc"),
 });
 
 export type RssFeedFilter = z.infer<typeof rssFeedFilterSchema>;

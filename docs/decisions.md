@@ -1004,3 +1004,26 @@ workflows again.
 
 This keeps the database transaction conventionally idempotent while making the
 workflow side effect exactly-once from the application's perspective.
+
+## ADR-071 — Scheduled RSS intake claims recent deferred opportunities first
+
+**Status:** Accepted, 2026-07-28
+
+An automatically eligible RSS opportunity can be deferred when a brand reaches
+its UTC daily maximum. A later feed poll may no longer return that article
+within the bounded per-feed catch-up window, so feed polling alone is not a
+complete retry mechanism.
+
+Before processing newly fetched feed items, WF-01 now asks a signed application
+endpoint to reconsider unprepared, unreserved RSS opportunities created within
+the brand's rolling 24-hour inbox window. Candidates must still come from an
+active feed with `score_then_research`, meet the current brand threshold, and
+pass the existing transactional daily-limit reservation. Selection is
+deterministic by score descending, then creation time and ID. Existing drafts
+and successful reservations are excluded, and the stable downstream research
+idempotency key remains opportunity-scoped.
+
+The carry-over claim happens before new articles can consume the day's slots.
+It does not expand the daily limit, reopen archived items, auto-publish, or
+introduce a second source of truth; Supabase remains authoritative for every
+selection and state transition.

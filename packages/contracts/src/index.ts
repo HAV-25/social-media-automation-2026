@@ -300,6 +300,29 @@ export const rssSourceAnalysisResultSchema = z.object({
   ),
 });
 
+export const rssDeferredSweepRequestSchema = z.object({
+  contractVersion: z.literal("1.0"),
+  correlationId: z.uuid(),
+  idempotencyKey: z.string().trim().min(16).max(200),
+  requestedAt: z.iso.datetime(),
+  brandId: z.uuid().optional(),
+});
+
+export const rssDeferredSweepResultSchema = z.object({
+  contractVersion: z.literal("1.0"),
+  selections: z
+    .array(
+      z.object({
+        actorId: z.uuid(),
+        brandId: z.uuid(),
+        opportunityId: z.uuid(),
+        reservationRunId: z.uuid(),
+        score: z.number().min(0).max(100),
+      }),
+    )
+    .max(400),
+});
+
 export const rssFetchRequestSchema = z.object({
   contractVersion: z.literal("1.0"),
   correlationId: z.uuid(),

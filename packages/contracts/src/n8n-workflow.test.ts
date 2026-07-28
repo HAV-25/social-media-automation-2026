@@ -49,6 +49,11 @@ describe("WF-01 RSS Intake workflow", () => {
       "Verify One-off RSS Request",
       "Sign Feed Plan Request",
       "Fetch Active Feed Plan",
+      "Sign Deferred Opportunity Sweep",
+      "Claim Deferred Opportunities",
+      "Prepare Deferred Opportunities",
+      "Research Deferred Draft Verify and Image",
+      "Restore Feed Plan",
       "Split Feeds",
       "Sign Safe Fetch Request",
       "Fetch and Parse Feed Safely",
@@ -83,12 +88,29 @@ describe("WF-01 RSS Intake workflow", () => {
     expect(source).toContain("/api/internal/workflows/rss/fetch");
     expect(source).toContain("/api/internal/workflows/rss/intake");
     expect(source).toContain("/api/internal/workflows/rss/analyze");
+    expect(source).toContain("/api/internal/workflows/rss/backlog");
     expect(source).toContain("/webhook/research-v1");
     expect(source).toContain("/webhook/rss-intake-run-v1");
     expect(source).toContain("brandQuery");
     expect(source).toContain("timingSafeEqual");
     expect(source).toContain("createHmac('sha256'");
     expect(source).toContain("rss-item:");
+    expect(source).toContain("rss-deferred-sweep:");
+    expect(source).toContain("rss-auto-research:");
+  });
+
+  it("claims deferred opportunities before fresh feed items consume the daily limit", () => {
+    const workflow = workflowSchema.parse(JSON.parse(readFileSync(workflowPath, "utf8")));
+    const serializedConnections = JSON.stringify(workflow.connections);
+
+    expect(serializedConnections).toContain(
+      '"Fetch Active Feed Plan":{"main":[[{"node":"Sign Deferred Opportunity Sweep"',
+    );
+    expect(serializedConnections).toContain(
+      '"Claim Deferred Opportunities":{"main":[[{"node":"Prepare Deferred Opportunities"',
+    );
+    expect(serializedConnections).toContain('"node":"Restore Feed Plan"');
+    expect(serializedConnections).toContain('"Restore Feed Plan":{"main":[[{"node":"Split Feeds"');
   });
 
   it("reads every decoded opportunity decision from the n8n 2.21 data envelopes", () => {
@@ -132,6 +154,26 @@ describe("WF-01 RSS Intake workflow", () => {
     expect(workflow).toContain('"name": "accept-encoding"');
     expect(workflow).toContain('"value": "identity"');
     expect(route).not.toMatch(/N8N_API_KEY|service[_-]?role/i);
+  });
+
+  it("reconsiders only signed, recent, unprepared RSS opportunities", () => {
+    const route = readFileSync(
+      `${appDirectory}api/internal/workflows/rss/backlog/route.ts`,
+      "utf8",
+    );
+    const selector = readFileSync(
+      fileURLToPath(new URL("../../../apps/web/lib/rss-deferred-candidates.ts", import.meta.url)),
+      "utf8",
+    );
+
+    expect(route).toContain("authenticateWorkflowRequest");
+    expect(route).toContain('rpc("reserve_rss_generation"');
+    expect(route).toContain('eq("generation_policy", "score_then_research")');
+    expect(route).toContain('eq("automatic_opportunity_selection", true)');
+    expect(route).toContain("selectDeferredRssCandidates");
+    expect(selector).toContain("blockedOpportunityIds");
+    expect(selector).toContain("rssSourceDocumentIds");
+    expect(selector).toContain("maximumAgeHours ?? 24");
   });
 });
 

@@ -46,7 +46,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const crypto = require('crypto');\nconst path = '/api/internal/workflows/rss/feeds';\nconst timestamp = String(Math.floor(Date.now() / 1000));\nconst nonce = crypto.randomUUID();\nconst body = '';\nconst bodyDigest = crypto.createHash('sha256').update(body, 'utf8').digest('hex');\nconst canonical = [timestamp, nonce, 'GET', path, bodyDigest].join('\\n');\nconst secret = $env.WORKFLOW_HMAC_SECRET;\nconst baseUrl = $env.APP_BASE_URL;\nif (!secret || !baseUrl) throw new Error('Required workflow environment is not configured');\nconst signature = `sha256=${crypto.createHmac('sha256', secret).update(canonical, 'utf8').digest('hex')}`;\nconst brandQuery = $json.brandId ? `?brandId=${encodeURIComponent($json.brandId)}` : '';\nreturn [{ json: { url: `${baseUrl}${path}${brandQuery}`, timestamp, nonce, signature } }];"
+        "jsCode": "const crypto = require('crypto');\nconst path = '/api/internal/workflows/rss/feeds';\nconst timestamp = String(Math.floor(Date.now() / 1000));\nconst nonce = crypto.randomUUID();\nconst body = '';\nconst bodyDigest = crypto.createHash('sha256').update(body, 'utf8').digest('hex');\nconst canonical = [timestamp, nonce, 'GET', path, bodyDigest].join('\\n');\nconst secret = $env.WORKFLOW_HMAC_SECRET;\nconst baseUrl = $env.APP_BASE_URL;\nif (!secret || !baseUrl) throw new Error('Required workflow environment is not configured');\nconst signature = `sha256=${crypto.createHmac('sha256', secret).update(canonical, 'utf8').digest('hex')}`;\nconst brandId = $json.brandId || null;\nconst brandQuery = brandId ? `?brandId=${encodeURIComponent(brandId)}` : '';\nreturn [{ json: { url: `${baseUrl}${path}${brandQuery}`, timestamp, nonce, signature, brandId } }];"
       },
       "id": "d7b40737-a4f6-4fde-af91-acde65873202",
       "name": "Sign Feed Plan Request",
@@ -97,6 +97,136 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [-500, 120]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst path = '/api/internal/workflows/rss/backlog';\nconst timestamp = String(Math.floor(Date.now() / 1000));\nconst nonce = crypto.randomUUID();\nconst requestedAt = new Date().toISOString();\nconst brandId = $('Sign Feed Plan Request').first().json.brandId || null;\nconst payload = {\n  contractVersion: '1.0',\n  correlationId: crypto.randomUUID(),\n  idempotencyKey: `rss-deferred-sweep:${requestedAt.slice(0, 10)}:${brandId || 'all'}`,\n  requestedAt,\n  ...(brandId ? { brandId } : {}),\n};\nconst body = JSON.stringify(payload);\nconst digest = crypto.createHash('sha256').update(body, 'utf8').digest('hex');\nconst canonical = [timestamp, nonce, 'POST', path, digest].join('\\n');\nconst secret = $env.WORKFLOW_HMAC_SECRET;\nconst baseUrl = $env.APP_BASE_URL;\nif (!secret || !baseUrl) throw new Error('Deferred RSS sweep environment is not configured');\nconst signature = `sha256=${crypto.createHmac('sha256', secret).update(canonical, 'utf8').digest('hex')}`;\nreturn [{ json: { body, nonce, signature, timestamp, url: `${baseUrl}${path}` } }];"
+      },
+      "id": "f24d824a-ea5c-4b55-b0f3-acde65873221",
+      "name": "Sign Deferred Opportunity Sweep",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-280, -40]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept-encoding",
+              "value": "identity"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-workflow-name",
+              "value": "WF-01 RSS Intake"
+            },
+            {
+              "name": "x-workflow-timestamp",
+              "value": "={{ $json.timestamp }}"
+            },
+            {
+              "name": "x-workflow-nonce",
+              "value": "={{ $json.nonce }}"
+            },
+            {
+              "name": "x-workflow-signature",
+              "value": "={{ $json.signature }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.body }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": false,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "f24d824a-ea5c-4b55-b0f3-acde65873222",
+      "name": "Claim Deferred Opportunities",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-60, -40]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst sweep = $json;\nif (sweep?.contractVersion !== '1.0' || !Array.isArray(sweep.selections)) throw new Error('Deferred RSS sweep contract is invalid');\nconst secret = $env.WORKFLOW_HMAC_SECRET;\nconst baseUrl = $env.N8N_WEBHOOK_BASE_URL;\nif (!secret || !baseUrl) throw new Error('Automatic preparation environment is not configured');\nconst path = '/webhook/research-v1';\nreturn sweep.selections.map((item) => {\n  if (!item.actorId || !item.brandId || !item.opportunityId || !item.reservationRunId) throw new Error('Deferred RSS selection is missing preparation context');\n  const payload = {\n    contractVersion: '1.0',\n    correlationId: crypto.randomUUID(),\n    idempotencyKey: `rss-auto-research:${item.opportunityId}`,\n    actorId: item.actorId,\n    brandId: item.brandId,\n    opportunityId: item.opportunityId,\n    allowedDomains: [],\n    requestedAt: new Date().toISOString(),\n  };\n  const body = JSON.stringify(payload);\n  const timestamp = String(Math.floor(Date.now() / 1000));\n  const nonce = crypto.randomUUID();\n  const digest = crypto.createHash('sha256').update(body, 'utf8').digest('hex');\n  const canonical = [timestamp, nonce, 'POST', path, digest].join('\\n');\n  const signature = `sha256=${crypto.createHmac('sha256', secret).update(canonical, 'utf8').digest('hex')}`;\n  return { json: { body, nonce, signature, timestamp, url: `${baseUrl}${path}` } };\n});"
+      },
+      "id": "f24d824a-ea5c-4b55-b0f3-acde65873223",
+      "name": "Prepare Deferred Opportunities",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [160, -120]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept-encoding",
+              "value": "identity"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-workflow-name",
+              "value": "WF-01 RSS Intake"
+            },
+            {
+              "name": "x-workflow-timestamp",
+              "value": "={{ $json.timestamp }}"
+            },
+            {
+              "name": "x-workflow-nonce",
+              "value": "={{ $json.nonce }}"
+            },
+            {
+              "name": "x-workflow-signature",
+              "value": "={{ $json.signature }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.body }}",
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "f24d824a-ea5c-4b55-b0f3-acde65873224",
+      "name": "Research Deferred Draft Verify and Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [380, -120]
+    },
+    {
+      "parameters": {
+        "jsCode": "const plan = $('Fetch Active Feed Plan').first().json;\nif (plan?.contractVersion !== '1.0' || !Array.isArray(plan.feeds)) throw new Error('RSS feed plan contract is invalid');\nreturn [{ json: plan }];"
+      },
+      "id": "f24d824a-ea5c-4b55-b0f3-acde65873225",
+      "name": "Restore Feed Plan",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [160, 120]
     },
     {
       "parameters": {
@@ -480,6 +610,55 @@
       ]
     },
     "Fetch Active Feed Plan": {
+      "main": [
+        [
+          {
+            "node": "Sign Deferred Opportunity Sweep",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign Deferred Opportunity Sweep": {
+      "main": [
+        [
+          {
+            "node": "Claim Deferred Opportunities",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim Deferred Opportunities": {
+      "main": [
+        [
+          {
+            "node": "Prepare Deferred Opportunities",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Restore Feed Plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Deferred Opportunities": {
+      "main": [
+        [
+          {
+            "node": "Research Deferred Draft Verify and Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore Feed Plan": {
       "main": [
         [
           {

@@ -1457,3 +1457,41 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   duplicate reservation to `already_prepared` with `researchEligible: false`.
   Regression coverage proves a replay cannot invoke research while a new
   reservation still dispatches once.
+
+### 2026-07-28 production verification and deferred-opportunity carry-over
+
+- The scheduled 10:00 Berlin RSS run persisted and scored a real article at
+  55.8. It correctly stopped below Klaank's automatic threshold. A controlled
+  11:14 Berlin run polled all five active feeds, processed 15 real items, left
+  every feed with zero consecutive failures, and incurred no AI cost.
+- No WF-05 Research or WF-07 Post Verification error execution occurred on
+  2026-07-28. The earlier duplicate-reservation redispatch cascade therefore
+  stopped after the consumer correction. Successful WF-01 executions are not
+  retained by n8n because its production setting deliberately saves error data
+  but not successful execution payloads; durable application records remain the
+  acceptance evidence.
+- A real reviewer-triggered production image completed for post
+  `29a4e9bd-25e4-448e-8432-88d2c8b579c8`. Generation run
+  `3e7e6172-e4c0-477a-b888-4f1d4e00bd32` used `gpt-image-2`, passed deterministic
+  composition checks, produced a 1200×630 ready asset with exact prompt
+  provenance, and recorded $0.005 cost.
+- Autonomous UAT was not yet complete: the real 82.98 opportunity
+  `d0edb898-b882-415d-8731-c69fc382a05e` had been deferred by the prior day's
+  daily maximum, then disappeared from the next three-item-per-feed catch-up
+  window. It remained a candidate with no draft or reservation.
+- Added a signed deferred-opportunity sweep to WF-01. It claims recent eligible
+  backlog before new feed items, uses the existing atomic reservation and daily
+  limit, excludes prepared/reserved/non-RSS/expired content, and dispatches the
+  normal research → three styles → verification → image chain with stable
+  idempotency.
+- The content inbox now labels qualified unclaimed work as “Queued for automatic
+  preparation,” shows Completed/Failed/Pending polling status on each feed, and
+  defaults the Daily opportunity feed to highest score first. The 60–74 band
+  remains an optional manual-review queue with no automatic provider spend.
+- Consolidated verification passes repository formatting, lint, strict
+  TypeScript, all 13 test tasks (156 contract/security assertions and 97 web
+  assertions), the optimized Next.js production build including the signed RSS
+  backlog route, and all four local Chromium regression journeys. The initial
+  sandboxed browser launch was denied by Windows process policy; the approved
+  unsandboxed rerun passed all four journeys. These checks used no paid model
+  call and no Netlify build.
