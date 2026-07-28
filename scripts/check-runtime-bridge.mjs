@@ -102,6 +102,7 @@ export async function checkRuntimeBridge({ remote = false } = {}) {
     issues.push(
       ...remoteState.duplicateNames.map((name) => `n8n duplicate workflow: ${name}`),
       ...remoteState.missingNames.map((name) => `n8n missing workflow: ${name}`),
+      ...remoteState.inactiveNames.map((name) => `n8n inactive workflow: ${name}`),
     );
   }
   return {
@@ -113,6 +114,7 @@ export async function checkRuntimeBridge({ remote = false } = {}) {
       "N8N_WEBHOOK_BASE_URL",
       "WORKFLOW_HMAC_SECRET",
       "NODE_FUNCTION_ALLOW_BUILTIN",
+      "N8N_BLOCK_ENV_ACCESS_IN_NODE",
     ],
   };
 }

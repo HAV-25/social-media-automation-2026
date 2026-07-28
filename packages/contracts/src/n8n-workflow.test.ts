@@ -479,6 +479,43 @@ describe("Milestone 8 recovery workflow", () => {
     expect(source).not.toMatch(/credentials|credentialId|N8N_API_KEY|OPENAI_API_KEY/i);
   });
 
+  it("cannot turn a dispatcher or persistence outage into a recurring WF-10 error", () => {
+    const workflow = JSON.parse(
+      readFileSync(`${workflowDirectory}wf-10-error-recovery.json`, "utf8"),
+    ) as {
+      nodes: Array<{
+        name: string;
+        onError?: string;
+        parameters: {
+          jsCode?: string;
+          options?: {
+            response?: {
+              response?: {
+                fullResponse?: boolean;
+                neverError?: boolean;
+                responseFormat?: string;
+              };
+            };
+          };
+        };
+      }>;
+    };
+    const nodes = new Map(workflow.nodes.map((node) => [node.name, node]));
+
+    for (const name of ["Persist Redacted Failure", "Dispatch Due Recoveries"]) {
+      const node = nodes.get(name);
+      expect(node?.onError).toBe("continueRegularOutput");
+      expect(node?.parameters.options?.response?.response).toMatchObject({
+        fullResponse: true,
+        neverError: true,
+        responseFormat: "json",
+      });
+    }
+    expect(nodes.get("Sign Due Recovery Poll")?.parameters.jsCode).toContain(
+      "if (!secret || !baseUrl) return [];",
+    );
+  });
+
   it("wraps every model/image workflow in a replayable application contract", () => {
     for (const filename of [
       "wf-05-research.json",

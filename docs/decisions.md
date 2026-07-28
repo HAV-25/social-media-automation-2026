@@ -1099,3 +1099,24 @@ instead observe the function owner.
 the bounded recovery RPC. No browser client gains access, the private
 implementation stays outside the exposed schema, and the compatibility claim
 cannot escape the request transaction.
+
+## ADR-075: WF-10 transport failures must not trigger WF-10 again
+
+**Date:** 2026-07-28
+
+**Decision:** Keep the error intake and bounded one-minute recovery poll in
+WF-10, but configure both application HTTP nodes to return their full response,
+continue on every HTTP or transport failure, and never treat a non-2xx response
+as an n8n execution error. If required scheduler environment is unavailable, the
+signing node returns no work rather than throwing.
+
+**Why:** Production executions `14098` and `14099` proved that a failed
+scheduled dispatch invoked the Error Trigger in the same workflow, after which
+failure persistence also failed. This produced two red executions every minute
+without advancing durable recovery state.
+
+**Consequences:** Supabase remains the authoritative place for retry state and
+the Runs & errors view continues to expose unresolved work. A temporary
+application or network outage no longer creates a self-amplifying n8n failure
+loop. Runtime preflight now fails for inactive workflows and explicitly reports
+the environment-access setting required by n8n Code nodes.

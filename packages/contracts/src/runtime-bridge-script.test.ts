@@ -24,7 +24,13 @@ describe("runtime bridge preflight", () => {
     expect(script).toContain("WF-01 RSS Intake");
     expect(script).toContain("WF-10 Error and Recovery");
     expect(script).toContain("inactiveNames");
+    expect(script).toContain("n8n inactive workflow:");
     expect(script).not.toMatch(/\/activate|method:\s*["'](?:POST|PUT|DELETE)/);
+  });
+
+  it("lists every n8n container setting required by the Code nodes", () => {
+    expect(script).toContain('"NODE_FUNCTION_ALLOW_BUILTIN"');
+    expect(script).toContain('"N8N_BLOCK_ENV_ACCESS_IN_NODE"');
   });
 
   it("is exposed as a read-only package command", () => {

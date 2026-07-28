@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(19);
+select plan(20);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -286,6 +286,15 @@ select ok(
     where initial_execution_id = 'recovery-execution-initial-21'
   ),
   'manual recovery opens one bounded attempt without erasing generation-run history'
+);
+
+reset role;
+set local role service_role;
+select set_config('request.jwt.claim.role', '', true);
+select set_config('request.jwt.claims', '{}', true);
+select lives_ok(
+  $$select count(*) from public.claim_due_recovery_replays(1)$$,
+  'opaque service-role requests can claim recovery replays without legacy JWT claims'
 );
 
 select * from finish();

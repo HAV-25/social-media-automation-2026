@@ -11,11 +11,12 @@
 | WF-07 Evaluate      | Draft created               | Evaluation, revision, verification results   |
 | WF-08 Image         | Verified post               | Base/final image assets                      |
 | WF-09 Regenerate    | Reviewer request            | New immutable component version              |
-| WF-10 Error         | Error trigger/1-minute poll | Leased retry or terminal recovery state      |
+| WF-10 Error         | Error trigger/1-minute poll | Fresh signed replay or terminal recovery     |
 
 Every workflow carries a correlation ID and idempotency key and calls a signed,
 versioned internal endpoint for durable changes.
 
 WF-05 through WF-09 use WF-10 as their runtime-linked n8n error workflow.
 Supabase, not n8n memory, owns retry timing, attempt caps, leases, dead-letter
-state, manual override, and provenance.
+state, manual override, and provenance. Recovery calls the target webhook with
+a fresh signature; it never reuses a saved time-bounded HTTP request.

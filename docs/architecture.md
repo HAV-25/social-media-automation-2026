@@ -44,10 +44,12 @@ automatic cap, dead-letter state, and audit trail.
 
 WF-10 receives n8n Error Trigger summaries and polls the signed recovery
 dispatcher each minute. The dispatcher atomically claims due work with
-`FOR UPDATE SKIP LOCKED`, optionally stops a stalled execution, and asks n8n to
-retry the exact original execution. Only an organization administrator can
-queue a manual retry; PostgreSQL reauthorizes the actor and preserves the
-failed generation-run history.
+`FOR UPDATE SKIP LOCKED` and starts the target webhook from immutable typed
+request context with a fresh timestamp, nonce, digest, and HMAC signature.
+WF-10 treats dispatcher/persistence transport outages as durable operational
+signals instead of throwing its scheduled branch into its own Error Trigger.
+Only an organization administrator can queue a manual replay; PostgreSQL
+reauthorizes the actor and preserves the failed generation-run history.
 
 ## Operational reporting
 

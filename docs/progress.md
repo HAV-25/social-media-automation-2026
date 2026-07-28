@@ -1553,3 +1553,26 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   explicit denial for `PUBLIC`, `anon`, and `authenticated`. The targeted
   recovery contract passes all five assertions. Production application of the
   migration and the resulting autonomous replay remain release gates.
+
+### 2026-07-28 WF-10 deep-review correction
+
+- A non-mutating opaque-key probe against production returned PostgreSQL
+  `42501` from `claim_due_recovery_replays`, while the established rate-limit
+  RPC reached its input validator with the same secret key. This proves the
+  production key is valid and the recovery compatibility wrapper is not yet
+  active in the live schema.
+- Production n8n executions `14098` and `14099` proved a second independent
+  defect: the scheduled WF-10 dispatch failure invoked WF-10's own Error
+  Trigger, and the resulting failure-persistence request also returned 503.
+- WF-10 now continues safely on both HTTP status and transport failures, and its
+  scheduled signing branch emits no work when runtime environment is missing.
+  Contract coverage prevents those safeguards from being removed.
+- The updated WF-10 was published automatically as the only changed remote
+  workflow. It remained active and produced no new error execution across more
+  than two one-minute scheduler intervals; the last retained errors remain the
+  pre-publication pair `14250`/`14251`. Successful executions are intentionally
+  not retained by the workflow's production data-retention setting.
+- The database recovery suite now executes the public claim RPC as
+  `service_role` with both legacy JWT claim settings empty, rather than merely
+  searching migration text. Runtime preflight also treats inactive remote
+  workflows as failures and reports `N8N_BLOCK_ENV_ACCESS_IN_NODE`.

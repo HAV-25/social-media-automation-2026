@@ -55,11 +55,14 @@ describe("run recovery database contract", () => {
   });
 
   it("tests idempotency, backoff, cap, dead letter, RLS, and manual override", () => {
-    expect(databaseTest).toContain("select plan(19)");
+    expect(databaseTest).toContain("select plan(20)");
     expect(databaseTest).toContain("first retry uses deterministic one-minute backoff");
     expect(databaseTest).toContain("three-attempt cap");
     expect(databaseTest).toContain("brand editors cannot inspect");
     expect(databaseTest).toContain("administrator can queue one audited manual recovery");
+    expect(databaseTest).toContain(
+      "opaque service-role requests can claim recovery replays without legacy JWT claims",
+    );
     expect(databaseTest).toContain("rollback;");
   });
 

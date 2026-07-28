@@ -57,6 +57,13 @@
         "rawContentType": "application/json",
         "body": "={{ $json.body }}",
         "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
           "timeout": 30000
         }
       },
@@ -64,7 +71,8 @@
       "name": "Persist Redacted Failure",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [-40, -100]
+      "position": [-40, -100],
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -85,7 +93,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const crypto = require('crypto');\nconst path = '/api/internal/workflows/recovery/dispatch';\nconst payload = { contractVersion: '1.0', requestedAt: new Date().toISOString(), limit: 5 };\nconst body = JSON.stringify(payload);\nconst timestamp = String(Math.floor(Date.now() / 1000));\nconst nonce = crypto.randomUUID();\nconst digest = crypto.createHash('sha256').update(body, 'utf8').digest('hex');\nconst canonical = [timestamp, nonce, 'POST', path, digest].join('\\n');\nconst secret = $env.WORKFLOW_HMAC_SECRET;\nconst baseUrl = $env.APP_BASE_URL;\nif (!secret || !baseUrl) throw new Error('Recovery workflow environment is not configured');\nconst signature = `sha256=${crypto.createHmac('sha256', secret).update(canonical, 'utf8').digest('hex')}`;\nreturn [{ json: { body, nonce, signature, timestamp, url: `${baseUrl}${path}` } }];"
+        "jsCode": "const crypto = require('crypto');\nconst path = '/api/internal/workflows/recovery/dispatch';\nconst payload = { contractVersion: '1.0', requestedAt: new Date().toISOString(), limit: 5 };\nconst body = JSON.stringify(payload);\nconst timestamp = String(Math.floor(Date.now() / 1000));\nconst nonce = crypto.randomUUID();\nconst digest = crypto.createHash('sha256').update(body, 'utf8').digest('hex');\nconst canonical = [timestamp, nonce, 'POST', path, digest].join('\\n');\nconst secret = $env.WORKFLOW_HMAC_SECRET;\nconst baseUrl = $env.APP_BASE_URL;\nif (!secret || !baseUrl) return [];\nconst signature = `sha256=${crypto.createHmac('sha256', secret).update(canonical, 'utf8').digest('hex')}`;\nreturn [{ json: { body, nonce, signature, timestamp, url: `${baseUrl}${path}` } }];"
       },
       "id": "ce10f001-6a77-4a0f-8d1c-000000000005",
       "name": "Sign Due Recovery Poll",
@@ -131,6 +139,13 @@
         "rawContentType": "application/json",
         "body": "={{ $json.body }}",
         "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
           "timeout": 90000
         }
       },
@@ -138,7 +153,8 @@
       "name": "Dispatch Due Recoveries",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [-40, 160]
+      "position": [-40, 160],
+      "onError": "continueRegularOutput"
     }
   ],
   "pinData": {},

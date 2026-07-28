@@ -69,8 +69,12 @@ state stay in the application and Supabase.
 WF-10 receives n8n Error Trigger summaries and polls the application recovery
 dispatcher once per minute. PostgreSQL owns classification, deterministic
 backoff, the three-attempt cap, leases, dead-letter state, manual administrator
-override, and audit provenance. n8n retries only a claimed original execution;
-raw exception messages are never forwarded or stored.
+override, and audit provenance. A claimed recovery starts the target webhook
+from immutable typed request context with a fresh timestamp, nonce, digest, and
+HMAC signature; saved n8n HTTP-node input is never retried. WF-10's own
+dispatcher and failure-persistence requests continue safely on transport
+failure so its scheduled branch cannot invoke its Error Trigger recursively.
+Raw exception messages are never forwarded or stored.
 
 Each request signs:
 
@@ -89,5 +93,5 @@ source documents.
 Run `pnpm runtime:preflight` before activating WF-01. It verifies required local
 key names and lengths, exact remote workflow inventory, duplicates, and active
 states without printing credential values or mutating n8n. The n8n public API
-cannot attest server environment values, so the operator must still confirm the
-four required n8n runtime keys above after any container restart.
+cannot attest server environment values, so the operator must still confirm all
+reported n8n runtime keys after any container restart.
