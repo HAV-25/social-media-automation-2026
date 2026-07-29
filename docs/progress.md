@@ -1618,3 +1618,13 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   completed recent style only when its verification handoff is provably
   missing. Deployment, workflow publication, migration application, and
   production image completion remain release gates.
+- Release `76fe85a` was deployed and the bounded handoff migration was applied.
+  Scheduled WF-10 recovery produced all three real Enigma styles with prompt
+  provenance; WF-06 and WF-07 completed without manual triggering.
+- Verification correctly withheld WF-08 because all drafts contained the word
+  `Safety`. Production inspection proved Klaank's intended comma-delimited
+  policy had been stored as standalone fragments, including `Safety`, even
+  though responsible safety discussion is a content pillar. A scoped migration
+  restores phrase-level restrictions and re-verifies only recent drafts whose
+  persisted evaluation proves they were affected, without repeating paid
+  research or writing.

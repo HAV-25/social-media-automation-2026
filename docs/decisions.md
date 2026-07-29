@@ -1187,3 +1187,24 @@ claim safety.
 provider failures. Unknown claim identifiers, missing selected angles,
 duplicate angle keys, malformed output, and safety/quality gates are still
 rejected or surfaced for reviewer control.
+
+## ADR-079: Brand restrictions are phrase-level policies
+
+**Date:** 2026-07-29
+
+**Decision:** Store Klaank's prohibited areas as explicit semantic phrases
+rather than comma-split keywords. Replace the accidental standalone `Safety`
+restriction with `Unverified safety, compliance, legal, or investment claims`.
+Re-verify only recent persisted drafts whose evaluation proves that the
+standalone restriction blocked them.
+
+**Why:** The production Enigma journey generated and verified all three styles,
+but every style mentioned responsible robotics safety considerations and was
+therefore blocked by the accidental single-word restriction. Safety discussion
+is one of Klaank's content pillars; unsupported safety claims are the actual
+prohibited category.
+
+**Consequences:** Responsible safety language no longer fails merely because it
+contains the word `Safety`. Unverified safety or compliance claims remain
+restricted. Recovery uses fresh attempt-specific idempotency keys and repeats
+only deterministic verification—not paid research or writing.

@@ -48,6 +48,15 @@ const partialHandoffMigration = readFileSync(
   ),
   "utf8",
 );
+const klaankPolicyReverificationMigration = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../../../supabase/migrations/20260729133000_normalize_klaank_policy_and_reverify.sql",
+      import.meta.url,
+    ),
+  ),
+  "utf8",
+);
 
 describe("run recovery database contract", () => {
   it("commits a tenant-scoped RLS-protected recovery state machine", () => {
@@ -126,5 +135,22 @@ describe("run recovery database contract", () => {
     expect(partialHandoffMigration).toContain("recovery.attempt_count < recovery.max_attempts");
     expect(partialHandoffMigration).toContain("recovery.created_at >= now() - interval '48 hours'");
     expect(partialHandoffMigration).toContain("verification.run_type = 'post_verification'");
+  });
+
+  it("normalizes phrase-level Klaank restrictions and re-verifies only affected drafts", () => {
+    expect(klaankPolicyReverificationMigration).toContain("brand.slug = 'klaank'");
+    expect(klaankPolicyReverificationMigration).toContain(
+      "'Unverified safety, compliance, legal, or investment claims'",
+    );
+    expect(klaankPolicyReverificationMigration).toContain(
+      "draft.score_breakdown #> '{evaluation,restrictedTopics}'",
+    );
+    expect(klaankPolicyReverificationMigration).toContain("recovery.target = 'post_verification'");
+    expect(klaankPolicyReverificationMigration).toContain(
+      "error_code = 'brand_policy_reverification'",
+    );
+    expect(klaankPolicyReverificationMigration).toContain(
+      "recovery.created_at >= now() - interval '48 hours'",
+    );
   });
 });
