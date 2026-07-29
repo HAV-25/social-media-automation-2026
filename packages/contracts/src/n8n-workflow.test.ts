@@ -305,47 +305,66 @@ describe("Milestone 5 research workflow", () => {
     );
   });
 
-  it("isolates each paid style call and rejoins its durable results for verification", () => {
-    const workflow = workflowSchema.parse(
-      JSON.parse(readFileSync(`${workflowDirectory}wf-05-research.json`, "utf8")),
-    );
+  it("isolates each paid style call and lets each child own its downstream handoff", () => {
+    const rawWorkflow = JSON.parse(
+      readFileSync(`${workflowDirectory}wf-05-research.json`, "utf8"),
+    ) as {
+      nodes: Array<{ name: string; onError?: string; parameters: unknown }>;
+    };
+    const workflow = workflowSchema.parse(rawWorkflow);
     const codeByNode = new Map(
       workflow.nodes
         .filter((node) => node.type === "n8n-nodes-base.code")
         .map((node) => [node.name, z.object({ jsCode: z.string() }).parse(node.parameters).jsCode]),
     );
     const generation = codeByNode.get("Sign Three-style Draft Request");
-    const verification = codeByNode.get("Sign Draft Verification Requests");
+    const dispatch = rawWorkflow.nodes.find((node) => node.name === "Generate Three Draft Styles");
 
     expect(generation).toContain("return styles.map((contentStyle) =>");
     expect(generation).toContain("contentStyles: [contentStyle]");
     expect(generation).toContain(
       "idempotencyKey: `rss-auto-drafts:${request.opportunityId}:${contentStyle}`",
     );
-    expect(verification).toContain(
-      "draftSets.flatMap((draftSet) => draftSet.drafts).map((draft) =>",
-    );
+    expect(dispatch?.onError).toBe("continueRegularOutput");
+    expect(JSON.stringify(dispatch?.parameters)).toContain('"neverError":true');
+    expect(workflow.connections["Generate Three Draft Styles"]).toBeUndefined();
   });
 
-  it("connects the unattended research-to-image path without a human handoff", () => {
-    const workflow = workflowSchema.parse(
+  it("connects every recoverable child to the next unattended stage", () => {
+    const research = workflowSchema.parse(
       JSON.parse(readFileSync(`${workflowDirectory}wf-05-research.json`, "utf8")),
+    );
+    const editorial = workflowSchema.parse(
+      JSON.parse(readFileSync(`${workflowDirectory}wf-06-angle-post-generation.json`, "utf8")),
+    );
+    const verification = workflowSchema.parse(
+      JSON.parse(readFileSync(`${workflowDirectory}wf-07-post-verification.json`, "utf8")),
     );
     const connectionSchema = z.object({
       main: z.array(z.array(z.object({ node: z.string() }))),
     });
-    const targetNames = (sourceName: string) =>
+    const targetNames = (workflow: z.infer<typeof workflowSchema>, sourceName: string) =>
       connectionSchema
         .parse(workflow.connections[sourceName])
         .main.flat()
         .map((connection) => connection.node);
 
-    expect(targetNames("Decode Research Result")).toEqual(["Sign Three-style Draft Request"]);
-    expect(targetNames("Sign Three-style Draft Request")).toEqual(["Generate Three Draft Styles"]);
-    expect(targetNames("Decode Draft Set")).toEqual(["Sign Draft Verification Requests"]);
-    expect(targetNames("Sign Draft Verification Requests")).toEqual(["Verify Drafts"]);
-    expect(targetNames("Decode Verification Results")).toEqual(["Sign Ready Draft Image Requests"]);
-    expect(targetNames("Sign Ready Draft Image Requests")).toEqual(["Generate Branded Images"]);
+    expect(targetNames(research, "Decode Research Result")).toEqual([
+      "Sign Three-style Draft Request",
+    ]);
+    expect(targetNames(research, "Sign Three-style Draft Request")).toEqual([
+      "Generate Three Draft Styles",
+    ]);
+    expect(targetNames(editorial, "Generate Evaluate and Persist Posts")).toEqual([
+      "Sign Verification Handoff",
+    ]);
+    expect(targetNames(editorial, "Sign Verification Handoff")).toEqual([
+      "Dispatch Verification Handoff",
+    ]);
+    expect(targetNames(verification, "Reevaluate and Persist Readiness")).toEqual([
+      "Sign Image Handoff",
+    ]);
+    expect(targetNames(verification, "Sign Image Handoff")).toEqual(["Dispatch Image Handoff"]);
   });
 });
 
@@ -513,6 +532,14 @@ describe("Milestone 8 recovery workflow", () => {
     }
     expect(nodes.get("Sign Due Recovery Poll")?.parameters.jsCode).toContain(
       "if (!secret || !baseUrl) return [];",
+    );
+    const applicationFailureFilter = nodes.get("Ignore Application-recorded Failures");
+    expect(applicationFailureFilter?.parameters.jsCode).toContain("applicationRecordedNodes.has");
+    expect(applicationFailureFilter?.parameters.jsCode).toContain(
+      "Generate Evaluate and Persist Posts",
+    );
+    expect(applicationFailureFilter?.parameters.jsCode).toContain(
+      "Direct Generate Validate Compose and Persist",
     );
   });
 

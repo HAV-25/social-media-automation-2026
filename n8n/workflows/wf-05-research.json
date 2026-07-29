@@ -140,9 +140,8 @@
         "options": {
           "response": {
             "response": {
-              "neverError": false,
-              "responseFormat": "file",
-              "outputPropertyName": "data"
+              "fullResponse": true,
+              "neverError": true
             }
           },
           "timeout": 600000
@@ -152,7 +151,8 @@
       "name": "Generate Three Draft Styles",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [680, 100]
+      "position": [680, 100],
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -349,17 +349,6 @@
         [
           {
             "node": "Generate Three Draft Styles",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Generate Three Draft Styles": {
-      "main": [
-        [
-          {
-            "node": "Decode Draft Set",
             "type": "main",
             "index": 0
           }

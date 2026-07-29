@@ -71,6 +71,70 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [20, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst result = $input.first().json;\nconst request = $('Signed Editorial Generation Webhook').first().json.body;\nif (result?.contractVersion !== '1.0' || result.opportunityId !== request.opportunityId || !Array.isArray(result.drafts) || result.drafts.length < 1) throw new Error('Editorial result contract is invalid');\nconst secret = $env.WORKFLOW_HMAC_SECRET;\nconst baseUrl = $env.N8N_WEBHOOK_BASE_URL;\nif (!secret || !baseUrl) throw new Error('Verification environment is not configured');\nconst path = '/webhook/post-verification-v1';\nreturn result.drafts.map((draft) => {\n  if (!draft.postDraftId || !draft.postVersionId || draft.status !== 'ready_for_review') throw new Error('Generated draft contract is invalid');\n  const payload = {\n    contractVersion: '1.0',\n    correlationId: request.correlationId,\n    idempotencyKey: `editorial-auto-verify:${draft.postDraftId}:${draft.postVersionId}`,\n    actorId: request.actorId,\n    brandId: request.brandId,\n    postDraftId: draft.postDraftId,\n    requestedAt: new Date().toISOString(),\n  };\n  const body = JSON.stringify(payload);\n  const timestamp = String(Math.floor(Date.now() / 1000));\n  const nonce = crypto.randomUUID();\n  const digest = crypto.createHash('sha256').update(body, 'utf8').digest('hex');\n  const canonical = [timestamp, nonce, 'POST', path, digest].join('\\n');\n  const signature = `sha256=${crypto.createHmac('sha256', secret).update(canonical, 'utf8').digest('hex')}`;\n  return { json: { body, nonce, signature, timestamp, url: `${baseUrl}${path}` } };\n});"
+      },
+      "id": "8b44c2f6-1b37-4f29-b259-876b44bcb606",
+      "name": "Sign Verification Handoff",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [260, 100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept-encoding",
+              "value": "identity"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-workflow-name",
+              "value": "WF-06 Angle and Post Generation"
+            },
+            {
+              "name": "x-workflow-timestamp",
+              "value": "={{ $json.timestamp }}"
+            },
+            {
+              "name": "x-workflow-nonce",
+              "value": "={{ $json.nonce }}"
+            },
+            {
+              "name": "x-workflow-signature",
+              "value": "={{ $json.signature }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.body }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 600000
+        }
+      },
+      "id": "8b44c2f6-1b37-4f29-b259-876b44bcb607",
+      "name": "Dispatch Verification Handoff",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 100],
+      "onError": "continueRegularOutput"
     }
   ],
   "pinData": {},
@@ -91,6 +155,28 @@
         [
           {
             "node": "Generate Evaluate and Persist Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Evaluate and Persist Posts": {
+      "main": [
+        [
+          {
+            "node": "Sign Verification Handoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign Verification Handoff": {
+      "main": [
+        [
+          {
+            "node": "Dispatch Verification Handoff",
             "type": "main",
             "index": 0
           }

@@ -1142,3 +1142,48 @@ idempotent, subsequent attempts can reserve and persist new provider work, and
 the three-attempt recovery cap remains authoritative. A narrow data correction
 requeues only dead letters whose active run proves this exact historical
 `research_already_running` defect; unrelated dead letters remain untouched.
+
+## ADR-077: Recoverable stages own their downstream handoff
+
+**Date:** 2026-07-29
+
+**Decision:** WF-05 ends after dispatching isolated style requests. WF-06 owns
+the generation-to-verification handoff, and WF-07 owns the
+verification-to-image handoff. Parent dispatch nodes tolerate a child's bounded
+failure because the child application wrapper has already persisted its own
+recovery state. WF-10 ignores error-trigger events from application HTTP nodes
+whose failure was already durably classified.
+
+**Why:** The first successful production Enigma research created one
+Educational draft while two style calls failed. The original WF-05 monolith
+then marked the already-succeeded research replay as failed and never verified
+the successful draft. Replaying a child WF-06 in isolation also had no path to
+WF-07 or WF-08.
+
+**Consequences:** Each style can fail and recover independently without
+invalidating completed research or blocking another style. A recovered
+generation continues to verification, a recovered verification continues to
+image generation, and duplicate parent/child recovery records no longer
+overwrite the application's more accurate retry classification.
+
+## ADR-078: Application-owned editorial fields are deterministic
+
+**Date:** 2026-07-29
+
+**Decision:** The requested style and tone remain authoritative application
+inputs. `fullText` is derived from the structured hook, body, and closing.
+Provider output is normalized to those values after strict schema parsing.
+Unique/selected angles and claim-key provenance remain fail-closed. The
+production writing prompt advances to `facebook-writer.v2` and states these
+invariants explicitly.
+
+**Why:** Two of three real Enigma style calls returned valid structured writing
+but failed a generic consistency gate because model-controlled copies of
+application-owned or derived fields were not byte-identical. Rejecting those
+safe redundant differences caused paid work to be discarded without improving
+claim safety.
+
+**Consequences:** Formatting and enum repetition no longer cause false
+provider failures. Unknown claim identifiers, missing selected angles,
+duplicate angle keys, malformed output, and safety/quality gates are still
+rejected or surfaced for reviewer control.

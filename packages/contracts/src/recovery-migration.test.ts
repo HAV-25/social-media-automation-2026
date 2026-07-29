@@ -39,6 +39,15 @@ const freshIdempotencyMigration = readFileSync(
   ),
   "utf8",
 );
+const partialHandoffMigration = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../../../supabase/migrations/20260729115000_resume_partial_editorial_handoffs.sql",
+      import.meta.url,
+    ),
+  ),
+  "utf8",
+);
 
 describe("run recovery database contract", () => {
   it("commits a tenant-scoped RLS-protected recovery state machine", () => {
@@ -108,5 +117,14 @@ describe("run recovery database contract", () => {
     expect(freshIdempotencyMigration).toContain("from public, anon, authenticated");
     expect(freshIdempotencyMigration).toContain("to service_role");
     expect(freshIdempotencyMigration).not.toContain("security definer");
+  });
+
+  it("reconciles proven research success and resumes only bounded partial handoffs", () => {
+    expect(partialHandoffMigration).toContain("research.status = 'succeeded'");
+    expect(partialHandoffMigration).toContain("active_run.error ->> 'code' = 'invalid_output'");
+    expect(partialHandoffMigration).toContain("error_code = 'verification_handoff_missing'");
+    expect(partialHandoffMigration).toContain("recovery.attempt_count < recovery.max_attempts");
+    expect(partialHandoffMigration).toContain("recovery.created_at >= now() - interval '48 hours'");
+    expect(partialHandoffMigration).toContain("verification.run_type = 'post_verification'");
   });
 });

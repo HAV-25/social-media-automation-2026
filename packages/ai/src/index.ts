@@ -14,7 +14,7 @@ import { z } from "zod";
 import {
   FACEBOOK_WRITER_PROMPT_VERSION,
   FACEBOOK_WRITER_SYSTEM_PROMPT,
-} from "./prompts/facebook-writer.v1";
+} from "./prompts/facebook-writer.v2";
 import { createEditorialAngles, evaluateEditorialDraft } from "./editorial";
 
 export { FACEBOOK_WRITER_PROMPT_VERSION, FACEBOOK_WRITER_SYSTEM_PROMPT };
@@ -347,7 +347,26 @@ export class OpenAIEditorialProvider implements EditorialProvider {
           response.status === "incomplete",
         );
       }
-      const generated = editorialGenerationSchema.parse(response.output_parsed);
+      const providerOutput = editorialGenerationSchema.parse(response.output_parsed);
+      const generated = editorialGenerationSchema.parse({
+        ...providerOutput,
+        contentStyle: parsed.contentStyle,
+        tone: parsed.tone,
+        angles: providerOutput.angles.map((angle) => ({
+          ...angle,
+          contentStyle: parsed.contentStyle,
+        })),
+        content: {
+          ...providerOutput.content,
+          fullText: [
+            providerOutput.content.hook,
+            providerOutput.content.body,
+            providerOutput.content.closing,
+          ]
+            .filter(Boolean)
+            .join("\n\n"),
+        },
+      });
       const selectedAngle = generated.angles.find(
         (angle) => angle.angleKey === generated.selectedAngleKey,
       );
@@ -355,17 +374,11 @@ export class OpenAIEditorialProvider implements EditorialProvider {
         rawRequest.evidencePackage.claims.map((claim) => claim.claimKey),
       );
       if (
-        generated.contentStyle !== parsed.contentStyle ||
-        generated.tone !== parsed.tone ||
-        selectedAngle?.contentStyle !== parsed.contentStyle ||
+        !selectedAngle ||
         new Set(generated.angles.map((angle) => angle.angleKey)).size !== 3 ||
         generated.angles.some((angle) =>
           angle.supportingClaimKeys.some((claimKey) => !knownClaimKeys.has(claimKey)),
-        ) ||
-        generated.content.fullText !==
-          [generated.content.hook, generated.content.body, generated.content.closing]
-            .filter(Boolean)
-            .join("\n\n")
+        )
       ) {
         throw new EditorialProviderError(
           "invalid_output",

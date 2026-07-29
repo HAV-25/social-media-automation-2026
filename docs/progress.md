@@ -1591,3 +1591,30 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   this historical conflict. Targeted recovery tests, strict web TypeScript,
   lint, and formatting checks pass. Production migration/deployment and the
   resumed research-to-package journey remain release gates.
+
+### 2026-07-29 first autonomous recovery evidence
+
+- Production migration `20260728212000` was applied. The next scheduled WF-10
+  poll claimed Enigma without a manual workflow trigger.
+- Real bounded research succeeded with `gpt-5.6-terra`, two web searches,
+  19,047 input tokens, 2,431 output tokens, and an estimated cost of
+  `$0.104083`. The evidence ledger contains six claims, including one immutable
+  high-risk `do_not_use` claim, and the opportunity advanced to
+  `ready_to_generate`.
+- Three style requests started automatically. Educational Breakdown persisted
+  with exact `facebook-writer.v1` prompt provenance; Newsworthy and Perspective
+  stopped at the provider consistency boundary with `invalid_output`.
+- Review proved the gate mixed safety invariants with redundant model copies of
+  application-owned style/tone and derived full text. `facebook-writer.v2`
+  makes the contract explicit and the provider now normalizes those redundant
+  fields while retaining fail-closed angle and claim provenance checks.
+- The successful Educational draft did not reach WF-07 because WF-05 owned the
+  entire downstream chain and stopped when sibling styles failed. WF-06 now
+  hands successful/recovered drafts to WF-07, and WF-07 hands review-ready
+  drafts to WF-08. WF-05 tolerates child failures already recorded by those
+  child recovery wrappers.
+- A bounded data migration reconciles the actually successful research,
+  requeues only recent editorial `invalid_output` failures, and replays a
+  completed recent style only when its verification handoff is provably
+  missing. Deployment, workflow publication, migration application, and
+  production image completion remain release gates.

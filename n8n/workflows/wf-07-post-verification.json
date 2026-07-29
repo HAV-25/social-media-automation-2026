@@ -71,6 +71,70 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [20, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst verification = $input.first().json;\nconst request = $('Signed Verification Webhook').first().json.body;\nif (verification?.contractVersion !== '1.0' || verification.postDraftId !== request.postDraftId || !verification.postVersionId || !verification.evaluation || typeof verification.evaluation.readyForReview !== 'boolean') throw new Error('Verification result contract is invalid');\nif (!verification.evaluation.readyForReview) return [];\nconst secret = $env.WORKFLOW_HMAC_SECRET;\nconst baseUrl = $env.N8N_WEBHOOK_BASE_URL;\nif (!secret || !baseUrl) throw new Error('Image environment is not configured');\nconst path = '/webhook/image-generation-v1';\nconst payload = {\n  contractVersion: '1.0',\n  correlationId: request.correlationId,\n  idempotencyKey: `verification-auto-image:${request.postDraftId}:${verification.postVersionId}`,\n  actorId: request.actorId,\n  brandId: request.brandId,\n  postDraftId: request.postDraftId,\n  expectedVersionId: verification.postVersionId,\n  action: 'generate',\n  imageStyle: 'editorial_hero',\n  template: 'editorial_overlay',\n  requestedAt: new Date().toISOString(),\n};\nconst body = JSON.stringify(payload);\nconst timestamp = String(Math.floor(Date.now() / 1000));\nconst nonce = crypto.randomUUID();\nconst digest = crypto.createHash('sha256').update(body, 'utf8').digest('hex');\nconst canonical = [timestamp, nonce, 'POST', path, digest].join('\\n');\nconst signature = `sha256=${crypto.createHmac('sha256', secret).update(canonical, 'utf8').digest('hex')}`;\nreturn [{ json: { body, nonce, signature, timestamp, url: `${baseUrl}${path}` } }];"
+      },
+      "id": "9c55d307-2c48-403a-836a-987c55cdc706",
+      "name": "Sign Image Handoff",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [260, 100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept-encoding",
+              "value": "identity"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-workflow-name",
+              "value": "WF-07 Post Verification"
+            },
+            {
+              "name": "x-workflow-timestamp",
+              "value": "={{ $json.timestamp }}"
+            },
+            {
+              "name": "x-workflow-nonce",
+              "value": "={{ $json.nonce }}"
+            },
+            {
+              "name": "x-workflow-signature",
+              "value": "={{ $json.signature }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.body }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 600000
+        }
+      },
+      "id": "9c55d307-2c48-403a-836a-987c55cdc707",
+      "name": "Dispatch Image Handoff",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 100],
+      "onError": "continueRegularOutput"
     }
   ],
   "pinData": {},
@@ -91,6 +155,28 @@
         [
           {
             "node": "Reevaluate and Persist Readiness",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reevaluate and Persist Readiness": {
+      "main": [
+        [
+          {
+            "node": "Sign Image Handoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign Image Handoff": {
+      "main": [
+        [
+          {
+            "node": "Dispatch Image Handoff",
             "type": "main",
             "index": 0
           }

@@ -298,4 +298,76 @@ describe("fake editorial provider", () => {
     expect(output.evaluation.readyForReview).toBe(true);
     expect(output.usage.estimatedCostUsd).toBeGreaterThan(0);
   });
+
+  it("normalizes application-owned style, tone, and derived full text", async () => {
+    const fakeOutput = await new FakeEditorialProvider().generateDraft({
+      opportunityId: "opportunity-a",
+      sourceTitle: "AI adoption note",
+      valueNucleus: "Teams gain more when they redesign decisions.",
+      contentStyle: "educational_breakdown",
+      tone: "thoughtful",
+      brandContext: context,
+      evidencePackage: evidence,
+      sourceText: "Teams gain more when they redesign decisions.",
+    });
+    const client = {
+      responses: {
+        parse: async () => ({
+          id: "resp_editorial_normalized",
+          model: "gpt-test",
+          status: "completed",
+          output: [],
+          output_parsed: {
+            contractVersion: fakeOutput.contractVersion,
+            contentStyle: "newsworthy_authority",
+            tone: "bold",
+            angles: fakeOutput.angles.map((angle) => ({
+              ...angle,
+              contentStyle: "perspective_conversation",
+            })),
+            selectedAngleKey: fakeOutput.selectedAngleKey,
+            content: { ...fakeOutput.content, fullText: "model-controlled duplicate field" },
+            revisionCount: fakeOutput.revisionCount,
+          },
+          usage: { input_tokens: 500, output_tokens: 300 },
+        }),
+      },
+    } as unknown as OpenAI;
+    const provider = new OpenAIEditorialProvider(
+      {
+        apiKey: "test-key",
+        model: "gpt-test",
+        reasoningEffort: "low",
+        inputUsdPer1M: 1,
+        outputUsdPer1M: 2,
+        maxOutputTokens: 2_000,
+        timeoutMs: 10_000,
+        maxCostUsd: 1,
+        maxRetries: 0,
+      },
+      client,
+    );
+
+    const output = await provider.generateDraft({
+      opportunityId: "opportunity-a",
+      sourceTitle: "AI adoption note",
+      valueNucleus: "Teams gain more when they redesign decisions.",
+      contentStyle: "educational_breakdown",
+      tone: "thoughtful",
+      brandContext: context,
+      evidencePackage: evidence,
+      sourceText: "Teams gain more when they redesign decisions.",
+    });
+
+    expect(output.contentStyle).toBe("educational_breakdown");
+    expect(output.tone).toBe("thoughtful");
+    expect(output.angles.every((angle) => angle.contentStyle === "educational_breakdown")).toBe(
+      true,
+    );
+    expect(output.content.fullText).toBe(
+      [output.content.hook, output.content.body, output.content.closing]
+        .filter(Boolean)
+        .join("\n\n"),
+    );
+  });
 });

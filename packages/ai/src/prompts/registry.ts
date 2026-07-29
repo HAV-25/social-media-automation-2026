@@ -5,7 +5,7 @@ import {
 import {
   FACEBOOK_WRITER_PROMPT_VERSION,
   FACEBOOK_WRITER_SYSTEM_PROMPT,
-} from "./facebook-writer.v1";
+} from "./facebook-writer.v2";
 import {
   OPPORTUNITY_ANALYST_PROMPT_VERSION,
   OPPORTUNITY_ANALYST_SYSTEM_PROMPT,
