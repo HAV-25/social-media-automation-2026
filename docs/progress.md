@@ -1628,3 +1628,13 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   restores phrase-level restrictions and re-verifies only recent drafts whose
   persisted evaluation proves they were affected, without repeating paid
   research or writing.
+- Klaank policy normalization re-verification completed autonomously.
+  Perspective passed with quality `74.46`; Educational and Newsworthy remained
+  blocked by evidence rules. WF-08 generated and deterministically composed a
+  ready 1200×630 `gpt-image-2` asset for `$0.005`, with exact prompt, base/final
+  paths, provider response ID, and SHA-256 checksums persisted.
+- Review of the successful chain found WF-10 did not acknowledge successful
+  synchronous replay responses, leaving parent claims queued until lease
+  expiry. Added a service-only atomic completion RPC, application acknowledgement,
+  and bounded durable-success reconciliation so accepted replays no longer
+  create repeated recovery noise.

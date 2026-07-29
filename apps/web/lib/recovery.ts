@@ -188,6 +188,20 @@ export async function dispatchDueRecoveries(limit: number) {
         recoveryId: claim.recovery_id,
         attemptCount: claim.attempt_count,
       });
+      const { error: completionPersistenceError } = await supabase.rpc("complete_recovery_replay", {
+        payload: {
+          recoveryId: claim.recovery_id,
+          generationRunId: claim.generation_run_id,
+        },
+      });
+      if (completionPersistenceError) {
+        results.push({
+          recoveryId: claim.recovery_id,
+          status: "dispatch_state_unknown",
+          code: "recovery_completion_persistence_failed",
+        });
+        continue;
+      }
       results.push({
         recoveryId: claim.recovery_id,
         status: "replay_accepted",

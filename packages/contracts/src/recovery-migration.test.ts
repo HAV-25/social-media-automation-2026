@@ -57,6 +57,19 @@ const klaankPolicyReverificationMigration = readFileSync(
   ),
   "utf8",
 );
+const recoveryCompletionMigration = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../../../supabase/migrations/20260729141000_complete_accepted_recovery_replays.sql",
+      import.meta.url,
+    ),
+  ),
+  "utf8",
+);
+const recoveryApplicationSource = readFileSync(
+  fileURLToPath(new URL("../../../apps/web/lib/recovery.ts", import.meta.url)),
+  "utf8",
+);
 
 describe("run recovery database contract", () => {
   it("commits a tenant-scoped RLS-protected recovery state machine", () => {
@@ -152,5 +165,22 @@ describe("run recovery database contract", () => {
     expect(klaankPolicyReverificationMigration).toContain(
       "recovery.created_at >= now() - interval '48 hours'",
     );
+  });
+
+  it("atomically completes accepted synchronous recovery replays", () => {
+    expect(recoveryCompletionMigration).toContain(
+      "create or replace function public.complete_recovery_replay",
+    );
+    expect(recoveryCompletionMigration).toContain("if current_user <> 'service_role'");
+    expect(recoveryCompletionMigration).toContain("recovery_record.status <> 'dispatching'");
+    expect(recoveryCompletionMigration).toContain("run_record.status <> 'queued'");
+    expect(recoveryCompletionMigration).toContain("'recovery.replay_completed'");
+    expect(recoveryCompletionMigration).toContain("from public, anon, authenticated");
+    expect(recoveryCompletionMigration).toContain("to service_role");
+    expect(recoveryCompletionMigration).toContain(
+      "'{\"reconciledFromDurableStageSuccess\":true}'::jsonb",
+    );
+    expect(recoveryApplicationSource).toContain('.rpc("complete_recovery_replay"');
+    expect(recoveryApplicationSource).toContain('code: "recovery_completion_persistence_failed"');
   });
 });

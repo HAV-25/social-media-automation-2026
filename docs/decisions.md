@@ -1208,3 +1208,22 @@ prohibited category.
 contains the word `Safety`. Unverified safety or compliance claims remain
 restricted. Recovery uses fresh attempt-specific idempotency keys and repeats
 only deterministic verification—not paid research or writing.
+
+## ADR-080: A synchronous 2xx recovery replay completes its durable claim
+
+**Date:** 2026-07-29
+
+**Decision:** After the recovery client receives a successful synchronous n8n
+webhook response, atomically mark the claimed generation run `succeeded` and
+the recovery `completed`. If that acknowledgement cannot be persisted, report
+an unknown dispatch state and retain the lease for bounded reconciliation.
+
+**Why:** Production recovery successfully created styles, verification results,
+and an image, but `dispatchDueRecoveries` never completed the claimed retry
+record. Its five-minute lease expired and WF-10 safely but noisily replayed the
+same idempotent stage until the retry cap.
+
+**Consequences:** Successful recovered work no longer creates stale queued runs
+or repeated lease-expiry retries. A migration closes only recent stale claims
+where a separate durable generation run proves the same entity and stage
+already succeeded. Failed history remains immutable.
