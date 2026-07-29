@@ -1638,3 +1638,8 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   expiry. Added a service-only atomic completion RPC, application acknowledgement,
   and bounded durable-success reconciliation so accepted replays no longer
   create repeated recovery noise.
+- The first acknowledgement migration was applied after several existing
+  five-minute leases had already reached `dead_letter`. Added a second,
+  non-replaying reconciliation that closes only `dispatch_lease_expired` or
+  `n8n_replay_rejected` rows when a separate durable run proves the same entity
+  and stage succeeded. Genuine provider failures remain unchanged.

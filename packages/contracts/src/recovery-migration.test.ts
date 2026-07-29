@@ -66,6 +66,15 @@ const recoveryCompletionMigration = readFileSync(
   ),
   "utf8",
 );
+const provenDeadLetterMigration = readFileSync(
+  fileURLToPath(
+    new URL(
+      "../../../supabase/migrations/20260729143000_reconcile_proven_replay_dead_letters.sql",
+      import.meta.url,
+    ),
+  ),
+  "utf8",
+);
 const recoveryApplicationSource = readFileSync(
   fileURLToPath(new URL("../../../apps/web/lib/recovery.ts", import.meta.url)),
   "utf8",
@@ -182,5 +191,18 @@ describe("run recovery database contract", () => {
     );
     expect(recoveryApplicationSource).toContain('.rpc("complete_recovery_replay"');
     expect(recoveryApplicationSource).toContain('code: "recovery_completion_persistence_failed"');
+  });
+
+  it("reconciles only acknowledgement dead letters with durable stage success", () => {
+    expect(provenDeadLetterMigration).toContain("recovery.status = 'dead_letter'");
+    expect(provenDeadLetterMigration).toContain("'dispatch_lease_expired'");
+    expect(provenDeadLetterMigration).toContain("'n8n_replay_rejected'");
+    expect(provenDeadLetterMigration).toContain("succeeded.status = 'succeeded'");
+    expect(provenDeadLetterMigration).toContain("'recovery.dead_letter_reconciled'");
+    expect(provenDeadLetterMigration).toContain(
+      "'{\"reconciledFromDurableStageSuccess\":true}'::jsonb",
+    );
+    expect(provenDeadLetterMigration).not.toContain("provider_rate_limit");
+    expect(provenDeadLetterMigration).not.toContain("provider_timeout");
   });
 });
