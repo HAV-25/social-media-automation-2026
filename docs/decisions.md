@@ -1227,3 +1227,49 @@ same idempotent stage until the retry cap.
 or repeated lease-expiry retries. A migration closes only recent stale claims
 where a separate durable generation run proves the same entity and stage
 already succeeded. Failed history remains immutable.
+
+## ADR-081: Daily automation uses explicit terminal gates and asynchronous stage ownership
+
+**Date:** 2026-07-30
+
+**Decision:** Run WF-01 once daily at 01:00 in the `Europe/Berlin` workflow
+timezone. Represent every legitimate no-work result as a typed `dispatch:
+false` item and route it through an explicit IF gate before any HTTP node.
+WF-05 through WF-08 acknowledge signed intake with HTTP 202, then own their
+application execution, recovery registration, and downstream handoff. A
+recovery replay receiving 202 remains active until the accepted child stage
+completes; only a synchronous success is completed from the dispatcher.
+
+**Why:** The 30 July scheduled WF-01 run had no newly eligible selection.
+n8n's enabled Always Output Data behavior converted the empty Code-node result
+to `{}`, and the next HTTP node failed because `$json.url` was undefined.
+The same empty-array hazard existed when research was not writing-ready and
+when verification withheld imagery. Synchronous parent/child webhooks also
+coupled the full research-to-image chain to inactivity timeouts.
+
+**Consequences:** A scan with zero eligible items, bounded research that cannot
+support writing, and a draft that fails verification now end successfully
+without a downstream request. Accepted stages continue autonomously without
+holding their parent open. Rejected handoffs fail visibly and enter WF-10
+instead of being hidden by `neverError`. Gateway and inactivity failures at an
+application node are recorded even when the application could not persist its
+own classification. No publishing or scheduling capability is introduced.
+
+## ADR-082: Completed research without a draft is a resumable backlog state
+
+**Date:** 2026-07-30
+
+**Decision:** The deferred RSS sweep may re-enter WF-05 when research is
+durably `succeeded` and no post draft exists. Queued, running, failed, or
+cancelled research remains blocked for WF-10. Existing draft presence remains
+the terminal backlog guard.
+
+**Why:** A previously successful research call could be left at
+`ready_to_generate` when its n8n-to-n8n editorial handoff failed before WF-06
+accepted it. Blocking every opportunity with any research run made that state
+permanent.
+
+**Consequences:** The existing research package is reused idempotently and does
+not incur a second research charge; WF-05 performs only the missing editorial
+handoff. Retry caps and dead-letter handling cannot be bypassed for incomplete
+or failed research.

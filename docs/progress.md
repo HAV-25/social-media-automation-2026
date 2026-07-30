@@ -1643,3 +1643,44 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   non-replaying reconciliation that closes only `dispatch_lease_expired` or
   `n8n_replay_rejected` rows when a separate durable run proves the same entity
   and stage succeeded. Genuine provider failures remain unchanged.
+
+### 2026-07-30 daily workflow reliability release (local, not deployed)
+
+- Reproduced the scheduled WF-01 failure path from the production execution:
+  no selected opportunities reached an HTTP node as `{}`, causing
+  `URL parameter must be a string, got undefined`.
+- Added explicit terminal outputs and dispatch gates to WF-01 backlog/current
+  selection, WF-05 writing readiness, WF-07 image readiness, and WF-10
+  duplicate-failure suppression. Legitimate no-op states no longer evaluate a
+  downstream URL or body.
+- Changed WF-01 to a daily 01:00 `Europe/Berlin` cron schedule and isolated a
+  failed external feed after the application durably records its poll failure,
+  allowing the other configured feeds to continue.
+- Changed WF-05 through WF-08 to acknowledge signed stage intake with HTTP 202.
+  Parent handoffs are bounded to 30 seconds, rejected handoffs fail into WF-10,
+  and asynchronous recovery acceptance is not marked complete until the child
+  stage itself persists completion.
+- Removed six unreachable legacy WF-05 nodes. WF-06 remains the sole owner of
+  generation-to-verification and WF-07 remains the sole owner of
+  verification-to-image.
+- The deferred sweep now safely re-enters completed research with no draft,
+  reusing the durable evidence package before performing the missing editorial
+  handoff. It does not bypass WF-10 for queued, running, failed, or cancelled
+  research.
+- Added a pending Supabase migration that changes feed-health staleness from 30
+  minutes to 26 hours while preserving SECURITY INVOKER behavior, RLS, and
+  explicit Data API grants. The migration has not been applied to production.
+- Added regression coverage for zero selections, malformed selection context,
+  research/image terminal states, gateway-timeout persistence, async replay
+  completion, feed-failure isolation, daily cron timezone, handoff timeouts,
+  and unreachable workflow nodes.
+- Completed the local release gate: formatting, lint, strict TypeScript, all
+  package tests (374 tests), the optimized Next.js production build, and all
+  four Chromium walking-skeleton journeys pass. The n8n API dry run identifies
+  exactly WF-01, WF-05, WF-06, WF-07, WF-08, and WF-10 as updates in the
+  intended project/folder, and the remote runtime bridge preflight passes
+  without exposing credentials.
+- Docker/Supabase local services are unavailable on this workstation, so the
+  pending feed-health migration is covered by migration contract tests but has
+  not been executed against a disposable local Postgres instance. It remains a
+  separate, approval-gated production action.

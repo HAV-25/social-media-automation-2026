@@ -24,6 +24,10 @@ export function automaticRecoveryAllowed(category: OperationsErrorCategory, retr
   return retryable && ["transient", "provider"].includes(category);
 }
 
+export function replayRequiresSynchronousCompletion(status: number) {
+  return z.number().int().min(100).max(599).parse(status) !== 202;
+}
+
 export function safeWorkflowFailure(status: number, raw: unknown) {
   const parsed = providerErrorSchema.safeParse(raw);
   const rawCode = parsed.success ? parsed.data.error?.code : undefined;

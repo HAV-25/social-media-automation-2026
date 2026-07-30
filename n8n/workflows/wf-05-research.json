@@ -5,8 +5,10 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "research-v1",
-        "responseMode": "lastNode",
-        "options": {}
+        "responseMode": "onReceived",
+        "options": {
+          "responseCode": 202
+        }
       },
       "id": "7a33b1e5-0a26-4f18-a148-765a33aab501",
       "name": "Signed Research Webhook",
@@ -92,13 +94,44 @@
     },
     {
       "parameters": {
-        "jsCode": "const crypto = require('crypto');\nconst research = $input.first().json.data;\nconst request = $('Signed Research Webhook').first().json.body;\nif (research?.contractVersion !== '1.0' || !research.researchRunId || !research.generationRunId || typeof research.readyForWriting !== 'boolean') throw new Error('Research result contract is invalid');\nif (!research.readyForWriting) return [];\nconst secret = $env.WORKFLOW_HMAC_SECRET;\nconst baseUrl = $env.N8N_WEBHOOK_BASE_URL;\nif (!secret || !baseUrl) throw new Error('Editorial preparation environment is not configured');\nconst path = '/webhook/editorial-generation-v1';\nconst styles = ['newsworthy_authority', 'educational_breakdown', 'perspective_conversation'];\nreturn styles.map((contentStyle) => {\n  const payload = {\n    contractVersion: '1.0',\n    correlationId: request.correlationId,\n    idempotencyKey: `rss-auto-drafts:${request.opportunityId}:${contentStyle}`,\n    actorId: request.actorId,\n    brandId: request.brandId,\n    opportunityId: request.opportunityId,\n    contentStyles: [contentStyle],\n    tone: 'thoughtful',\n    requestedAt: new Date().toISOString(),\n  };\n  const body = JSON.stringify(payload);\n  const timestamp = String(Math.floor(Date.now() / 1000));\n  const nonce = crypto.randomUUID();\n  const digest = crypto.createHash('sha256').update(body, 'utf8').digest('hex');\n  const canonical = [timestamp, nonce, 'POST', path, digest].join('\\n');\n  const signature = `sha256=${crypto.createHmac('sha256', secret).update(canonical, 'utf8').digest('hex')}`;\n  return { json: { body, contentStyle, nonce, signature, timestamp, url: `${baseUrl}${path}` } };\n});"
+        "jsCode": "const crypto = require('crypto');\nconst research = $input.first().json.data;\nconst request = $('Signed Research Webhook').first().json.body;\nif (research?.contractVersion !== '1.0' || !research.researchRunId || !research.generationRunId || typeof research.readyForWriting !== 'boolean') throw new Error('Research result contract is invalid');\nif (!research.readyForWriting) return [{ json: { dispatch: false, reason: 'research_not_ready_for_writing' } }];\nconst secret = $env.WORKFLOW_HMAC_SECRET;\nconst baseUrl = $env.N8N_WEBHOOK_BASE_URL;\nif (!secret || !baseUrl) throw new Error('Editorial preparation environment is not configured');\nconst path = '/webhook/editorial-generation-v1';\nconst styles = ['newsworthy_authority', 'educational_breakdown', 'perspective_conversation'];\nreturn styles.map((contentStyle) => {\n  const payload = {\n    contractVersion: '1.0',\n    correlationId: request.correlationId,\n    idempotencyKey: `rss-auto-drafts:${request.opportunityId}:${contentStyle}`,\n    actorId: request.actorId,\n    brandId: request.brandId,\n    opportunityId: request.opportunityId,\n    contentStyles: [contentStyle],\n    tone: 'thoughtful',\n    requestedAt: new Date().toISOString(),\n  };\n  const body = JSON.stringify(payload);\n  const timestamp = String(Math.floor(Date.now() / 1000));\n  const nonce = crypto.randomUUID();\n  const digest = crypto.createHash('sha256').update(body, 'utf8').digest('hex');\n  const canonical = [timestamp, nonce, 'POST', path, digest].join('\\n');\n  const signature = `sha256=${crypto.createHmac('sha256', secret).update(canonical, 'utf8').digest('hex')}`;\n  return { json: { dispatch: true, body, contentStyle, nonce, signature, timestamp, url: `${baseUrl}${path}` } };\n});"
       },
       "id": "7a33b1e5-0a26-4f18-a148-765a33aab507",
       "name": "Sign Three-style Draft Request",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [460, 100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c050f001-6a77-4a0f-8d1c-000000000014",
+              "leftValue": "={{ $json.dispatch }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c050f001-6a77-4a0f-8d1c-000000000014",
+      "name": "Dispatch Editorial Generation?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [680, 100]
     },
     {
       "parameters": {
@@ -141,161 +174,17 @@
           "response": {
             "response": {
               "fullResponse": true,
-              "neverError": true
+              "neverError": false
             }
           },
-          "timeout": 600000
+          "timeout": 30000
         }
       },
       "id": "7a33b1e5-0a26-4f18-a148-765a33aab508",
       "name": "Generate Three Draft Styles",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [680, 100],
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
-        "operation": "fromJson",
-        "options": {}
-      },
-      "id": "7a33b1e5-0a26-4f18-a148-765a33aab509",
-      "name": "Decode Draft Set",
-      "type": "n8n-nodes-base.extractFromFile",
-      "typeVersion": 1,
       "position": [900, 100]
-    },
-    {
-      "parameters": {
-        "jsCode": "const crypto = require('crypto');\nconst request = $('Signed Research Webhook').first().json.body;\nconst draftSets = $input.all().map((input) => input.json.data);\nif (draftSets.length < 1 || draftSets.length > 3 || draftSets.some((draftSet) => draftSet?.contractVersion !== '1.0' || draftSet.opportunityId !== request.opportunityId || !Array.isArray(draftSet.drafts) || draftSet.drafts.length !== 1)) throw new Error('Editorial result contract is invalid');\nconst secret = $env.WORKFLOW_HMAC_SECRET;\nconst baseUrl = $env.N8N_WEBHOOK_BASE_URL;\nif (!secret || !baseUrl) throw new Error('Verification environment is not configured');\nconst path = '/webhook/post-verification-v1';\nreturn draftSets.flatMap((draftSet) => draftSet.drafts).map((draft) => {\n  if (!draft.postDraftId || !draft.postVersionId || draft.status !== 'ready_for_review') throw new Error('Generated draft contract is invalid');\n  const payload = {\n    contractVersion: '1.0',\n    correlationId: request.correlationId,\n    idempotencyKey: `rss-auto-verify:${draft.postDraftId}`,\n    actorId: request.actorId,\n    brandId: request.brandId,\n    postDraftId: draft.postDraftId,\n    requestedAt: new Date().toISOString(),\n  };\n  const body = JSON.stringify(payload);\n  const timestamp = String(Math.floor(Date.now() / 1000));\n  const nonce = crypto.randomUUID();\n  const digest = crypto.createHash('sha256').update(body, 'utf8').digest('hex');\n  const canonical = [timestamp, nonce, 'POST', path, digest].join('\\n');\n  const signature = `sha256=${crypto.createHmac('sha256', secret).update(canonical, 'utf8').digest('hex')}`;\n  return { json: { actorId: request.actorId, brandId: request.brandId, correlationId: request.correlationId, expectedVersionId: draft.postVersionId, postDraftId: draft.postDraftId, body, nonce, signature, timestamp, url: `${baseUrl}${path}` } };\n});"
-      },
-      "id": "7a33b1e5-0a26-4f18-a148-765a33aab50a",
-      "name": "Sign Draft Verification Requests",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [1120, 100]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "={{ $json.url }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "accept-encoding",
-              "value": "identity"
-            },
-            {
-              "name": "content-type",
-              "value": "application/json"
-            },
-            {
-              "name": "x-workflow-name",
-              "value": "WF-05 Research"
-            },
-            {
-              "name": "x-workflow-timestamp",
-              "value": "={{ $json.timestamp }}"
-            },
-            {
-              "name": "x-workflow-nonce",
-              "value": "={{ $json.nonce }}"
-            },
-            {
-              "name": "x-workflow-signature",
-              "value": "={{ $json.signature }}"
-            }
-          ]
-        },
-        "sendBody": true,
-        "contentType": "raw",
-        "rawContentType": "application/json",
-        "body": "={{ $json.body }}",
-        "options": {
-          "response": {
-            "response": {
-              "neverError": false,
-              "responseFormat": "file",
-              "outputPropertyName": "data"
-            }
-          },
-          "timeout": 200000
-        }
-      },
-      "id": "7a33b1e5-0a26-4f18-a148-765a33aab50b",
-      "name": "Verify Drafts",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1340, 100]
-    },
-    {
-      "parameters": {
-        "operation": "fromJson",
-        "options": {}
-      },
-      "id": "7a33b1e5-0a26-4f18-a148-765a33aab50c",
-      "name": "Decode Verification Results",
-      "type": "n8n-nodes-base.extractFromFile",
-      "typeVersion": 1,
-      "position": [1560, 100]
-    },
-    {
-      "parameters": {
-        "jsCode": "const crypto = require('crypto');\nconst verifications = $input.all();\nconst contexts = $('Sign Draft Verification Requests').all();\nconst secret = $env.WORKFLOW_HMAC_SECRET;\nconst baseUrl = $env.N8N_WEBHOOK_BASE_URL;\nif (!secret || !baseUrl) throw new Error('Image preparation environment is not configured');\nconst path = '/webhook/image-generation-v1';\nreturn verifications.flatMap((input, index) => {\n  const verification = input.json.data;\n  const context = contexts[index]?.json;\n  if (!context || verification?.contractVersion !== '1.0' || verification.postDraftId !== context.postDraftId || !verification.postVersionId || !verification.evaluation || typeof verification.evaluation.readyForReview !== 'boolean') throw new Error('Verification result contract is invalid');\n  if (!verification.evaluation.readyForReview) return [];\n  const payload = {\n    contractVersion: '1.0',\n    correlationId: context.correlationId,\n    idempotencyKey: `rss-auto-image:${context.postDraftId}`,\n    actorId: context.actorId,\n    brandId: context.brandId,\n    postDraftId: context.postDraftId,\n    expectedVersionId: verification.postVersionId,\n    action: 'generate',\n    imageStyle: 'editorial_hero',\n    template: 'editorial_overlay',\n    requestedAt: new Date().toISOString(),\n  };\n  const body = JSON.stringify(payload);\n  const timestamp = String(Math.floor(Date.now() / 1000));\n  const nonce = crypto.randomUUID();\n  const digest = crypto.createHash('sha256').update(body, 'utf8').digest('hex');\n  const canonical = [timestamp, nonce, 'POST', path, digest].join('\\n');\n  const signature = `sha256=${crypto.createHmac('sha256', secret).update(canonical, 'utf8').digest('hex')}`;\n  return [{ json: { body, nonce, signature, timestamp, url: `${baseUrl}${path}` }, pairedItem: { item: index } }];\n});"
-      },
-      "id": "7a33b1e5-0a26-4f18-a148-765a33aab50d",
-      "name": "Sign Ready Draft Image Requests",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [1780, 100]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "={{ $json.url }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "accept-encoding",
-              "value": "identity"
-            },
-            {
-              "name": "content-type",
-              "value": "application/json"
-            },
-            {
-              "name": "x-workflow-name",
-              "value": "WF-05 Research"
-            },
-            {
-              "name": "x-workflow-timestamp",
-              "value": "={{ $json.timestamp }}"
-            },
-            {
-              "name": "x-workflow-nonce",
-              "value": "={{ $json.nonce }}"
-            },
-            {
-              "name": "x-workflow-signature",
-              "value": "={{ $json.signature }}"
-            }
-          ]
-        },
-        "sendBody": true,
-        "contentType": "raw",
-        "rawContentType": "application/json",
-        "body": "={{ $json.body }}",
-        "options": {
-          "timeout": 600000
-        }
-      },
-      "id": "7a33b1e5-0a26-4f18-a148-765a33aab50e",
-      "name": "Generate Branded Images",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [2000, 100]
     }
   ],
   "pinData": {},
@@ -348,66 +237,23 @@
       "main": [
         [
           {
+            "node": "Dispatch Editorial Generation?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispatch Editorial Generation?": {
+      "main": [
+        [
+          {
             "node": "Generate Three Draft Styles",
             "type": "main",
             "index": 0
           }
-        ]
-      ]
-    },
-    "Decode Draft Set": {
-      "main": [
-        [
-          {
-            "node": "Sign Draft Verification Requests",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Sign Draft Verification Requests": {
-      "main": [
-        [
-          {
-            "node": "Verify Drafts",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Verify Drafts": {
-      "main": [
-        [
-          {
-            "node": "Decode Verification Results",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Decode Verification Results": {
-      "main": [
-        [
-          {
-            "node": "Sign Ready Draft Image Requests",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Sign Ready Draft Image Requests": {
-      "main": [
-        [
-          {
-            "node": "Generate Branded Images",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        ],
+        []
       ]
     }
   },

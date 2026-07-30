@@ -9,6 +9,13 @@ const migration = readFileSync(
   ),
   "utf8",
 );
+const dailyHealthMigration = readFileSync(
+  resolve(
+    process.cwd(),
+    "../../supabase/migrations/20260730150423_align_daily_rss_feed_health.sql",
+  ),
+  "utf8",
+);
 
 describe("brand performance dashboard migration", () => {
   it("keeps reporting invoker-scoped with explicit Data API grants", () => {
@@ -27,7 +34,12 @@ describe("brand performance dashboard migration", () => {
 
   it("classifies current feed health without exposing feed errors", () => {
     expect(migration).toContain("when feed.consecutive_failures > 0 then 'failing'");
-    expect(migration).toContain("p_until - interval '30 minutes'");
+    expect(dailyHealthMigration).toContain("'interval ''30 minutes'''");
+    expect(dailyHealthMigration).toContain("'interval ''26 hours'''");
+    expect(dailyHealthMigration).toContain("Expected 30-minute feed-health boundary was not found");
+    expect(dailyHealthMigration).toContain("from public, anon");
+    expect(dailyHealthMigration).toContain("to authenticated");
+    expect(dailyHealthMigration).not.toContain("security definer");
     expect(migration).toContain("'never_polled'");
     expect(migration).not.toContain("'lastError'");
   });

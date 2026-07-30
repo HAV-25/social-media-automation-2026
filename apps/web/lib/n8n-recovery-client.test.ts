@@ -16,7 +16,7 @@ describe("n8n recovery client", () => {
   it("replays the typed workflow from its webhook with a fresh signature", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValue(new Response(JSON.stringify({ accepted: true }), { status: 200 }));
+      .mockResolvedValue(new Response(JSON.stringify({ accepted: true }), { status: 202 }));
     vi.stubGlobal("fetch", fetchMock);
     const client = new N8nRecoveryClient({
       webhookBaseUrl: "https://n8n.example.test/",
@@ -33,7 +33,7 @@ describe("n8n recovery client", () => {
         opportunityId: "10000000-0000-4000-8000-000000000004",
         requestedAt: "2026-07-28T15:45:00.000Z",
       }),
-    ).resolves.toEqual({ accepted: true, status: 200 });
+    ).resolves.toEqual({ accepted: true, status: 202 });
     expect(fetchMock).toHaveBeenCalledWith(
       "https://n8n.example.test/webhook/research-v1",
       expect.objectContaining({

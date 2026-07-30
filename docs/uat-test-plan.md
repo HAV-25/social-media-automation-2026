@@ -13,8 +13,8 @@ content.
 - Initial test brand: Klaank
 - Automatic opportunity threshold: 75
 - Manual Review band: 60–74
-- Automatic daily maximum: 3 opportunities per UTC day
-- RSS polling: every 15 minutes
+- Automatic daily maximum: 4 opportunities per UTC day for Klaank
+- RSS polling: once daily at 01:00 Europe/Berlin, plus the explicit one-off control
 - Standard styles: Newsworthy, Educational, and Perspective
 - Tone overlays: choose only from the structured options shown by the product
 
@@ -45,7 +45,7 @@ Pass when configuration is durable and affects only the selected brand.
 
 1. Open Sources and confirm active feed URLs and brand routing.
 2. Add or edit one valid RSS feed.
-3. Wait for the next 15-minute poll, or use the explicit one-off intake control.
+3. Wait for the 01:00 Europe/Berlin poll, or use the explicit one-off intake control.
 4. Confirm Runs & errors records the intake and each feed shows its latest poll.
 
 Pass when a real feed is fetched without manual approval at every stage and a
@@ -66,7 +66,7 @@ items at or above 75.
 
 ### UAT-05 — Daily limit and Review band
 
-1. Confirm no more than three eligible opportunities are automatically selected
+1. Confirm no more than four eligible opportunities are automatically selected
    across all Klaank feeds during one UTC day.
 2. Confirm a score from 60 through 74 appears under Review and does not generate
    automatically.
@@ -128,7 +128,7 @@ Run this once after each release candidate deployment before inviting additional
 reviewers:
 
 1. Record the deployed Git commit and UTC start time.
-2. Trigger one Klaank RSS intake or wait for the scheduled 15-minute poll.
+2. Trigger one Klaank RSS intake or wait for the scheduled 01:00 Europe/Berlin poll.
 3. Choose one newly observed, eligible article that scores at least 75 and does
    not reuse a previously prepared opportunity.
 4. Do not click Research, Generate draft, Verify, or Generate image.

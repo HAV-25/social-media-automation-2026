@@ -152,8 +152,8 @@ export default async function PerformancePage({
                 </p>
                 <h2 className="serif mt-2 text-3xl">Are sources arriving reliably?</h2>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">
-                  An active feed is healthy when it has no consecutive failures and was polled
-                  within 30 minutes—twice the configured 15-minute intake interval.
+                  An active feed is healthy when it has no consecutive failures and completed its
+                  scheduled daily poll within the last 26 hours.
                 </p>
               </div>
               <a

@@ -8,7 +8,7 @@ import { randomUUID } from "node:crypto";
 import { sha256Hex, signWorkflowRequest } from "@content-engine/security";
 import { z } from "zod";
 import { N8nRecoveryClient, N8nRecoveryError } from "./n8n-recovery-client";
-import { safeWorkflowFailure } from "./recovery-core";
+import { replayRequiresSynchronousCompletion, safeWorkflowFailure } from "./recovery-core";
 import { createSupabaseServiceClient } from "./supabase/service";
 
 const registrationResultSchema = z.object({
@@ -188,6 +188,15 @@ export async function dispatchDueRecoveries(limit: number) {
         recoveryId: claim.recovery_id,
         attemptCount: claim.attempt_count,
       });
+      if (!replayRequiresSynchronousCompletion(replay.status)) {
+        results.push({
+          recoveryId: claim.recovery_id,
+          status: "replay_accepted_async",
+          attemptCount: claim.attempt_count,
+          replay,
+        });
+        continue;
+      }
       const { error: completionPersistenceError } = await supabase.rpc("complete_recovery_replay", {
         payload: {
           recoveryId: claim.recovery_id,

@@ -11,7 +11,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const execution = $json.execution || {};\nconst applicationRecordedNodes = new Set([\n  'Run and Persist Bounded Research',\n  'Generate Evaluate and Persist Posts',\n  'Reevaluate and Persist Readiness',\n  'Direct Generate Validate Compose and Persist',\n  'Persist Selective Content Action',\n]);\nif (applicationRecordedNodes.has(String(execution.lastNodeExecuted || ''))) return [];\nreturn $input.all();"
+        "jsCode": "const execution = $json.execution || {};\nconst applicationRecordedNodes = new Set([\n  'Run and Persist Bounded Research',\n  'Generate Evaluate and Persist Posts',\n  'Reevaluate and Persist Readiness',\n  'Direct Generate Validate Compose and Persist',\n  'Persist Selective Content Action',\n]);\nconst raw = String(execution.error?.message || $json.trigger?.error?.message || '').toLowerCase();\nconst transportFailure = /gateway|inactivity|timeout|timed out|econn|socket|network|connection reset/.test(raw);\nif (applicationRecordedNodes.has(String(execution.lastNodeExecuted || '')) && !transportFailure) {\n  return [{ json: { persist: false, reason: 'application_failure_already_recorded' } }];\n}\nreturn $input.all().map((item) => ({ json: { ...item.json, persist: true } }));"
       },
       "id": "ce10f001-6a77-4a0f-8d1c-000000000011",
       "name": "Ignore Application-recorded Failures",
@@ -21,13 +21,44 @@
     },
     {
       "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ce10f001-6a77-4a0f-8d1c-000000000012",
+              "leftValue": "={{ $json.persist }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "ce10f001-6a77-4a0f-8d1c-000000000012",
+      "name": "Persist Workflow Failure?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-280, -100]
+    },
+    {
+      "parameters": {
         "jsCode": "const crypto = require('crypto');\nconst execution = $json.execution || {};\nconst workflow = $json.workflow || {};\nconst raw = String(execution.error?.message || $json.trigger?.error?.message || '').toLowerCase();\nlet errorCode = 'workflow_execution_failed';\nlet category = 'permanent';\nlet retryable = false;\nif (/rate.?limit|429/.test(raw)) { errorCode = 'provider_rate_limit'; category = 'provider'; retryable = true; }\nelse if (/timeout|timed out/.test(raw)) { errorCode = 'provider_timeout'; category = 'provider'; retryable = true; }\nelse if (/network|connection|unavailable|econn/.test(raw)) { errorCode = 'dependency_unavailable'; category = 'transient'; retryable = true; }\nelse if (/signature|nonce|auth|forbidden|permission/.test(raw)) { errorCode = 'workflow_security_rejection'; category = 'security'; }\nelse if (/budget|quota|cost/.test(raw)) { errorCode = 'workflow_budget_rejection'; category = 'budget'; }\nelse if (/validation|schema|invalid|malformed/.test(raw)) { errorCode = 'workflow_validation_rejection'; category = 'validation'; }\nconst workflowExecutionId = String(execution.id || '');\nif (!workflowExecutionId) throw new Error('Failed execution ID is unavailable');\nconst path = '/api/internal/workflows/recovery/failures';\nconst payload = {\n  contractVersion: '1.0',\n  workflowExecutionId,\n  retryOfExecutionId: execution.retryOf ? String(execution.retryOf) : null,\n  workflowName: String(workflow.name || 'Unknown workflow').slice(0, 160),\n  errorCode,\n  category,\n  retryable,\n  occurredAt: new Date().toISOString(),\n};\nconst body = JSON.stringify(payload);\nconst timestamp = String(Math.floor(Date.now() / 1000));\nconst nonce = crypto.randomUUID();\nconst digest = crypto.createHash('sha256').update(body, 'utf8').digest('hex');\nconst canonical = [timestamp, nonce, 'POST', path, digest].join('\\n');\nconst secret = $env.WORKFLOW_HMAC_SECRET;\nconst baseUrl = $env.APP_BASE_URL;\nif (!secret || !baseUrl) throw new Error('Recovery workflow environment is not configured');\nconst signature = `sha256=${crypto.createHmac('sha256', secret).update(canonical, 'utf8').digest('hex')}`;\nreturn [{ json: { body, nonce, signature, timestamp, url: `${baseUrl}${path}` } }];"
       },
       "id": "ce10f001-6a77-4a0f-8d1c-000000000002",
       "name": "Classify and Sign Failure",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [-280, -100]
+      "position": [-160, -100]
     },
     {
       "parameters": {
@@ -81,7 +112,7 @@
       "name": "Persist Redacted Failure",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [-40, -100],
+      "position": [80, -100],
       "onError": "continueRegularOutput"
     },
     {
@@ -103,7 +134,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const crypto = require('crypto');\nconst path = '/api/internal/workflows/recovery/dispatch';\nconst payload = { contractVersion: '1.0', requestedAt: new Date().toISOString(), limit: 5 };\nconst body = JSON.stringify(payload);\nconst timestamp = String(Math.floor(Date.now() / 1000));\nconst nonce = crypto.randomUUID();\nconst digest = crypto.createHash('sha256').update(body, 'utf8').digest('hex');\nconst canonical = [timestamp, nonce, 'POST', path, digest].join('\\n');\nconst secret = $env.WORKFLOW_HMAC_SECRET;\nconst baseUrl = $env.APP_BASE_URL;\nif (!secret || !baseUrl) return [];\nconst signature = `sha256=${crypto.createHmac('sha256', secret).update(canonical, 'utf8').digest('hex')}`;\nreturn [{ json: { body, nonce, signature, timestamp, url: `${baseUrl}${path}` } }];"
+        "jsCode": "const crypto = require('crypto');\nconst path = '/api/internal/workflows/recovery/dispatch';\nconst payload = { contractVersion: '1.0', requestedAt: new Date().toISOString(), limit: 5 };\nconst body = JSON.stringify(payload);\nconst timestamp = String(Math.floor(Date.now() / 1000));\nconst nonce = crypto.randomUUID();\nconst digest = crypto.createHash('sha256').update(body, 'utf8').digest('hex');\nconst canonical = [timestamp, nonce, 'POST', path, digest].join('\\n');\nconst secret = $env.WORKFLOW_HMAC_SECRET;\nconst baseUrl = $env.APP_BASE_URL;\nif (!secret || !baseUrl) throw new Error('Recovery poll environment is not configured');\nconst signature = `sha256=${crypto.createHmac('sha256', secret).update(canonical, 'utf8').digest('hex')}`;\nreturn [{ json: { body, nonce, signature, timestamp, url: `${baseUrl}${path}` } }];"
       },
       "id": "ce10f001-6a77-4a0f-8d1c-000000000005",
       "name": "Sign Due Recovery Poll",
@@ -184,11 +215,23 @@
       "main": [
         [
           {
-            "node": "Classify and Sign Failure",
+            "node": "Persist Workflow Failure?",
             "type": "main",
             "index": 0
           }
         ]
+      ]
+    },
+    "Persist Workflow Failure?": {
+      "main": [
+        [
+          {
+            "node": "Classify and Sign Failure",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
       ]
     },
     "Classify and Sign Failure": {

@@ -28,9 +28,9 @@ export function classifyDeferredRssProgress(input: {
   );
   const blockedOpportunityIds = new Set(input.draftedOpportunityIds);
   for (const run of input.runs) {
-    if (run.run_type !== "rss_opportunity_reservation") {
-      blockedOpportunityIds.add(run.entity_id);
-    }
+    if (run.run_type === "rss_opportunity_reservation") continue;
+    if (run.run_type === "research" && run.status === "succeeded") continue;
+    blockedOpportunityIds.add(run.entity_id);
   }
   return { blockedOpportunityIds, existingReservationByOpportunity };
 }

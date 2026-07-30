@@ -41,6 +41,51 @@ describe("deferred RSS candidate selection", () => {
     expect(progress.blockedOpportunityIds.has(draftedOpportunityId)).toBe(true);
   });
 
+  it("re-enters completed research only when no editorial draft exists", () => {
+    const resumableOpportunityId = "10000000-0000-4000-8000-000000000010";
+    const draftedOpportunityId = "10000000-0000-4000-8000-000000000011";
+    const progress = classifyDeferredRssProgress({
+      draftedOpportunityIds: [draftedOpportunityId],
+      runs: [
+        {
+          id: "20000000-0000-4000-8000-000000000010",
+          entity_id: resumableOpportunityId,
+          run_type: "research",
+          status: "succeeded",
+        },
+        {
+          id: "20000000-0000-4000-8000-000000000011",
+          entity_id: draftedOpportunityId,
+          run_type: "research",
+          status: "succeeded",
+        },
+      ],
+    });
+
+    expect(progress.blockedOpportunityIds.has(resumableOpportunityId)).toBe(false);
+    expect(progress.blockedOpportunityIds.has(draftedOpportunityId)).toBe(true);
+  });
+
+  it.each(["queued", "running", "failed", "cancelled"] as const)(
+    "does not bypass WF-10 for %s research",
+    (status) => {
+      const opportunityId = "10000000-0000-4000-8000-000000000020";
+      const progress = classifyDeferredRssProgress({
+        draftedOpportunityIds: [],
+        runs: [
+          {
+            id: "20000000-0000-4000-8000-000000000020",
+            entity_id: opportunityId,
+            run_type: "research",
+            status,
+          },
+        ],
+      });
+
+      expect(progress.blockedOpportunityIds.has(opportunityId)).toBe(true);
+    },
+  );
+
   it("returns recent unprepared RSS opportunities in deterministic score order", () => {
     const result = selectDeferredRssCandidates({
       requestedAt,

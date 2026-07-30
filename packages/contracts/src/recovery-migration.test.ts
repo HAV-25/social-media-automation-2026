@@ -190,6 +190,10 @@ describe("run recovery database contract", () => {
       "'{\"reconciledFromDurableStageSuccess\":true}'::jsonb",
     );
     expect(recoveryApplicationSource).toContain('.rpc("complete_recovery_replay"');
+    expect(recoveryApplicationSource).toContain(
+      "if (!replayRequiresSynchronousCompletion(replay.status))",
+    );
+    expect(recoveryApplicationSource).toContain('status: "replay_accepted_async"');
     expect(recoveryApplicationSource).toContain('code: "recovery_completion_persistence_failed"');
   });
 

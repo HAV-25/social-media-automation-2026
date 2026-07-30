@@ -6,14 +6,14 @@
         "rule": {
           "interval": [
             {
-              "field": "minutes",
-              "minutesInterval": 15
+              "field": "cronExpression",
+              "expression": "0 1 * * *"
             }
           ]
         }
       },
       "id": "5a8e2607-d565-4b8e-a187-acde65873201",
-      "name": "Every 15 Minutes",
+      "name": "Daily at 1 AM Berlin",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [-940, 120]
@@ -175,13 +175,44 @@
     },
     {
       "parameters": {
-        "jsCode": "const crypto = require('crypto');\nconst sweep = $json.data;\nif (sweep?.contractVersion !== '1.0' || !Array.isArray(sweep.selections)) throw new Error('Deferred RSS sweep contract is invalid');\nconst secret = $env.WORKFLOW_HMAC_SECRET;\nconst baseUrl = $env.N8N_WEBHOOK_BASE_URL;\nif (!secret || !baseUrl) throw new Error('Automatic preparation environment is not configured');\nconst path = '/webhook/research-v1';\nreturn sweep.selections.map((item) => {\n  if (!item.actorId || !item.brandId || !item.opportunityId || !item.reservationRunId) throw new Error('Deferred RSS selection is missing preparation context');\n  const payload = {\n    contractVersion: '1.0',\n    correlationId: crypto.randomUUID(),\n    idempotencyKey: `rss-auto-research:${item.opportunityId}`,\n    actorId: item.actorId,\n    brandId: item.brandId,\n    opportunityId: item.opportunityId,\n    allowedDomains: [],\n    requestedAt: new Date().toISOString(),\n  };\n  const body = JSON.stringify(payload);\n  const timestamp = String(Math.floor(Date.now() / 1000));\n  const nonce = crypto.randomUUID();\n  const digest = crypto.createHash('sha256').update(body, 'utf8').digest('hex');\n  const canonical = [timestamp, nonce, 'POST', path, digest].join('\\n');\n  const signature = `sha256=${crypto.createHmac('sha256', secret).update(canonical, 'utf8').digest('hex')}`;\n  return { json: { body, nonce, signature, timestamp, url: `${baseUrl}${path}` } };\n});"
+        "jsCode": "const crypto = require('crypto');\nconst sweep = $json.data;\nif (sweep?.contractVersion !== '1.0' || !Array.isArray(sweep.selections)) throw new Error('Deferred RSS sweep contract is invalid');\nif (sweep.selections.length === 0) return [{ json: { dispatch: false, reason: 'no_deferred_opportunities' } }];\nconst secret = $env.WORKFLOW_HMAC_SECRET;\nconst baseUrl = $env.N8N_WEBHOOK_BASE_URL;\nif (!secret || !baseUrl) throw new Error('Automatic preparation environment is not configured');\nconst path = '/webhook/research-v1';\nreturn sweep.selections.map((item) => {\n  if (!item.actorId || !item.brandId || !item.opportunityId || !item.reservationRunId) throw new Error('Deferred RSS selection is missing preparation context');\n  const payload = {\n    contractVersion: '1.0',\n    correlationId: crypto.randomUUID(),\n    idempotencyKey: `rss-auto-research:${item.opportunityId}`,\n    actorId: item.actorId,\n    brandId: item.brandId,\n    opportunityId: item.opportunityId,\n    allowedDomains: [],\n    requestedAt: new Date().toISOString(),\n  };\n  const body = JSON.stringify(payload);\n  const timestamp = String(Math.floor(Date.now() / 1000));\n  const nonce = crypto.randomUUID();\n  const digest = crypto.createHash('sha256').update(body, 'utf8').digest('hex');\n  const canonical = [timestamp, nonce, 'POST', path, digest].join('\\n');\n  const signature = `sha256=${crypto.createHmac('sha256', secret).update(canonical, 'utf8').digest('hex')}`;\n  return { json: { dispatch: true, body, nonce, signature, timestamp, url: `${baseUrl}${path}` } };\n});"
       },
       "id": "f24d824a-ea5c-4b55-b0f3-acde65873223",
       "name": "Prepare Deferred Opportunities",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [160, -120]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a110f001-6a77-4a0f-8d1c-000000000027",
+              "leftValue": "={{ $json.dispatch }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a110f001-6a77-4a0f-8d1c-000000000027",
+      "name": "Dispatch Deferred Research?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [380, -120]
     },
     {
       "parameters": {
@@ -221,14 +252,14 @@
         "rawContentType": "application/json",
         "body": "={{ $json.body }}",
         "options": {
-          "timeout": 600000
+          "timeout": 30000
         }
       },
       "id": "f24d824a-ea5c-4b55-b0f3-acde65873224",
       "name": "Research Deferred Draft Verify and Image",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [380, -120]
+      "position": [600, -120]
     },
     {
       "parameters": {
@@ -316,7 +347,8 @@
       "name": "Fetch and Parse Feed Safely",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [180, 120]
+      "position": [180, 120],
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -519,13 +551,44 @@
     },
     {
       "parameters": {
-        "jsCode": "const crypto = require('crypto');\nconst analysisResults = $input.all().map((input) => input.json.data);\nfor (const result of analysisResults) {\n  if (result?.contractVersion !== '1.0' || !result.sourceDocumentId || !Array.isArray(result.results)) throw new Error('RSS analysis result contract is invalid');\n}\nconst secret = $env.WORKFLOW_HMAC_SECRET;\nconst baseUrl = $env.N8N_WEBHOOK_BASE_URL;\nif (!secret || !baseUrl) throw new Error('Automatic preparation environment is not configured');\nconst path = '/webhook/research-v1';\nreturn analysisResults.flatMap((result) => result.results).filter((item) => item.researchEligible === true && item.eligibilityReason === 'reserved').map((item) => {\n  if (!item.actorId || !item.brandId || !item.opportunityId) throw new Error('Selected RSS opportunity is missing preparation context');\n  const payload = {\n    contractVersion: '1.0',\n    correlationId: crypto.randomUUID(),\n    idempotencyKey: `rss-auto-research:${item.opportunityId}`,\n    actorId: item.actorId,\n    brandId: item.brandId,\n    opportunityId: item.opportunityId,\n    allowedDomains: [],\n    requestedAt: new Date().toISOString(),\n  };\n  const body = JSON.stringify(payload);\n  const timestamp = String(Math.floor(Date.now() / 1000));\n  const nonce = crypto.randomUUID();\n  const digest = crypto.createHash('sha256').update(body, 'utf8').digest('hex');\n  const canonical = [timestamp, nonce, 'POST', path, digest].join('\\n');\n  const signature = `sha256=${crypto.createHmac('sha256', secret).update(canonical, 'utf8').digest('hex')}`;\n  return { json: { body, nonce, signature, timestamp, url: `${baseUrl}${path}` } };\n});"
+        "jsCode": "const crypto = require('crypto');\nconst analysisResults = $input.all().map((input) => input.json.data);\nfor (const result of analysisResults) {\n  if (result?.contractVersion !== '1.0' || !result.sourceDocumentId || !Array.isArray(result.results)) throw new Error('RSS analysis result contract is invalid');\n}\nconst selected = analysisResults.flatMap((result) => result.results).filter((item) => item.researchEligible === true && item.eligibilityReason === 'reserved');\nif (selected.length === 0) return [{ json: { dispatch: false, reason: 'no_newly_selected_opportunities' } }];\nconst secret = $env.WORKFLOW_HMAC_SECRET;\nconst baseUrl = $env.N8N_WEBHOOK_BASE_URL;\nif (!secret || !baseUrl) throw new Error('Automatic preparation environment is not configured');\nconst path = '/webhook/research-v1';\nreturn selected.map((item) => {\n  if (!item.actorId || !item.brandId || !item.opportunityId) throw new Error('Selected RSS opportunity is missing preparation context');\n  const payload = {\n    contractVersion: '1.0',\n    correlationId: crypto.randomUUID(),\n    idempotencyKey: `rss-auto-research:${item.opportunityId}`,\n    actorId: item.actorId,\n    brandId: item.brandId,\n    opportunityId: item.opportunityId,\n    allowedDomains: [],\n    requestedAt: new Date().toISOString(),\n  };\n  const body = JSON.stringify(payload);\n  const timestamp = String(Math.floor(Date.now() / 1000));\n  const nonce = crypto.randomUUID();\n  const digest = crypto.createHash('sha256').update(body, 'utf8').digest('hex');\n  const canonical = [timestamp, nonce, 'POST', path, digest].join('\\n');\n  const signature = `sha256=${crypto.createHmac('sha256', secret).update(canonical, 'utf8').digest('hex')}`;\n  return { json: { dispatch: true, body, nonce, signature, timestamp, url: `${baseUrl}${path}` } };\n});"
       },
       "id": "2f28250a-57af-4aa0-84f8-31da4ed62e02",
       "name": "Prepare Selected Opportunities",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [1940, 120]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a110f001-6a77-4a0f-8d1c-000000000028",
+              "leftValue": "={{ $json.dispatch }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a110f001-6a77-4a0f-8d1c-000000000028",
+      "name": "Dispatch Selected Research?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2160, 120]
     },
     {
       "parameters": {
@@ -565,19 +628,19 @@
         "rawContentType": "application/json",
         "body": "={{ $json.body }}",
         "options": {
-          "timeout": 600000
+          "timeout": 30000
         }
       },
       "id": "2f28250a-57af-4aa0-84f8-31da4ed62e03",
       "name": "Research Draft Verify and Image",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2160, 120]
+      "position": [2380, 120]
     }
   ],
   "pinData": {},
   "connections": {
-    "Every 15 Minutes": {
+    "Daily at 1 AM Berlin": {
       "main": [
         [
           {
@@ -674,11 +737,23 @@
       "main": [
         [
           {
-            "node": "Research Deferred Draft Verify and Image",
+            "node": "Dispatch Deferred Research?",
             "type": "main",
             "index": 0
           }
         ]
+      ]
+    },
+    "Dispatch Deferred Research?": {
+      "main": [
+        [
+          {
+            "node": "Research Deferred Draft Verify and Image",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
       ]
     },
     "Restore Feed Plan": {
@@ -722,7 +797,8 @@
             "type": "main",
             "index": 0
           }
-        ]
+        ],
+        []
       ]
     },
     "Decode RSS JSON": {
@@ -839,11 +915,23 @@
       "main": [
         [
           {
-            "node": "Research Draft Verify and Image",
+            "node": "Dispatch Selected Research?",
             "type": "main",
             "index": 0
           }
         ]
+      ]
+    },
+    "Dispatch Selected Research?": {
+      "main": [
+        [
+          {
+            "node": "Research Draft Verify and Image",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
       ]
     }
   },
@@ -853,7 +941,8 @@
     "saveDataErrorExecution": "all",
     "saveDataSuccessExecution": "none",
     "saveManualExecutions": true,
-    "executionTimeout": 900
+    "executionTimeout": 900,
+    "timezone": "Europe/Berlin"
   },
   "versionId": "8e619a3a-d5d3-46f7-a6d9-acde65873210",
   "meta": {

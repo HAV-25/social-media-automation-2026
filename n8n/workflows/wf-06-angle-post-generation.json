@@ -5,8 +5,10 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "editorial-generation-v1",
-        "responseMode": "lastNode",
-        "options": {}
+        "responseMode": "onReceived",
+        "options": {
+          "responseCode": 202
+        }
       },
       "id": "8b44c2f6-1b37-4f29-b259-876b44bcb601",
       "name": "Signed Editorial Generation Webhook",
@@ -123,18 +125,17 @@
           "response": {
             "response": {
               "fullResponse": true,
-              "neverError": true
+              "neverError": false
             }
           },
-          "timeout": 600000
+          "timeout": 30000
         }
       },
       "id": "8b44c2f6-1b37-4f29-b259-876b44bcb607",
       "name": "Dispatch Verification Handoff",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [500, 100],
-      "onError": "continueRegularOutput"
+      "position": [500, 100]
     }
   ],
   "pinData": {},

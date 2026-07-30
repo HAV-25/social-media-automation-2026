@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -37,6 +38,41 @@ const imageCompositorPath = fileURLToPath(
 const publisherPath = fileURLToPath(
   new URL("../../../scripts/publish-n8n-workflows.mjs", import.meta.url),
 );
+const nodeRequire = createRequire(import.meta.url);
+
+function loadWorkflow(filename: string) {
+  return workflowSchema.parse(JSON.parse(readFileSync(`${workflowDirectory}${filename}`, "utf8")));
+}
+
+function codeNode(filename: string, name: string) {
+  const node = loadWorkflow(filename).nodes.find((candidate) => candidate.name === name);
+  if (!node || typeof node.parameters.jsCode !== "string") {
+    throw new Error(`Code node "${name}" was not found in ${filename}.`);
+  }
+  return node.parameters.jsCode;
+}
+
+function runCodeNode(
+  source: string,
+  context: {
+    input?: { all?: () => unknown[]; first?: () => unknown };
+    lookup?: (name: string) => { first: () => unknown; all?: () => unknown[] };
+    env?: Record<string, string>;
+    json?: Record<string, unknown>;
+  },
+) {
+  const execute = new Function("require", "$input", "$", "$env", "$json", source);
+  return execute(
+    nodeRequire,
+    {
+      all: context.input?.all ?? (() => []),
+      first: context.input?.first ?? (() => ({ json: {} })),
+    },
+    context.lookup ?? (() => ({ first: () => ({ json: {} }), all: () => [] })),
+    context.env ?? {},
+    context.json ?? {},
+  ) as Array<{ json: Record<string, unknown> }>;
+}
 
 describe("WF-01 RSS Intake workflow", () => {
   it("is valid JSON, inactive, credential-free, and structurally importable", () => {
@@ -44,7 +80,7 @@ describe("WF-01 RSS Intake workflow", () => {
     const workflow = workflowSchema.parse(JSON.parse(source));
 
     expect(workflow.nodes.map((node) => node.name)).toEqual([
-      "Every 15 Minutes",
+      "Daily at 1 AM Berlin",
       "Signed One-off RSS Webhook",
       "Verify One-off RSS Request",
       "Sign Feed Plan Request",
@@ -53,6 +89,7 @@ describe("WF-01 RSS Intake workflow", () => {
       "Claim Deferred Opportunities",
       "Decode Deferred Opportunity Sweep",
       "Prepare Deferred Opportunities",
+      "Dispatch Deferred Research?",
       "Research Deferred Draft Verify and Image",
       "Restore Feed Plan",
       "Split Feeds",
@@ -69,6 +106,7 @@ describe("WF-01 RSS Intake workflow", () => {
       "Normalize Cluster Score and Gate",
       "Decode Opportunity Decisions",
       "Prepare Selected Opportunities",
+      "Dispatch Selected Research?",
       "Research Draft Verify and Image",
     ]);
     expect(workflow.nodes.find((node) => node.name === "Fetch and Parse Feed Safely")?.type).toBe(
@@ -117,6 +155,100 @@ describe("WF-01 RSS Intake workflow", () => {
     expect(serializedConnections).toContain('"Restore Feed Plan":{"main":[[{"node":"Split Feeds"');
   });
 
+  it("runs once at 01:00 Europe/Berlin", () => {
+    const parsed = JSON.parse(readFileSync(workflowPath, "utf8")) as {
+      nodes: Array<{ name: string; parameters: unknown }>;
+      settings: { timezone?: string };
+    };
+    const trigger = parsed.nodes.find((node) => node.name === "Daily at 1 AM Berlin");
+
+    expect(trigger?.parameters).toEqual({
+      rule: { interval: [{ field: "cronExpression", expression: "0 1 * * *" }] },
+    });
+    expect(parsed.settings.timezone).toBe("Europe/Berlin");
+  });
+
+  it("terminates cleanly when neither the backlog nor the current scan selects an opportunity", () => {
+    const deferred = runCodeNode(
+      codeNode("wf-01-rss-intake.json", "Prepare Deferred Opportunities"),
+      {
+        json: { data: { contractVersion: "1.0", selections: [] } },
+      },
+    );
+    const selected = runCodeNode(
+      codeNode("wf-01-rss-intake.json", "Prepare Selected Opportunities"),
+      {
+        input: {
+          all: () => [
+            {
+              json: {
+                data: {
+                  contractVersion: "1.0",
+                  sourceDocumentId: "00000000-0000-4000-8000-000000000001",
+                  results: [],
+                },
+              },
+            },
+          ],
+        },
+      },
+    );
+
+    expect(deferred).toEqual([{ json: { dispatch: false, reason: "no_deferred_opportunities" } }]);
+    expect(selected).toEqual([
+      { json: { dispatch: false, reason: "no_newly_selected_opportunities" } },
+    ]);
+
+    const parsed = loadWorkflow("wf-01-rss-intake.json");
+    expect(parsed.connections["Dispatch Deferred Research?"]).toEqual({
+      main: [[{ node: "Research Deferred Draft Verify and Image", type: "main", index: 0 }], []],
+    });
+    expect(parsed.connections["Dispatch Selected Research?"]).toEqual({
+      main: [[{ node: "Research Draft Verify and Image", type: "main", index: 0 }], []],
+    });
+  });
+
+  it("signs only complete selected opportunities and rejects malformed preparation context", () => {
+    const source = codeNode("wf-01-rss-intake.json", "Prepare Selected Opportunities");
+    const validItem = {
+      researchEligible: true,
+      eligibilityReason: "reserved",
+      actorId: "00000000-0000-4000-8000-000000000010",
+      brandId: "00000000-0000-4000-8000-000000000020",
+      opportunityId: "00000000-0000-4000-8000-000000000030",
+    };
+    const input = (item: Record<string, unknown>) => ({
+      all: () => [
+        {
+          json: {
+            data: {
+              contractVersion: "1.0",
+              sourceDocumentId: "00000000-0000-4000-8000-000000000001",
+              results: [item],
+            },
+          },
+        },
+      ],
+    });
+    const env = {
+      WORKFLOW_HMAC_SECRET: "x".repeat(32),
+      N8N_WEBHOOK_BASE_URL: "https://n8n.example.test",
+    };
+
+    const result = runCodeNode(source, { input: input(validItem), env });
+    expect(result).toHaveLength(1);
+    expect(result[0]?.json.dispatch).toBe(true);
+    expect(result[0]?.json.url).toBe("https://n8n.example.test/webhook/research-v1");
+    expect(result[0]?.json.signature).toMatch(/^sha256=[0-9a-f]{64}$/);
+
+    expect(() =>
+      runCodeNode(source, {
+        input: input({ ...validItem, actorId: undefined }),
+        env,
+      }),
+    ).toThrow("Selected RSS opportunity is missing preparation context");
+  });
+
   it("reads every decoded opportunity decision from the n8n 2.21 data envelopes", () => {
     const workflow = workflowSchema.parse(JSON.parse(readFileSync(workflowPath, "utf8")));
     const preparationNode = workflow.nodes.find(
@@ -160,6 +292,26 @@ describe("WF-01 RSS Intake workflow", () => {
     expect(route).not.toMatch(/N8N_API_KEY|service[_-]?role/i);
   });
 
+  it("records and isolates one unavailable feed without cancelling the other feeds", () => {
+    const raw = JSON.parse(readFileSync(workflowPath, "utf8")) as {
+      nodes: Array<{ name: string; onError?: string }>;
+    };
+    const fetchNode = raw.nodes.find((node) => node.name === "Fetch and Parse Feed Safely");
+    const fetchRoute = readFileSync(
+      `${appDirectory}api/internal/workflows/rss/fetch/route.ts`,
+      "utf8",
+    );
+
+    expect(fetchNode?.onError).toBe("continueErrorOutput");
+    expect(
+      loadWorkflow("wf-01-rss-intake.json").connections["Fetch and Parse Feed Safely"],
+    ).toEqual({
+      main: [[{ node: "Decode RSS JSON", type: "main", index: 0 }], []],
+    });
+    expect(fetchRoute).toContain('status: "failed"');
+    expect(fetchRoute).toContain("errorCode: error.code");
+  });
+
   it("reconsiders only signed, recent, unprepared RSS opportunities", () => {
     const route = readFileSync(
       `${appDirectory}api/internal/workflows/rss/backlog/route.ts`,
@@ -184,6 +336,51 @@ describe("WF-01 RSS Intake workflow", () => {
 });
 
 describe("Milestone 4 n8n workflow package", () => {
+  it("contains no unreachable workflow nodes", () => {
+    for (const filename of [
+      "wf-01-rss-intake.json",
+      "wf-02-manual-intake.json",
+      "wf-03-normalize.json",
+      "wf-04-cluster-score.json",
+      "wf-05-research.json",
+      "wf-06-angle-post-generation.json",
+      "wf-07-post-verification.json",
+      "wf-08-image-generation.json",
+      "wf-09-content-actions.json",
+      "wf-10-error-recovery.json",
+    ]) {
+      const parsed = loadWorkflow(filename);
+      const startNames = parsed.nodes
+        .filter(
+          (node) =>
+            node.type.endsWith(".webhook") ||
+            node.type.endsWith(".scheduleTrigger") ||
+            node.type.endsWith(".errorTrigger"),
+        )
+        .map((node) => node.name);
+      const reachable = new Set(startNames);
+      const pending = [...startNames];
+      while (pending.length) {
+        const current = pending.shift()!;
+        const outputs = (
+          parsed.connections[current] as
+            | { main?: Array<Array<{ node: string }> | undefined> }
+            | undefined
+        )?.main;
+        for (const connection of outputs?.flatMap((output) => output ?? []) ?? []) {
+          if (!reachable.has(connection.node)) {
+            reachable.add(connection.node);
+            pending.push(connection.node);
+          }
+        }
+      }
+
+      expect(
+        parsed.nodes.filter((node) => !reachable.has(node.name)).map((node) => node.name),
+      ).toEqual([]);
+    }
+  });
+
   it("decodes every non-terminal file response before downstream processing", () => {
     for (const filename of [
       "wf-01-rss-intake.json",
@@ -272,19 +469,16 @@ describe("Milestone 5 research workflow", () => {
     expect(source).toContain("/api/internal/workflows/recovery/execute");
     expect(source).toContain("target: 'research'");
     expect(source).toContain("/webhook/editorial-generation-v1");
-    expect(source).toContain("/webhook/post-verification-v1");
-    expect(source).toContain("/webhook/image-generation-v1");
     expect(source).toContain("newsworthy_authority");
     expect(source).toContain("educational_breakdown");
     expect(source).toContain("perspective_conversation");
     expect(source).toContain("readyForWriting");
-    expect(source).toContain("readyForReview");
     expect(source).toContain("createHmac('sha256'");
     expect(source).toContain("timingSafeEqual");
     expect(source).not.toMatch(/service[_-]?role|credentialId|OPENAI_API_KEY|system prompt/i);
   });
 
-  it("reads every decoded automatic-preparation response from the n8n 2.21 data envelope", () => {
+  it("reads the decoded research response from the n8n 2.21 data envelope", () => {
     const workflow = workflowSchema.parse(
       JSON.parse(readFileSync(`${workflowDirectory}wf-05-research.json`, "utf8")),
     );
@@ -297,15 +491,11 @@ describe("Milestone 5 research workflow", () => {
     expect(codeByNode.get("Sign Three-style Draft Request")).toContain(
       "const research = $input.first().json.data;",
     );
-    expect(codeByNode.get("Sign Draft Verification Requests")).toContain(
-      "const draftSets = $input.all().map((input) => input.json.data);",
-    );
-    expect(codeByNode.get("Sign Ready Draft Image Requests")).toContain(
-      "const verification = input.json.data;",
-    );
+    expect(codeByNode.has("Sign Draft Verification Requests")).toBe(false);
+    expect(codeByNode.has("Sign Ready Draft Image Requests")).toBe(false);
   });
 
-  it("isolates each paid style call and lets each child own its downstream handoff", () => {
+  it("isolates each paid style call and surfaces a rejected handoff for durable recovery", () => {
     const rawWorkflow = JSON.parse(
       readFileSync(`${workflowDirectory}wf-05-research.json`, "utf8"),
     ) as {
@@ -325,9 +515,21 @@ describe("Milestone 5 research workflow", () => {
     expect(generation).toContain(
       "idempotencyKey: `rss-auto-drafts:${request.opportunityId}:${contentStyle}`",
     );
-    expect(dispatch?.onError).toBe("continueRegularOutput");
-    expect(JSON.stringify(dispatch?.parameters)).toContain('"neverError":true');
+    expect(dispatch?.onError).toBeUndefined();
+    expect(JSON.stringify(dispatch?.parameters)).toContain('"neverError":false');
     expect(workflow.connections["Generate Three Draft Styles"]).toBeUndefined();
+    expect(
+      workflow.nodes.every((node) =>
+        [
+          "Decode Draft Set",
+          "Sign Draft Verification Requests",
+          "Verify Drafts",
+          "Decode Verification Results",
+          "Sign Ready Draft Image Requests",
+          "Generate Branded Images",
+        ].every((removed) => node.name !== removed),
+      ),
+    ).toBe(true);
   });
 
   it("connects every recoverable child to the next unattended stage", () => {
@@ -353,6 +555,9 @@ describe("Milestone 5 research workflow", () => {
       "Sign Three-style Draft Request",
     ]);
     expect(targetNames(research, "Sign Three-style Draft Request")).toEqual([
+      "Dispatch Editorial Generation?",
+    ]);
+    expect(targetNames(research, "Dispatch Editorial Generation?")).toEqual([
       "Generate Three Draft Styles",
     ]);
     expect(targetNames(editorial, "Generate Evaluate and Persist Posts")).toEqual([
@@ -364,7 +569,81 @@ describe("Milestone 5 research workflow", () => {
     expect(targetNames(verification, "Reevaluate and Persist Readiness")).toEqual([
       "Sign Image Handoff",
     ]);
-    expect(targetNames(verification, "Sign Image Handoff")).toEqual(["Dispatch Image Handoff"]);
+    expect(targetNames(verification, "Sign Image Handoff")).toEqual(["Dispatch Image Generation?"]);
+    expect(targetNames(verification, "Dispatch Image Generation?")).toEqual([
+      "Dispatch Image Handoff",
+    ]);
+  });
+
+  it("acknowledges autonomous stage intake before paid work begins", () => {
+    for (const filename of [
+      "wf-05-research.json",
+      "wf-06-angle-post-generation.json",
+      "wf-07-post-verification.json",
+      "wf-08-image-generation.json",
+    ]) {
+      const parsed = loadWorkflow(filename);
+      const webhook = parsed.nodes.find((node) => node.type === "n8n-nodes-base.webhook");
+
+      expect(webhook?.parameters.responseMode).toBe("onReceived");
+      expect(webhook?.parameters.options).toEqual({ responseCode: 202 });
+    }
+  });
+
+  it("bounds every autonomous n8n-to-n8n acceptance handoff at 30 seconds", () => {
+    for (const [filename, nodeNames] of [
+      [
+        "wf-01-rss-intake.json",
+        ["Research Deferred Draft Verify and Image", "Research Draft Verify and Image"],
+      ],
+      ["wf-05-research.json", ["Generate Three Draft Styles"]],
+      ["wf-06-angle-post-generation.json", ["Dispatch Verification Handoff"]],
+      ["wf-07-post-verification.json", ["Dispatch Image Handoff"]],
+    ] as const) {
+      const parsed = loadWorkflow(filename);
+      for (const name of nodeNames) {
+        const node = parsed.nodes.find((candidate) => candidate.name === name);
+        expect((node?.parameters.options as { timeout?: number } | undefined)?.timeout).toBe(
+          30_000,
+        );
+      }
+    }
+  });
+
+  it("treats bounded research that is not ready for writing as a successful terminal outcome", () => {
+    const result = runCodeNode(codeNode("wf-05-research.json", "Sign Three-style Draft Request"), {
+      input: {
+        first: () => ({
+          json: {
+            data: {
+              contractVersion: "1.0",
+              researchRunId: "00000000-0000-4000-8000-000000000001",
+              generationRunId: "00000000-0000-4000-8000-000000000002",
+              readyForWriting: false,
+            },
+          },
+        }),
+      },
+      lookup: () => ({
+        first: () => ({
+          json: {
+            body: {
+              correlationId: "00000000-0000-4000-8000-000000000003",
+              opportunityId: "00000000-0000-4000-8000-000000000004",
+            },
+          },
+        }),
+      }),
+    });
+
+    expect(result).toEqual([
+      { json: { dispatch: false, reason: "research_not_ready_for_writing" } },
+    ]);
+    expect(
+      loadWorkflow("wf-05-research.json").connections["Dispatch Editorial Generation?"],
+    ).toEqual({
+      main: [[{ node: "Generate Three Draft Styles", type: "main", index: 0 }], []],
+    });
   });
 });
 
@@ -410,6 +689,58 @@ describe("Milestone 6 editorial workflows", () => {
     expect(source).toContain("regenerate_base");
     expect(source).toContain("change_template");
     expect(source).toContain("'image_generation'");
+  });
+
+  it("does not call image generation when verification requires editorial review", () => {
+    const postDraftId = "00000000-0000-4000-8000-000000000001";
+    const result = runCodeNode(codeNode("wf-07-post-verification.json", "Sign Image Handoff"), {
+      input: {
+        first: () => ({
+          json: {
+            contractVersion: "1.0",
+            postDraftId,
+            postVersionId: "00000000-0000-4000-8000-000000000002",
+            evaluation: { readyForReview: false },
+          },
+        }),
+      },
+      lookup: () => ({
+        first: () => ({
+          json: {
+            body: {
+              postDraftId,
+              correlationId: "00000000-0000-4000-8000-000000000003",
+            },
+          },
+        }),
+      }),
+    });
+
+    expect(result).toEqual([{ json: { dispatch: false, reason: "draft_not_ready_for_image" } }]);
+    expect(
+      loadWorkflow("wf-07-post-verification.json").connections["Dispatch Image Generation?"],
+    ).toEqual({
+      main: [[{ node: "Dispatch Image Handoff", type: "main", index: 0 }], []],
+    });
+  });
+
+  it("fails rejected verification and image handoffs so WF-10 can recover them", () => {
+    for (const [filename, nodeName] of [
+      ["wf-06-angle-post-generation.json", "Dispatch Verification Handoff"],
+      ["wf-07-post-verification.json", "Dispatch Image Handoff"],
+    ] as const) {
+      const raw = JSON.parse(readFileSync(`${workflowDirectory}${filename}`, "utf8")) as {
+        nodes: Array<{
+          name: string;
+          onError?: string;
+          parameters: { options?: { response?: { response?: { neverError?: boolean } } } };
+        }>;
+      };
+      const node = raw.nodes.find((candidate) => candidate.name === nodeName);
+
+      expect(node?.onError).toBeUndefined();
+      expect(node?.parameters.options?.response?.response?.neverError).toBe(false);
+    }
   });
 
   it("excludes the current draft from verification and regeneration similarity", () => {
@@ -531,16 +862,46 @@ describe("Milestone 8 recovery workflow", () => {
       });
     }
     expect(nodes.get("Sign Due Recovery Poll")?.parameters.jsCode).toContain(
-      "if (!secret || !baseUrl) return [];",
+      "throw new Error('Recovery poll environment is not configured')",
     );
     const applicationFailureFilter = nodes.get("Ignore Application-recorded Failures");
     expect(applicationFailureFilter?.parameters.jsCode).toContain("applicationRecordedNodes.has");
+    expect(applicationFailureFilter?.parameters.jsCode).toContain("transportFailure");
+    expect(applicationFailureFilter?.parameters.jsCode).toContain("persist: false");
     expect(applicationFailureFilter?.parameters.jsCode).toContain(
       "Generate Evaluate and Persist Posts",
     );
     expect(applicationFailureFilter?.parameters.jsCode).toContain(
       "Direct Generate Validate Compose and Persist",
     );
+    expect(
+      loadWorkflow("wf-10-error-recovery.json").connections["Persist Workflow Failure?"],
+    ).toEqual({
+      main: [[{ node: "Classify and Sign Failure", type: "main", index: 0 }], []],
+    });
+  });
+
+  it("records gateway timeouts even when they occur at an application-owned node", () => {
+    const source = codeNode("wf-10-error-recovery.json", "Ignore Application-recorded Failures");
+    const payload = (message: string) => ({
+      execution: {
+        lastNodeExecuted: "Run and Persist Bounded Research",
+        error: { message },
+      },
+    });
+    const execute = (message: string) => {
+      const value = payload(message);
+      return runCodeNode(source, {
+        json: value,
+        input: { all: () => [{ json: value }] },
+      });
+    };
+
+    expect(execute("Gateway timed out - Inactivity Timeout")[0]?.json.persist).toBe(true);
+    expect(execute("Research validation rejected")[0]?.json).toEqual({
+      persist: false,
+      reason: "application_failure_already_recorded",
+    });
   });
 
   it("wraps every model/image workflow in a replayable application contract", () => {

@@ -46,8 +46,8 @@ a newly staged workflow before that folder placement is verified.
 
 For a manual alternative, import WF-01 through WF-10 from `workflows/`, inspect
 the nodes, run them manually against non-production sources, and only then
-activate WF-01's 15-minute schedule, WF-10's recovery schedule, and the webhook
-workflows.
+activate WF-01's daily 01:00 Europe/Berlin schedule, WF-10's recovery schedule,
+and the webhook workflows.
 The workflow never fetches a configured feed directly: the application fetches
 each URL through its DNS-pinned SSRF boundary, validates redirects, MIME type,
 size, timeout, and XML before returning normalized items. RSS intake then calls
@@ -58,6 +58,13 @@ WF-05 accepts a signed, reviewer-authorized bounded-research contract and calls
 the application-owned research endpoint. The application owns prompts,
 provider selection, strict evidence validation, cost enforcement, and durable
 claim provenance; n8n only orchestrates the typed handoff.
+
+WF-05 through WF-08 acknowledge a valid signed webhook with HTTP 202 before
+starting their paid or deterministic stage. The accepted child execution owns
+its recovery registration and completion, so a slow provider call cannot hold
+WF-01 or its parent stage open. An asynchronous recovery replay is completed
+only by the accepted child stage; synchronous WF-09 content actions retain
+atomic acknowledgement completion.
 
 WF-06 coordinates bounded angle/post generation for one to three requested
 styles. WF-07 re-runs deterministic claim, risk, brand-fit, and similarity

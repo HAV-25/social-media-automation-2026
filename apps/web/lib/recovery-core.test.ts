@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { automaticRecoveryAllowed, retryDelaySeconds, safeWorkflowFailure } from "./recovery-core";
+import {
+  automaticRecoveryAllowed,
+  replayRequiresSynchronousCompletion,
+  retryDelaySeconds,
+  safeWorkflowFailure,
+} from "./recovery-core";
 
 describe("recovery policy", () => {
   it("uses deterministic capped exponential backoff", () => {
@@ -13,6 +18,13 @@ describe("recovery policy", () => {
     expect(automaticRecoveryAllowed("provider", true)).toBe(true);
     expect(automaticRecoveryAllowed("security", true)).toBe(false);
     expect(automaticRecoveryAllowed("provider", false)).toBe(false);
+  });
+
+  it("lets an asynchronously accepted replay complete only when its child stage finishes", () => {
+    expect(replayRequiresSynchronousCompletion(202)).toBe(false);
+    expect(replayRequiresSynchronousCompletion(200)).toBe(true);
+    expect(replayRequiresSynchronousCompletion(201)).toBe(true);
+    expect(() => replayRequiresSynchronousCompletion(99)).toThrow();
   });
 
   it("keeps only a bounded error code and never leaks raw provider details", () => {

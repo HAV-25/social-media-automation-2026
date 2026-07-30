@@ -5,8 +5,10 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "image-generation-v1",
-        "responseMode": "lastNode",
-        "options": {}
+        "responseMode": "onReceived",
+        "options": {
+          "responseCode": 202
+        }
       },
       "id": "a866e418-5d8b-4b49-8a11-639a72ff0801",
       "name": "Signed Image Generation Webhook",
