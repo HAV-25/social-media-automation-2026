@@ -1684,3 +1684,28 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   pending feed-health migration is covered by migration contract tests but has
   not been executed against a disposable local Postgres instance. It remains a
   separate, approval-gated production action.
+
+### 2026-08-01 internal UAT editorial-warning policy (local, not deployed)
+
+- Kept Klaank's automatic opportunity threshold at 75 and changed only the
+  research-to-writing and verification-to-image editorial gates: completed
+  research now prepares all three standard styles, and completed verification
+  may prepare an image while retaining every evidence and quality warning.
+- Added `Approve with warnings` for a `ready_for_review` draft. The application
+  and service-only database function require an explicit acknowledgement, a
+  reviewer reason, and an exact current warning snapshot. Missing evaluation,
+  stale warnings, permissions, invalid states, and provider failures remain hard
+  blockers.
+- Expanded the reviewer ZIP metadata to include research sources and claims,
+  research/post/image prompt and model provenance, scores, warnings, reviewer
+  decision data, and per-stage plus total recorded cost.
+- Changed only WF-05 and WF-07 workflow JSON. No intake, normalization, scoring,
+  generation, image-provider, recovery, publishing, or scheduling workflow was
+  modified.
+- Completed the local release gate: formatting, repository-wide ESLint, strict
+  TypeScript for every package and the web application, all 378 tests, the
+  optimized Next.js production build, and all four Chromium walking-skeleton
+  journeys pass. The migration and WF-05/WF-07 publication remain unapplied,
+  approval-gated production actions. Docker/Supabase local services were not
+  available, so the SQL behavior is covered by migration contract and pgTAP
+  tests but has not been executed against a disposable local Postgres instance.

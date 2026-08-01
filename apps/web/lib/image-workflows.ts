@@ -178,13 +178,10 @@ export async function generateWorkflowImage(rawInput: ImageWorkflowRequest) {
       409,
     );
   }
-  const evaluation = z
-    .object({ evaluation: z.object({ readyForReview: z.literal(true) }) })
-    .safeParse(draft.score_breakdown);
-  if (draft.status !== "ready_for_review" || !evaluation.success) {
+  if (draft.status !== "ready_for_review") {
     throw new ImageWorkflowError(
       "post_not_ready",
-      "The post must pass editorial verification before image generation.",
+      "The post must complete editorial verification before image generation.",
       409,
     );
   }

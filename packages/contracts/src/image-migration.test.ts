@@ -65,7 +65,7 @@ describe("image asset persistence migration", () => {
   });
 
   it("commits a transactional PostgreSQL fixture for permission and atomicity checks", () => {
-    expect(databaseTestSql).toContain("select plan(17)");
+    expect(databaseTestSql).toContain("select plan(21)");
     expect(databaseTestSql).toContain("authenticated editors cannot upload generated images");
     expect(databaseTestSql).toContain("an unassigned user cannot read the image asset");
     expect(databaseTestSql).toContain("assigned reviewer can explicitly override a flagged image");

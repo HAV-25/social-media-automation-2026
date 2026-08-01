@@ -1273,3 +1273,31 @@ permanent.
 not incur a second research charge; WF-05 performs only the missing editorial
 handoff. Retry caps and dead-letter handling cannot be bypassed for incomplete
 or failed research.
+
+## ADR-083: Internal UAT treats editorial findings as audited warnings
+
+**Date:** 2026-08-01
+
+**Decision:** Preserve the automatic opportunity threshold of 75, bounded
+research, deterministic evaluation, claims ledger, and all provenance, but do
+not stop draft or image preparation solely because `readyForWriting` or
+`readyForReview` is false. Generate the three standard styles after completed
+research and permit image preparation after completed verification. A reviewer
+may approve a warning-bearing post only by acknowledging the current warning
+snapshot and recording a reason of at least ten characters.
+
+**Why:** During the controlled internal-test period, research conflicts and
+quality findings must inform the human decision without making otherwise valid
+drafts and images impossible to inspect. The reviewer remains accountable for
+the final decision; the platform must still expose exactly what was known when
+that decision was made.
+
+**Consequences:** `readyForWriting` and `readyForReview` remain durable signals,
+not erased or converted into passes. Missing or structurally invalid research,
+missing verification, authentication/authorization failures, invalid state
+transitions, stale warning snapshots, provider failures, retry limits, and
+provenance failures remain hard blockers. Warning approvals persist the reason,
+reviewer, exact warning snapshot, and audit/feedback events, and the reviewer
+package includes source, claim, score, prompt, model, cost, warning, and decision
+provenance. Only WF-05 and WF-07 change orchestration behavior. No publishing or
+scheduling capability is introduced.

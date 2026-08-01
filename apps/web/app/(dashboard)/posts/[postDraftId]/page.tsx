@@ -286,9 +286,11 @@ export default async function PostReviewPage({
                 </div>
               </div>
               <p className="mt-4 text-xs leading-5 text-white/55">
-                {post.evaluation?.readyForReview
-                  ? "All deterministic readiness gates pass. Human approval is still required."
-                  : "Approval is blocked until evidence, brand-fit, risk, and similarity gates pass."}
+                {!post.evaluation
+                  ? "Verification data is unavailable. Reload or retry verification before making a final decision."
+                  : post.evaluation.readyForReview
+                    ? "All deterministic readiness gates pass. Human approval is still required."
+                    : "One or more readiness checks produced warnings. You may revise the post or explicitly approve it with an audited reason."}
               </p>
               {post.evaluation?.warnings.length ? (
                 <ul className="mt-4 space-y-2 text-xs leading-5 text-amber-200">
@@ -401,9 +403,54 @@ export default async function PostReviewPage({
                     </button>
                   </form>
                 ) : null}
-                {post.status === "ready_for_review" && !post.evaluation?.readyForReview ? (
-                  <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
-                    Approval is unavailable until every readiness gate passes.
+                {post.status === "ready_for_review" &&
+                post.evaluation &&
+                !post.evaluation.readyForReview ? (
+                  <form
+                    action={approveAction}
+                    className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4"
+                  >
+                    <input type="hidden" name="expectedVersionId" value={post.currentVersion.id} />
+                    <input
+                      type="hidden"
+                      name="idempotencyKey"
+                      value={reviewKey("approve-with-warnings")}
+                    />
+                    <p className="text-xs leading-5 text-amber-950">
+                      This post has recorded evidence or quality warnings. Approval remains a human
+                      decision and will be preserved in the audit history and download package.
+                    </p>
+                    <label className="mt-3 block text-[10px] font-bold text-amber-950 uppercase">
+                      Decision reason
+                      <textarea
+                        required
+                        minLength={10}
+                        maxLength={2000}
+                        name="reason"
+                        rows={3}
+                        className="mt-1.5 w-full rounded-xl border border-amber-300 bg-white px-3 py-2.5 text-xs font-normal leading-5 text-[var(--ink)]"
+                      />
+                    </label>
+                    <label className="mt-3 flex items-start gap-2 text-xs leading-5 text-amber-950">
+                      <input
+                        required
+                        type="checkbox"
+                        name="warningsAcknowledged"
+                        className="mt-1"
+                      />
+                      <span>
+                        I reviewed the warnings and accept responsibility for this decision.
+                      </span>
+                    </label>
+                    <button className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-700 px-4 py-3 text-sm font-bold text-white">
+                      <ThumbsUp size={16} /> Approve with warnings
+                    </button>
+                  </form>
+                ) : null}
+                {post.status === "ready_for_review" && !post.evaluation ? (
+                  <p className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-xs leading-5 text-red-900">
+                    Verification data is unavailable. Approval remains disabled because this is a
+                    technical integrity failure, not an editorial warning.
                   </p>
                 ) : null}
 

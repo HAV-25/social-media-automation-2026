@@ -73,11 +73,11 @@ export async function POST(
     return errorResponse(404, "brand_not_found", "Brand context could not be loaded.");
   }
   const research = await getResearchEvidence(opportunityId);
-  if (!research?.evidencePackage.readyForWriting) {
+  if (!research) {
     return errorResponse(
       409,
       "evidence_not_ready",
-      "Complete research and resolve evidence blockers before generating a draft.",
+      "Complete bounded research before generating a draft.",
     );
   }
   const existingDrafts =

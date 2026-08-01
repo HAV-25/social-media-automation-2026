@@ -8,6 +8,7 @@ import {
   manualInputRequestSchema,
   organizationRoleSchema,
   postActionWorkflowRequestSchema,
+  postReviewActionSchema,
   postVerificationWorkflowRequestSchema,
   researchPlanSchema,
   serverEnvSchema,
@@ -38,6 +39,21 @@ describe("shared contracts", () => {
   it("accepts every Phase 1 role and content style", () => {
     expect(organizationRoleSchema.parse("reviewer")).toBe("reviewer");
     expect(contentStyleSchema.parse("perspective_conversation")).toBe("perspective_conversation");
+  });
+
+  it("carries explicit warning acknowledgement on approval requests", () => {
+    const approval = postReviewActionSchema.parse({
+      action: "approve",
+      idempotencyKey: "approval-with-warning-0001",
+      expectedVersionId: "00000000-0000-4000-8000-000000000001",
+      reason: "Reviewer accepts the documented evidence limitation.",
+      warningsAcknowledged: true,
+    });
+
+    expect(approval).toMatchObject({
+      action: "approve",
+      warningsAcknowledged: true,
+    });
   });
 
   it("binds initial image generation to the selected concept and template", () => {

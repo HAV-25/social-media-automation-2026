@@ -5,6 +5,7 @@ import { buildReviewerPackage } from "@/lib/download-package";
 import { canReviewContent } from "@/lib/permissions";
 import { getPostDetail } from "@/lib/post-detail";
 import { getPostFinalImageBytes } from "@/lib/post-image-review";
+import { getResearchEvidence } from "@/lib/research";
 
 export const runtime = "nodejs";
 
@@ -26,7 +27,10 @@ export async function GET(request: Request, context: { params: Promise<{ postDra
       { status: 404 },
     );
   }
-  const image = await getPostFinalImageBytes(post);
+  const [image, research] = await Promise.all([
+    getPostFinalImageBytes(post),
+    getResearchEvidence(post.opportunityId),
+  ]);
   if (!image) {
     return NextResponse.json(
       {
@@ -38,6 +42,12 @@ export async function GET(request: Request, context: { params: Promise<{ postDra
       { status: 409 },
     );
   }
+  const decisionEvent = post.feedback.find((event) =>
+    ["approve", "reject", "request_changes"].includes(event.eventType),
+  );
+  const warningAcknowledgement = post.feedback.find(
+    (event) => event.eventType === "approval_warning_acknowledged",
+  );
   const packageResult = buildReviewerPackage({
     post: {
       id: post.id,
@@ -51,7 +61,19 @@ export async function GET(request: Request, context: { params: Promise<{ postDra
       versionNumber: post.currentVersion.versionNumber,
       fullText: post.currentVersion.content.fullText,
       evaluation: post.evaluation,
+      provenance: post.provenance,
     },
+    research,
+    decision: decisionEvent
+      ? {
+          type: decisionEvent.eventType,
+          reason: decisionEvent.reason,
+          reviewerId: decisionEvent.userId,
+          decidedAt: decisionEvent.createdAt,
+          warningsAcknowledged: Boolean(warningAcknowledgement),
+          warningSnapshot: warningAcknowledgement?.metadata.warningSnapshot ?? null,
+        }
+      : null,
     image,
   });
   return new NextResponse(new Uint8Array(packageResult.bytes), {

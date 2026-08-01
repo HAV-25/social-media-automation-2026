@@ -610,7 +610,7 @@ describe("Milestone 5 research workflow", () => {
     }
   });
 
-  it("treats bounded research that is not ready for writing as a successful terminal outcome", () => {
+  it("dispatches three styles when bounded research completes with editorial warnings", () => {
     const result = runCodeNode(codeNode("wf-05-research.json", "Sign Three-style Draft Request"), {
       input: {
         first: () => ({
@@ -630,14 +630,24 @@ describe("Milestone 5 research workflow", () => {
             body: {
               correlationId: "00000000-0000-4000-8000-000000000003",
               opportunityId: "00000000-0000-4000-8000-000000000004",
+              actorId: "00000000-0000-4000-8000-000000000005",
+              brandId: "00000000-0000-4000-8000-000000000006",
             },
           },
         }),
       }),
+      env: {
+        WORKFLOW_HMAC_SECRET: "test-workflow-secret",
+        N8N_WEBHOOK_BASE_URL: "https://n8n.example.test",
+      },
     });
 
-    expect(result).toEqual([
-      { json: { dispatch: false, reason: "research_not_ready_for_writing" } },
+    expect(result).toHaveLength(3);
+    expect(result.every((item) => item.json.dispatch === true)).toBe(true);
+    expect(result.map((item) => item.json.contentStyle)).toEqual([
+      "newsworthy_authority",
+      "educational_breakdown",
+      "perspective_conversation",
     ]);
     expect(
       loadWorkflow("wf-05-research.json").connections["Dispatch Editorial Generation?"],
@@ -691,7 +701,7 @@ describe("Milestone 6 editorial workflows", () => {
     expect(source).toContain("'image_generation'");
   });
 
-  it("does not call image generation when verification requires editorial review", () => {
+  it("dispatches image generation when verification completes with editorial warnings", () => {
     const postDraftId = "00000000-0000-4000-8000-000000000001";
     const result = runCodeNode(codeNode("wf-07-post-verification.json", "Sign Image Handoff"), {
       input: {
@@ -710,13 +720,21 @@ describe("Milestone 6 editorial workflows", () => {
             body: {
               postDraftId,
               correlationId: "00000000-0000-4000-8000-000000000003",
+              actorId: "00000000-0000-4000-8000-000000000004",
+              brandId: "00000000-0000-4000-8000-000000000005",
             },
           },
         }),
       }),
+      env: {
+        WORKFLOW_HMAC_SECRET: "test-workflow-secret",
+        N8N_WEBHOOK_BASE_URL: "https://n8n.example.test",
+      },
     });
 
-    expect(result).toEqual([{ json: { dispatch: false, reason: "draft_not_ready_for_image" } }]);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.json.dispatch).toBe(true);
+    expect(result[0]?.json.url).toBe("https://n8n.example.test/webhook/image-generation-v1");
     expect(
       loadWorkflow("wf-07-post-verification.json").connections["Dispatch Image Generation?"],
     ).toEqual({

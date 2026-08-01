@@ -61,6 +61,8 @@ export type PostDetail = {
   feedback: Array<{
     eventType: string;
     reason: string;
+    userId: string | null;
+    metadata: Record<string, unknown>;
     createdAt: string;
   }>;
 };
@@ -117,7 +119,11 @@ export async function getPostDetail(postDraftId: string): Promise<PostDetail | n
         costUsd: 0,
         promptSnapshot: null,
       },
-      feedback: draft.feedback,
+      feedback: draft.feedback.map((item) => ({
+        ...item,
+        userId: null,
+        metadata: {},
+      })),
     };
   }
 
@@ -165,7 +171,7 @@ export async function getPostDetail(postDraftId: string): Promise<PostDetail | n
       .limit(1),
     supabase
       .from("feedback_events")
-      .select("event_type,reason,created_at")
+      .select("event_type,reason,user_id,metadata,created_at")
       .eq("post_draft_id", postDraftId)
       .order("created_at", { ascending: false }),
   ]);
@@ -255,6 +261,11 @@ export async function getPostDetail(postDraftId: string): Promise<PostDetail | n
     feedback: (feedback ?? []).map((item) => ({
       eventType: item.event_type,
       reason: item.reason ?? "",
+      userId: item.user_id,
+      metadata:
+        item.metadata && typeof item.metadata === "object" && !Array.isArray(item.metadata)
+          ? (item.metadata as Record<string, unknown>)
+          : {},
       createdAt: item.created_at,
     })),
   };

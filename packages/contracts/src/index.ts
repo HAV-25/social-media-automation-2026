@@ -1454,6 +1454,7 @@ export const postReviewActionSchema = z.discriminatedUnion("action", [
     idempotencyKey: z.string().min(16).max(200),
     expectedVersionId: z.uuid(),
     reason: z.string().trim().max(2_000).default(""),
+    warningsAcknowledged: z.boolean().default(false),
   }),
   z.object({
     action: z.literal("reject"),

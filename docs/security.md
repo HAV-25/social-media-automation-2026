@@ -68,6 +68,13 @@
   inside the persistence transaction. Verified factual/numerical claims require
   supporting evidence; unverified high-risk claims are blocked; unknown
   source/claim references and empty writing-ready packages are rejected.
+- During internal UAT, a valid completed evidence package and deterministic
+  evaluation may carry advisory findings into draft and image preparation.
+  Missing/invalid evidence or verification remains a hard failure. Approving a
+  warning-bearing post requires a reviewer reason, explicit acknowledgement,
+  and an exact warning snapshot rechecked by the service-only database function;
+  stale or altered snapshots fail closed and successful overrides are written to
+  both feedback and audit history.
 - Provider failures retain available model, prompt, response, token, search,
   cost, and error provenance without returning secrets or raw provider errors to
   the browser.

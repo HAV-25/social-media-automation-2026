@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(17);
+select plan(21);
 
 insert into auth.users (
   instance_id,
@@ -126,7 +126,7 @@ values (
   'thoughtful',
   'ready_for_review',
   88,
-  '{"evaluation":{"readyForReview":true}}'::jsonb
+  '{"evaluation":{"contractVersion":"1.0","evidenceScore":62,"brandFitScore":78,"qualityScore":74,"sourceSimilarity":0.2,"sameBrandSimilarity":0.1,"crossBrandSimilarity":0.1,"hookReuseSimilarity":0.1,"unsupportedHighRiskClaims":0,"contradictions":1,"prohibitedPhrases":[],"restrictedTopics":[],"cliches":[],"warnings":["The evidence ledger contains a material conflict."],"sentenceClaims":[],"readyForReview":false}}'::jsonb
 );
 
 insert into public.post_versions (
@@ -256,7 +256,7 @@ select results_eq(
     )
   $$,
   array['ready'::text],
-  'service persistence creates a ready image only after both objects exist'
+  'service persistence creates a ready image for a verified draft with recorded warnings'
 );
 select results_eq(
   $$
@@ -512,6 +512,91 @@ select throws_ok(
   '23514',
   'Image generation provenance is immutable',
   'generated-image provenance cannot be rewritten'
+);
+
+select throws_ok(
+  $$
+    select *
+    from public.review_evaluated_post(
+      jsonb_build_object(
+        'actorId', '40000000-0000-4000-8000-000000000013',
+        'postDraftId', '66000000-0000-4000-8000-000000000001',
+        'expectedVersionId', '67000000-0000-4000-8000-000000000001',
+        'idempotencyKey', 'warning-approval-missing-ack-0001',
+        'requestHash', repeat('3', 64),
+        'action', 'approve',
+        'reason', 'The reviewer accepts the recorded evidence limitation.',
+        'warningsAcknowledged', false,
+        'warningSnapshot', jsonb_build_object()
+      )
+    )
+  $$,
+  '22023',
+  'Warning approval requires acknowledgement and reason',
+  'warning-bearing approval requires explicit acknowledgement'
+);
+select throws_ok(
+  $$
+    select *
+    from public.review_evaluated_post(
+      jsonb_build_object(
+        'actorId', '40000000-0000-4000-8000-000000000013',
+        'postDraftId', '66000000-0000-4000-8000-000000000001',
+        'expectedVersionId', '67000000-0000-4000-8000-000000000001',
+        'idempotencyKey', 'warning-approval-stale-snapshot-0001',
+        'requestHash', repeat('4', 64),
+        'action', 'approve',
+        'reason', 'The reviewer accepts the recorded evidence limitation.',
+        'warningsAcknowledged', true,
+        'warningSnapshot', jsonb_build_object('readyForReview', false)
+      )
+    )
+  $$,
+  '40001',
+  'Editorial warning snapshot is stale',
+  'warning-bearing approval rejects a stale warning snapshot'
+);
+select results_eq(
+  $$
+    select status::text
+    from public.review_evaluated_post(
+      jsonb_build_object(
+        'actorId', '40000000-0000-4000-8000-000000000013',
+        'postDraftId', '66000000-0000-4000-8000-000000000001',
+        'expectedVersionId', '67000000-0000-4000-8000-000000000001',
+        'idempotencyKey', 'warning-approval-complete-0001',
+        'requestHash', repeat('5', 64),
+        'action', 'approve',
+        'reason', 'The reviewer accepts the recorded evidence limitation.',
+        'warningsAcknowledged', true,
+        'warningSnapshot', jsonb_build_object(
+          'readyForReview', false,
+          'warnings', jsonb_build_array('The evidence ledger contains a material conflict.'),
+          'evidenceScore', 62,
+          'brandFitScore', 78,
+          'unsupportedHighRiskClaims', 0,
+          'contradictions', 1,
+          'prohibitedPhrases', jsonb_build_array(),
+          'restrictedTopics', jsonb_build_array(),
+          'sourceSimilarity', 0.2,
+          'sameBrandSimilarity', 0.1
+        )
+      )
+    )
+  $$,
+  array['approved'::text],
+  'assigned reviewer can approve with an exact warning acknowledgement'
+);
+select is(
+  (
+    select count(*)
+    from public.feedback_events
+    where post_draft_id = '66000000-0000-4000-8000-000000000001'
+      and event_type = 'approval_warning_acknowledged'
+      and metadata -> 'warningSnapshot' ->> 'readyForReview' = 'false'
+  ),
+  1::bigint,
+  'warning acknowledgement and snapshot are retained for audit and export'
 );
 
 select * from finish();

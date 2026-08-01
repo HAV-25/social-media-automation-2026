@@ -171,7 +171,7 @@ export default async function OpportunityPage({
                   >
                     {research.evidencePackage.readyForWriting
                       ? "Ready for writing"
-                      : "Reviewer judgment required"}
+                      : "Prepared with evidence warnings"}
                   </span>
                 </div>
                 {research.simulated ? (
@@ -321,7 +321,7 @@ export default async function OpportunityPage({
             <DraftGenerator
               opportunityId={opportunity.id}
               defaultStyle={opportunity.recommendedStyle}
-              hasEvidence={Boolean(research?.evidencePackage.readyForWriting)}
+              hasEvidence={Boolean(research)}
             />
           </aside>
         </div>

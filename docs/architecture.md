@@ -94,6 +94,15 @@ an equally durable path, preserving available provider usage while releasing an
 unused reservation. n8n WF-05 coordinates the signed call; it contains neither
 prompts nor provider credentials and is never the system of record.
 
+For the internal UAT policy, a structurally valid completed research package may
+continue to three-style preparation even when its evidence assessment contains
+warnings. Deterministic verification likewise records quality, risk, similarity,
+and evidence findings before image preparation without treating those findings
+as transport or state failures. Final approval remains human-only. A warning
+approval requires an explicit acknowledgement, reviewer reason, and exact
+server-verified snapshot of the current findings; technical integrity failures
+remain fail-closed.
+
 ## Security boundaries
 
 - `anon` receives no application-table grants.

@@ -56,17 +56,22 @@ export async function reviewPost(
   }
   const nextStatus = nextPostStatus(post.status, action);
   if (!nextStatus) fail(postDraftId, `Action ${action} is not allowed from ${post.status}.`);
-  if (action === "approve" && !post.evaluation?.readyForReview) {
-    fail(
-      postDraftId,
-      "This post does not pass the evidence, brand-fit, risk, and similarity gates.",
-    );
-  }
 
   const closing = String(formData.get("closing") ?? "").trim();
   const hook = String(formData.get("hook") ?? "").trim();
   const body = String(formData.get("body") ?? "").trim();
   const reason = String(formData.get("reason") ?? "").trim();
+  const warningsAcknowledged = formData.get("warningsAcknowledged") === "on";
+  if (action === "approve" && !post.evaluation) {
+    fail(postDraftId, "Verification data is unavailable. Retry verification before approval.");
+  }
+  const hasReadinessWarnings = action === "approve" && !post.evaluation?.readyForReview;
+  if (hasReadinessWarnings && !warningsAcknowledged) {
+    fail(postDraftId, "Acknowledge the recorded warnings before approving this post.");
+  }
+  if (hasReadinessWarnings && reason.length < 10) {
+    fail(postDraftId, "Add a short decision reason before approving with warnings.");
+  }
   const input = postReviewActionSchema.safeParse(
     action === "edit"
       ? {
@@ -85,6 +90,7 @@ export async function reviewPost(
           idempotencyKey: String(formData.get("idempotencyKey") ?? ""),
           expectedVersionId,
           reason,
+          ...(action === "approve" ? { warningsAcknowledged } : {}),
         },
   );
   if (!input.success) {
@@ -173,6 +179,8 @@ export async function reviewPost(
       content: editedContent,
       evaluation: nextEvaluation ?? undefined,
       reason: decisionReason || undefined,
+      warningsAcknowledged:
+        validated.action === "approve" ? validated.warningsAcknowledged : undefined,
     }),
   );
   const supabase = createSupabaseServiceClient();
@@ -184,6 +192,21 @@ export async function reviewPost(
         postDraftId,
         requestHash,
         evaluation: nextEvaluation,
+        warningSnapshot:
+          validated.action === "approve" && !post.evaluation?.readyForReview
+            ? {
+                readyForReview: false,
+                warnings: post.evaluation?.warnings ?? [],
+                evidenceScore: post.evaluation?.evidenceScore ?? null,
+                brandFitScore: post.evaluation?.brandFitScore ?? null,
+                unsupportedHighRiskClaims: post.evaluation?.unsupportedHighRiskClaims ?? null,
+                contradictions: post.evaluation?.contradictions ?? null,
+                prohibitedPhrases: post.evaluation?.prohibitedPhrases ?? [],
+                restrictedTopics: post.evaluation?.restrictedTopics ?? [],
+                sourceSimilarity: post.evaluation?.sourceSimilarity ?? null,
+                sameBrandSimilarity: post.evaluation?.sameBrandSimilarity ?? null,
+              }
+            : undefined,
       },
     })
     .single();

@@ -1,4 +1,4 @@
-import type { DraftEvaluation } from "@content-engine/contracts";
+import type { DraftEvaluation, EvidencePackage } from "@content-engine/contracts";
 import type { PostImageReviewState } from "./post-image-review";
 
 export type ZipEntry = {
@@ -116,6 +116,7 @@ function evidenceSummary(input: {
   sourceTitle: string;
   opportunityId: string;
   evaluation: DraftEvaluation | null;
+  evidencePackage: EvidencePackage | null;
 }) {
   const claims =
     input.evaluation?.sentenceClaims
@@ -129,6 +130,28 @@ function evidenceSummary(input: {
   const warnings = input.evaluation?.warnings.length
     ? input.evaluation.warnings.map((warning) => `- ${warning}`).join("\n")
     : "- None";
+  const researchSources = input.evidencePackage?.sources.length
+    ? input.evidencePackage.sources
+        .map(
+          (source, index) =>
+            `${index + 1}. ${source.title} — ${source.publisher}\n   ${source.url}\n   Retrieved: ${source.retrievedAt}`,
+        )
+        .join("\n")
+    : "No research sources were recorded.";
+  const researchClaims = input.evidencePackage?.claims.length
+    ? input.evidencePackage.claims
+        .map(
+          (claim, index) =>
+            `${index + 1}. [${claim.verificationState}; ${claim.usageGuidance}; risk ${claim.riskLevel}] ${claim.text}${claim.caveat ? `\n   Caveat: ${claim.caveat}` : ""}`,
+        )
+        .join("\n")
+    : "No research claims were recorded.";
+  const researchWarnings = [
+    ...(input.evidencePackage?.caveats ?? []),
+    ...(input.evidencePackage?.conflicts.map(
+      (conflict) => `${conflict.description} Resolution: ${conflict.resolution}`,
+    ) ?? []),
+  ];
   return `# Source and evidence summary
 
 Source: ${input.sourceTitle}
@@ -138,9 +161,21 @@ Opportunity ID: ${input.opportunityId}
 
 ${claims}
 
+## Research sources
+
+${researchSources}
+
+## Claims ledger
+
+${researchClaims}
+
 ## Quality and risk warnings
 
 ${warnings}
+
+## Research caveats and conflicts
+
+${researchWarnings.length ? researchWarnings.map((warning) => `- ${warning}`).join("\n") : "- None"}
 `;
 }
 
@@ -157,9 +192,46 @@ export function buildReviewerPackage(input: {
     versionNumber: number;
     fullText: string;
     evaluation: DraftEvaluation | null;
+    provenance: {
+      model: string | null;
+      promptVersion: string | null;
+      responseId: string | null;
+      inputTokens: number;
+      outputTokens: number;
+      costUsd: number;
+      promptSnapshot: {
+        promptVersion: string;
+        systemPrompt: string;
+        userPrompt: string;
+        checksum: string;
+      } | null;
+    };
   };
+  research: {
+    evidencePackage: EvidencePackage;
+    model: string;
+    promptVersion: string;
+    responseId: string;
+    usage: {
+      inputTokens: number;
+      outputTokens: number;
+      webSearchCalls: number;
+      estimatedCostUsd: number;
+    };
+  } | null;
+  decision: {
+    type: string;
+    reason: string;
+    reviewerId: string | null;
+    decidedAt: string;
+    warningsAcknowledged: boolean;
+    warningSnapshot: unknown;
+  } | null;
   image: { bytes: Buffer; state: PostImageReviewState };
 }) {
+  const researchCostUsd = input.research?.usage.estimatedCostUsd ?? 0;
+  const postCostUsd = input.post.provenance.costUsd;
+  const imageCostUsd = input.image.state.estimatedCostUsd;
   const metadata = {
     contractVersion: "1.0",
     exportedAt: new Date().toISOString(),
@@ -172,7 +244,13 @@ export function buildReviewerPackage(input: {
       contentStyle: input.post.contentStyle,
       tone: input.post.tone,
       status: input.post.status,
+      scores: input.post.evaluation,
+      prompt: input.post.provenance.promptSnapshot,
+      model: input.post.provenance.model,
+      promptVersion: input.post.provenance.promptVersion,
+      responseId: input.post.provenance.responseId,
     },
+    research: input.research,
     image: {
       imageAssetId: input.image.state.imageAssetId,
       selectedConceptKey: input.image.state.selectedConceptKey,
@@ -180,9 +258,17 @@ export function buildReviewerPackage(input: {
       model: input.image.state.model,
       promptVersion: input.image.state.promptVersion,
       providerResponseId: input.image.state.providerResponseId,
+      prompt: input.image.state.prompt,
       estimatedCostUsd: input.image.state.estimatedCostUsd,
       validation: input.image.state.validation,
       createdAt: input.image.state.createdAt,
+    },
+    decision: input.decision,
+    cost: {
+      researchUsd: researchCostUsd,
+      postUsd: postCostUsd,
+      imageUsd: imageCostUsd,
+      totalUsd: researchCostUsd + postCostUsd + imageCostUsd,
     },
   };
   const zip = createStoredZip([
@@ -195,6 +281,7 @@ export function buildReviewerPackage(input: {
           sourceTitle: input.post.sourceTitle,
           opportunityId: input.post.opportunityId,
           evaluation: input.post.evaluation,
+          evidencePackage: input.research?.evidencePackage ?? null,
         }),
         "utf8",
       ),

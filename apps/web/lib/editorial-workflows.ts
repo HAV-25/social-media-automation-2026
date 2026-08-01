@@ -248,10 +248,10 @@ export async function generateWorkflowDrafts(input: EditorialWorkflowRequest) {
     brandId: input.brandId,
     organizationId: brand.brand.organizationId,
   });
-  if (!research?.evidencePackage.readyForWriting) {
+  if (!research) {
     throw new EditorialWorkflowError(
       "evidence_not_ready",
-      "Writing-ready research is required before editorial generation.",
+      "Completed bounded research is required before editorial generation.",
       409,
     );
   }

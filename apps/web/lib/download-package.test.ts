@@ -32,6 +32,29 @@ describe("reviewer download package", () => {
         versionNumber: 2,
         fullText: "A verified post.\n\nEvidence-led body.\n\nWhat would you test?",
         evaluation: null,
+        provenance: {
+          model: "fake-editorial-v1",
+          promptVersion: "facebook-writer.v2",
+          responseId: "fake-editorial-response",
+          inputTokens: 20,
+          outputTokens: 30,
+          costUsd: 0,
+          promptSnapshot: {
+            promptVersion: "facebook-writer.v2",
+            systemPrompt: "Write only from the supplied evidence.",
+            userPrompt: "Create an educational Facebook post.",
+            checksum: "a".repeat(64),
+          },
+        },
+      },
+      research: null,
+      decision: {
+        type: "approve",
+        reason: "",
+        reviewerId: "40000000-0000-4000-8000-000000000001",
+        decidedAt: "2026-07-24T12:05:00.000Z",
+        warningsAcknowledged: false,
+        warningSnapshot: null,
       },
       image: {
         bytes: Buffer.from("fake-png-bytes"),
@@ -73,6 +96,10 @@ describe("reviewer download package", () => {
     expect(entries.get("generation-metadata.json")?.toString("utf8")).not.toContain(
       "OPENAI_API_KEY",
     );
+    expect(entries.get("generation-metadata.json")?.toString("utf8")).toContain(
+      "fake-editorial-response",
+    );
+    expect(entries.get("generation-metadata.json")?.toString("utf8")).toContain('"decision"');
     expect(result.filename).toBe("ai-operating-model-a-field-note-package.zip");
   });
 
