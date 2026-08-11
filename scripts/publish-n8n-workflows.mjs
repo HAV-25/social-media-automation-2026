@@ -2,8 +2,11 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
+/* global URLSearchParams, console, fetch, process */
+
 const root = resolve(import.meta.dirname, "..");
-const workflowDirectory = resolve(root, "n8n", "workflows");
+const legacyWorkflowDirectory = resolve(root, "n8n", "workflows");
+const lightweightWorkflowDirectory = resolve(root, "n8n", "lightweight");
 const defaultFiles = [
   "wf-10-error-recovery.json",
   "wf-01-rss-intake.json",
@@ -23,6 +26,13 @@ const recoverableWorkflowNames = new Set([
   "WF-08 Image Generation",
   "WF-09 Content Actions",
 ]);
+const lightweightFiles = [
+  "lw-01-daily-intake.json",
+  "lw-02-research-worker.json",
+  "lw-03-draft-verification-worker.json",
+  "lw-04-image-package-worker.json",
+  "lw-05-retry-recovery.json",
+];
 
 export function parseEnv(source) {
   return Object.fromEntries(
@@ -141,16 +151,29 @@ async function listWorkflows(request, projectId) {
   return workflows;
 }
 
-function selectedFiles(argumentsList) {
+export function selectedProfile(argumentsList) {
+  const profile = argumentsList.find((argument) => argument.startsWith("--profile="));
+  const value = profile?.slice("--profile=".length) ?? "legacy";
+  if (!new Set(["legacy", "lightweight"]).has(value)) {
+    throw new Error("--profile must be legacy or lightweight.");
+  }
+  return value;
+}
+
+export function selectedFiles(argumentsList, profile) {
   const requested = argumentsList.find((argument) => argument.startsWith("--files="));
-  if (!requested) return defaultFiles;
+  if (!requested) return profile === "lightweight" ? lightweightFiles : defaultFiles;
   const files = requested
     .slice("--files=".length)
     .split(",")
     .map((file) => file.trim())
     .filter(Boolean);
-  if (!files.length || files.some((file) => !/^wf-(?:0[1-9]|10)[a-z0-9-]*\.json$/.test(file))) {
-    throw new Error("--files must be a comma-separated list of workflow JSON filenames.");
+  const allowedPattern =
+    profile === "lightweight"
+      ? /^lw-0[1-5][a-z0-9-]*\.json$/
+      : /^wf-(?:0[1-9]|10)[a-z0-9-]*\.json$/;
+  if (!files.length || files.some((file) => !allowedPattern.test(file))) {
+    throw new Error(`--files contains a filename outside the ${profile} workflow profile.`);
   }
   return files;
 }
@@ -161,6 +184,8 @@ export async function publishWorkflows({
   projectId,
   folderId,
   files = defaultFiles,
+  workflowDirectory = legacyWorkflowDirectory,
+  linkRecoveryWorkflow = true,
   apply = false,
   publish = false,
 }) {
@@ -177,8 +202,11 @@ export async function publishWorkflows({
   );
   const remote = await listWorkflows(request, projectId);
   const results = [];
-  const plansWf10Creation = !apply && files.includes("wf-10-error-recovery.json");
-  let errorWorkflowId = remote.find((workflow) => workflow.name === "WF-10 Error and Recovery")?.id;
+  const plansWf10Creation =
+    linkRecoveryWorkflow && !apply && files.includes("wf-10-error-recovery.json");
+  let errorWorkflowId = linkRecoveryWorkflow
+    ? remote.find((workflow) => workflow.name === "WF-10 Error and Recovery")?.id
+    : undefined;
   for (const filename of files) {
     const local = JSON.parse(await readFile(resolve(workflowDirectory, filename), "utf8"));
     const matches = remote.filter((workflow) => workflow.name === local.name);
@@ -186,10 +214,15 @@ export async function publishWorkflows({
       throw new Error(`Refusing to update duplicate remote workflows named "${local.name}".`);
     }
     const current = matches[0];
-    const linkedErrorWorkflowId = recoverableWorkflowNames.has(local.name)
-      ? (errorWorkflowId ?? (plansWf10Creation ? "<created-WF-10-id>" : undefined))
-      : undefined;
-    if (recoverableWorkflowNames.has(local.name) && !linkedErrorWorkflowId) {
+    const linkedErrorWorkflowId =
+      linkRecoveryWorkflow && recoverableWorkflowNames.has(local.name)
+        ? (errorWorkflowId ?? (plansWf10Creation ? "<created-WF-10-id>" : undefined))
+        : undefined;
+    if (
+      linkRecoveryWorkflow &&
+      recoverableWorkflowNames.has(local.name) &&
+      !linkedErrorWorkflowId
+    ) {
       throw new Error("WF-10 Error and Recovery must be published before recoverable workflows.");
     }
     const action = !current
@@ -225,7 +258,7 @@ export async function publishWorkflows({
         body: JSON.stringify(workflowPayload(local, {}, linkedErrorWorkflowId)),
       });
     }
-    if (local.name === "WF-10 Error and Recovery" && workflowId) {
+    if (linkRecoveryWorkflow && local.name === "WF-10 Error and Recovery" && workflowId) {
       errorWorkflowId = workflowId;
     }
     if (apply && publish && workflowId && current?.active && action === "update") {
@@ -258,11 +291,21 @@ export async function publishWorkflows({
 
 async function main() {
   const configuration = await localConfiguration();
+  const argumentsList = process.argv.slice(2);
+  const profile = selectedProfile(argumentsList);
   const apply = process.argv.includes("--apply");
   const publish = process.argv.includes("--publish");
+  if (profile === "lightweight" && publish) {
+    throw new Error(
+      "Lightweight workflows must be imported inactive. Activate them only during the approval-gated cutover.",
+    );
+  }
   const results = await publishWorkflows({
     ...configuration,
-    files: selectedFiles(process.argv.slice(2)),
+    files: selectedFiles(argumentsList, profile),
+    workflowDirectory:
+      profile === "lightweight" ? lightweightWorkflowDirectory : legacyWorkflowDirectory,
+    linkRecoveryWorkflow: profile === "legacy",
     apply,
     publish,
   });

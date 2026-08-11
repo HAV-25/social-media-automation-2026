@@ -1860,3 +1860,15 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   RSS-to-package journey are still open. Production cutover remains blocked
   until those environment-level gates pass and the product owner accepts the
   preview.
+- Added a 32-assertion pgTAP shadow suite covering lightweight RLS, service-only
+  RPCs, provider reservation/reuse/ambiguity, atomic lease-bound persistence,
+  stale workers, exhausted leases, reviewer idempotency/version transitions and
+  shared-feed administration. It is ready to execute on the disposable branch.
+- Added a separate n8n `lightweight` import profile and explicit plan/import
+  commands. The profile imports only the five LW workflows and refuses
+  activation even when `--publish` is supplied. A read-only production n8n API
+  dry run identified all five as new inactive creates in project
+  `LM6rFYOifKxnz9j6`, folder `Zkn0ES0lLmQ9L5uB`; no workflow was changed.
+- Added `docs/lightweight-shadow-validation.md` with the database, Edge, n8n,
+  happy-path, recovery-matrix, acceptance and branch-cleanup evidence required
+  before cutover.

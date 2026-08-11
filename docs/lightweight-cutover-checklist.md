@@ -1,5 +1,8 @@
 # Lightweight cutover checklist
 
+Execute and retain the evidence defined in
+`docs/lightweight-shadow-validation.md` before checking any pre-cutover item.
+
 ## Pre-cutover
 
 - [ ] Migration reviewed and applied successfully.

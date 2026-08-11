@@ -42,8 +42,26 @@ const supabaseConfig = readFileSync(
   new URL("../../../supabase/config.toml", import.meta.url),
   "utf8",
 );
+const n8nPublisherSource = readFileSync(
+  new URL("../../../scripts/publish-n8n-workflows.mjs", import.meta.url),
+  "utf8",
+);
+const rootPackage = JSON.parse(
+  readFileSync(new URL("../../../package.json", import.meta.url), "utf8"),
+) as { scripts?: Record<string, string> };
 
 describe("lightweight production runtime", () => {
+  it("has a dedicated inactive-only n8n import profile", () => {
+    expect(rootPackage.scripts?.["n8n:lightweight:plan"]).toContain("--profile=lightweight");
+    expect(rootPackage.scripts?.["n8n:lightweight:import"]).toContain(
+      "--profile=lightweight --apply",
+    );
+    expect(rootPackage.scripts?.["n8n:lightweight:import"]).not.toContain("--publish");
+    expect(n8nPublisherSource).toContain("Lightweight workflows must be imported inactive.");
+    expect(n8nPublisherSource).toContain('profile === "lightweight" && publish');
+    expect(n8nPublisherSource).toContain('linkRecoveryWorkflow: profile === "legacy"');
+  });
+
   it("claims durable jobs atomically and bounds retries", () => {
     expect(controlPlane).toContain("for update skip locked");
     expect(controlPlane).toContain("attempt < job.max_attempts");

@@ -19,7 +19,9 @@
     "sheet:build": "node scripts/build-team-input-register.mjs",
     "runtime:preflight": "node scripts/check-runtime-bridge.mjs --remote",
     "n8n:plan": "node scripts/publish-n8n-workflows.mjs",
-    "n8n:publish": "node scripts/publish-n8n-workflows.mjs --apply --publish"
+    "n8n:publish": "node scripts/publish-n8n-workflows.mjs --apply --publish",
+    "n8n:lightweight:plan": "node scripts/publish-n8n-workflows.mjs --profile=lightweight",
+    "n8n:lightweight:import": "node scripts/publish-n8n-workflows.mjs --profile=lightweight --apply"
   },
   "devDependencies": {
     "@eslint/js": "9.32.0",
