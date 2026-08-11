@@ -1,5 +1,37 @@
 # Architecture decisions
 
+## ADR-035 — Paid provider calls use a durable ambiguity boundary
+
+**Status:** Accepted, 2026-08-11
+
+Every research, writing, or image provider operation is reserved in a private
+durable ledger before the external call. Completed responses are cached for
+replay. A failure proven safe to retry releases the reservation; an outcome that
+may have reached the provider becomes `ambiguous` and requires operator review.
+Workers also supply stable provider idempotency keys where supported, but the
+system does not claim impossible cross-system exactly-once transactions.
+
+## ADR-036 — Stage persistence is atomic and lease-bound
+
+**Status:** Accepted, 2026-08-11
+
+A worker may persist a stage only while it owns the matching unexpired lease.
+Stage output, usage, cost, job completion, pipeline state and next-stage enqueue
+are one PostgreSQL transaction. Final expired attempts are terminalized. Tenant
+identity is protected by composite foreign keys and runtime validation across
+pipelines, jobs, opportunities, drafts, images and packages.
+
+## ADR-037 — Reviewer assets and decisions are current-version-bound
+
+**Status:** Accepted, 2026-08-11
+
+Ready Posts contains only `ready_for_review` drafts. Images and packages are
+shown only when their provenance matches the draft's current immutable version.
+Edits, actions and decisions use stable operation idempotency keys plus an
+expected-version precondition, and the database enforces permitted state
+transitions. Evidence warnings remain reviewer-visible and non-blocking under
+the approved UAT policy.
+
 ## ADR-001 — Next.js, Supabase, and n8n boundary
 
 **Status:** Accepted, 2026-07-23

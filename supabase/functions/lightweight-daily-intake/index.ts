@@ -21,7 +21,7 @@ const requestSchema = z
     contractVersion: z.literal("1.0"),
     correlationId: z.uuid().optional(),
     brandId: z.uuid().optional(),
-    maxItemsPerFeed: z.number().int().min(1).max(10).default(3),
+    maxItemsPerFeed: z.number().int().min(1).max(100).default(50),
   })
   .strict();
 const linkSchema = z.object({
@@ -70,7 +70,19 @@ Deno.serve(async (request) => {
     const input = requestSchema.parse(await request.json());
     const correlationId = input.correlationId ?? crypto.randomUUID();
     const url = Deno.env.get("SUPABASE_URL");
-    const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    let key =
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_SECRET_KEY") ?? "";
+    if (!key) {
+      try {
+        const keys = JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") ?? "{}") as Record<
+          string,
+          string
+        >;
+        key = keys.default ?? Object.values(keys)[0] ?? "";
+      } catch {
+        key = "";
+      }
+    }
     if (!url || !key)
       throw new WorkerHttpError(
         500,

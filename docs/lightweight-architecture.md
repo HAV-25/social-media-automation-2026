@@ -49,11 +49,20 @@ client of those stored results.
 in `private.pipeline_job_payloads`; reviewers see only safe summaries.
 
 Workers atomically claim jobs using `FOR UPDATE SKIP LOCKED`. A lease expiry
-returns abandoned work to the queue. Completion writes output references, usage
-and cost in the same transaction that creates the next stage. The next-stage
-idempotency key derives from the predecessor, so retries cannot duplicate a paid
-stage. Retry delay is bounded exponential backoff and attempts stop at the
-configured ceiling.
+returns abandoned work to the queue unless the final attempt is exhausted, in
+which case the job is terminalized. Stage output, usage, cost, job completion and
+the next-stage enqueue are committed in one lease-bound transaction, so a stale
+worker cannot mutate durable content.
+
+Paid calls use a separate durable provider-operation ledger keyed by job and
+stage. A retry reuses a completed provider result instead of paying again. If a
+worker loses contact after a provider may have accepted a request, the operation
+is marked ambiguous and stops for review rather than automatically repeating an
+unknown-cost call. Stable provider idempotency keys are also supplied where the
+provider accepts them. This is an explicit at-most-once safety boundary; it does
+not claim that an external provider can offer transactional exactly-once delivery.
+Retry delay is bounded exponential backoff and attempts stop at the configured
+ceiling.
 
 Each n8n worker invocation claims one expensive job. The durable queue—not a
 long synchronous request—provides throughput, so scaling does not recreate the
@@ -85,6 +94,12 @@ The release candidate includes:
 - generated-image preview and exact image-prompt provenance;
 - durable stage history with retries, errors and exact recorded cost;
 - 30-second read refresh without starting automation.
+
+The Ready Posts queue contains only `ready_for_review` drafts. Images must match
+the draft's current immutable version, and a downloadable package must identify
+that same draft and version in its manifest. Edits and review decisions carry an
+operation idempotency key and expected-version check, preventing double-clicks
+or stale browser state from creating duplicate versions or decisions.
 
 Brand profile editing remains a cutover-gated compatibility capability. Feed
 administration is implemented directly against RLS-protected Supabase records

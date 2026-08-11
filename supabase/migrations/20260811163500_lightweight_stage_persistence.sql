@@ -6,15 +6,19 @@ create table public.content_packages (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete cascade,
   brand_id uuid not null,
-  pipeline_id uuid not null references public.pipeline_instances(id) on delete cascade,
-  opportunity_id uuid not null references public.opportunities(id) on delete cascade,
+  pipeline_id uuid not null,
+  opportunity_id uuid not null,
   manifest jsonb not null,
   storage_path text,
   checksum text not null check (checksum ~ '^[0-9a-f]{64}$'),
   created_at timestamptz not null default now(),
   unique (pipeline_id),
   foreign key (brand_id, organization_id)
-    references public.brands(id, organization_id) on delete cascade
+    references public.brands(id, organization_id) on delete cascade,
+  foreign key (pipeline_id, brand_id, organization_id)
+    references public.pipeline_instances(id, brand_id, organization_id) on delete cascade,
+  foreign key (opportunity_id, brand_id, organization_id)
+    references public.opportunities(id, brand_id, organization_id) on delete cascade
 );
 
 create index content_packages_brand_created_idx
@@ -25,6 +29,15 @@ create policy content_packages_select on public.content_packages for select
 revoke all on public.content_packages from public, anon, authenticated;
 grant select on public.content_packages to authenticated;
 
+create table private.pipeline_stage_outputs (
+  job_id uuid primary key references public.pipeline_jobs(id) on delete cascade,
+  stage public.pipeline_stage not null,
+  output_hash text not null check (output_hash ~ '^[0-9a-f]{64}$'),
+  persistence_result jsonb not null,
+  created_at timestamptz not null default now()
+);
+revoke all on private.pipeline_stage_outputs from public, anon, authenticated;
+
 create or replace function private.persist_lightweight_stage_output(payload jsonb)
 returns jsonb
 language plpgsql
@@ -32,6 +45,7 @@ security definer
 set search_path = ''
 as $$
 declare
+  target_job public.pipeline_jobs%rowtype;
   target_pipeline public.pipeline_instances%rowtype;
   stage_value public.pipeline_stage := (payload ->> 'stage')::public.pipeline_stage;
   actor_value uuid := nullif(payload ->> 'actorId', '')::uuid;
@@ -41,24 +55,93 @@ declare
   draft_id_value uuid;
   version_id_value uuid;
   angle_value jsonb;
+  evaluation_value jsonb;
+  sentence_claim_value jsonb;
+  claim_id_value uuid;
   selected_angle_id_value uuid;
   next_version_number integer;
   image_value jsonb;
   image_id_value uuid;
   package_id_value uuid;
   affected_count integer;
+  output_value jsonb := payload -> 'output';
+  output_hash_value text;
+  cost_value numeric := coalesce((payload ->> 'costUsd')::numeric, 0);
+  next_stage_value public.pipeline_stage := nullif(payload ->> 'nextStage', '')::public.pipeline_stage;
   result jsonb := '{}'::jsonb;
 begin
+  select * into target_job
+  from public.pipeline_jobs
+  where id = (payload ->> 'jobId')::uuid
+    and state = 'leased'
+    and worker_id = payload ->> 'workerId'
+    and lease_expires_at > now()
+  for update;
+  if target_job.id is null then
+    raise exception 'Active stage job lease not found' using errcode = 'P0002';
+  end if;
   select * into target_pipeline
   from public.pipeline_instances
-  where id = (payload ->> 'pipelineId')::uuid
+  where id = target_job.pipeline_id
   for update;
   if target_pipeline.id is null
      or target_pipeline.opportunity_id is null
      or actor_value is null
-     or jsonb_typeof(payload -> 'output') <> 'object'
+     or target_job.pipeline_id is distinct from nullif(payload ->> 'pipelineId', '')::uuid
+     or target_job.stage is distinct from stage_value
+     or target_job.organization_id is distinct from target_pipeline.organization_id
+     or target_job.brand_id is distinct from target_pipeline.brand_id
+     or target_pipeline.current_stage is distinct from stage_value
+     or jsonb_typeof(output_value) is distinct from 'object'
+     or pg_catalog.octet_length(output_value::text) > 2097152
+     or jsonb_typeof(coalesce(payload -> 'usage', '{}'::jsonb)) is distinct from 'object'
+     or cost_value not between 0 and 100
   then
     raise exception 'Invalid lightweight stage output' using errcode = '22023';
+  end if;
+  if next_stage_value is distinct from case stage_value
+       when 'research' then 'draft'::public.pipeline_stage
+       when 'draft' then 'verify'::public.pipeline_stage
+       when 'verify' then 'image'::public.pipeline_stage
+       when 'image' then 'package'::public.pipeline_stage
+       else null::public.pipeline_stage
+     end
+  then
+    raise exception 'Invalid lightweight stage transition' using errcode = '23514';
+  end if;
+  output_hash_value := encode(extensions.digest(convert_to(output_value::text, 'utf8'), 'sha256'), 'hex');
+
+  if stage_value = 'research' and (
+       jsonb_typeof(output_value -> 'plan') is distinct from 'object'
+       or jsonb_typeof(output_value -> 'evidencePackage') is distinct from 'object'
+       or jsonb_typeof(output_value -> 'evidencePackage' -> 'sources') is distinct from 'array'
+       or jsonb_typeof(output_value -> 'evidencePackage' -> 'claims') is distinct from 'array'
+       or jsonb_array_length(output_value -> 'evidencePackage' -> 'sources') < 1
+       or jsonb_array_length(output_value -> 'evidencePackage' -> 'claims') < 1
+       or output_value -> 'evidencePackage' ->> 'readyForWriting' is distinct from 'true'
+     ) then
+    raise exception 'Research output is incomplete' using errcode = '23514';
+  elsif stage_value = 'draft' and (
+       jsonb_typeof(output_value -> 'drafts') is distinct from 'array'
+       or jsonb_array_length(output_value -> 'drafts') not between 1 and 3
+     ) then
+    raise exception 'Draft output is incomplete' using errcode = '23514';
+  elsif stage_value = 'verify' and (
+       jsonb_typeof(output_value -> 'evaluations') is distinct from 'array'
+       or jsonb_array_length(output_value -> 'evaluations') < 1
+     ) then
+    raise exception 'Verification output is incomplete' using errcode = '23514';
+  elsif stage_value = 'image' and (
+       jsonb_typeof(output_value -> 'images') is distinct from 'array'
+       or jsonb_array_length(output_value -> 'images') < 1
+     ) then
+    raise exception 'Image output is incomplete' using errcode = '23514';
+  elsif stage_value = 'package' and (
+       jsonb_typeof(output_value -> 'manifest') is distinct from 'object'
+       or char_length(coalesce(output_value ->> 'storagePath', '')) not between 1 and 1000
+       or coalesce(output_value ->> 'checksum', '') !~ '^[0-9a-f]{64}$'
+     ) then
+    raise exception 'Package output is incomplete' using errcode = '23514';
   end if;
 
   if stage_value = 'research' then
@@ -136,6 +219,11 @@ begin
     result := jsonb_build_object('researchRunId', research_run_id_value, 'generationRunId', generation_run_id_value);
 
   elsif stage_value = 'draft' then
+    select id into research_run_id_value
+    from public.research_runs
+    where opportunity_id = target_pipeline.opportunity_id and status = 'succeeded'
+    order by completed_at desc nulls last, created_at desc
+    limit 1;
     for draft_value in select value from jsonb_array_elements(payload -> 'output' -> 'drafts') loop
       if nullif(draft_value ->> 'postDraftId', '') is not null then
         select id into draft_id_value from public.post_drafts
@@ -182,6 +270,26 @@ begin
               'revisionCount', next_version_number - 1), updated_at = now()
         where id = draft_id_value;
 
+        if research_run_id_value is not null then
+          for sentence_claim_value in
+            select value from jsonb_array_elements(
+              coalesce(draft_value -> 'evaluation' -> 'sentenceClaims', '[]'::jsonb)
+            )
+          loop
+            if nullif(sentence_claim_value ->> 'claimKey', '') is not null then
+              select id into claim_id_value
+              from public.claims
+              where research_run_id = research_run_id_value
+                and claim_key = sentence_claim_value ->> 'claimKey';
+              if claim_id_value is not null then
+                insert into public.post_claims (post_version_id, claim_id, sentence_text)
+                values (version_id_value, claim_id_value, sentence_claim_value ->> 'sentence')
+                on conflict do nothing;
+              end if;
+            end if;
+          end loop;
+        end if;
+
         for angle_value in select value from jsonb_array_elements(draft_value -> 'angles') loop
           insert into public.angles (
             opportunity_id, title, thesis, content_style, intended_reaction,
@@ -201,21 +309,60 @@ begin
     result := jsonb_build_object('draftCount', jsonb_array_length(payload -> 'output' -> 'drafts'));
 
   elsif stage_value = 'verify' then
-    update public.post_drafts draft
-    set status = 'ready_for_review',
-        score_breakdown = draft.score_breakdown || jsonb_build_object(
-          'verification', coalesce(payload -> 'output' -> 'verification', '{}'::jsonb),
-          'warningsAreNonBlocking', true
-        ),
-        updated_at = now()
-    where draft.opportunity_id = target_pipeline.opportunity_id
-      and draft.brand_id = target_pipeline.brand_id
-      and draft.status in ('verifying', 'evaluating', 'image_pending');
-    get diagnostics affected_count = row_count;
+    affected_count := 0;
+    for evaluation_value in
+      select value from jsonb_array_elements(coalesce(payload -> 'output' -> 'evaluations', '[]'::jsonb))
+    loop
+      update public.post_drafts draft
+      set status = 'ready_for_review',
+          quality_score = (evaluation_value ->> 'qualityScore')::numeric,
+          score_breakdown = draft.score_breakdown || jsonb_build_object(
+            'evaluation', evaluation_value,
+            'verification', coalesce(payload -> 'output' -> 'verification', '{}'::jsonb),
+            'warningsAreNonBlocking', true
+          ),
+          updated_at = now()
+      where draft.id = (evaluation_value ->> 'postDraftId')::uuid
+        and draft.opportunity_id = target_pipeline.opportunity_id
+        and draft.brand_id = target_pipeline.brand_id
+        and draft.status in ('verifying', 'evaluating', 'image_pending', 'ready_for_review');
+      affected_count := affected_count + case when found then 1 else 0 end;
+    end loop;
     result := jsonb_build_object('verifiedDraftCount', affected_count);
 
   elsif stage_value = 'image' then
     for image_value in select value from jsonb_array_elements(payload -> 'output' -> 'images') loop
+      if coalesce(image_value ->> 'baseChecksum', '') !~ '^[0-9a-f]{64}$'
+         or coalesce(image_value ->> 'finalChecksum', '') !~ '^[0-9a-f]{64}$'
+         or image_value -> 'validation' -> 'finalComposition' ->> 'readyForReview' is distinct from 'true'
+         or image_value ->> 'baseImagePath' is distinct from concat(
+           target_pipeline.organization_id, '/', target_pipeline.brand_id, '/',
+           image_value ->> 'postDraftId', '/', image_value ->> 'imageAssetId', '/base.png'
+         )
+         or image_value ->> 'finalImagePath' is distinct from concat(
+           target_pipeline.organization_id, '/', target_pipeline.brand_id, '/',
+           image_value ->> 'postDraftId', '/', image_value ->> 'imageAssetId', '/final.png'
+         )
+         or not exists (
+           select 1 from public.post_drafts draft
+           where draft.id = (image_value ->> 'postDraftId')::uuid
+             and draft.current_version_id = (image_value ->> 'postVersionId')::uuid
+             and draft.opportunity_id = target_pipeline.opportunity_id
+             and draft.brand_id = target_pipeline.brand_id
+         )
+         or not exists (
+           select 1 from storage.objects object
+           where object.bucket_id = 'generated-images'
+             and object.name = image_value ->> 'baseImagePath'
+         )
+         or not exists (
+           select 1 from storage.objects object
+           where object.bucket_id = 'generated-images'
+             and object.name = image_value ->> 'finalImagePath'
+         )
+      then
+        raise exception 'Generated image output failed durable validation' using errcode = '23514';
+      end if;
       insert into public.image_assets (
         id, organization_id, brand_id, post_draft_id, post_version_id, image_style,
         concept, concept_key, concept_direction, template, prompt, prompt_version,
@@ -237,19 +384,52 @@ begin
     result := jsonb_build_object('imageCount', jsonb_array_length(payload -> 'output' -> 'images'));
 
   elsif stage_value = 'package' then
+    if not exists (
+      select 1 from storage.objects object
+      where object.bucket_id = 'generated-images'
+        and object.name = payload -> 'output' ->> 'storagePath'
+    ) then
+      raise exception 'Content package storage object is missing' using errcode = '23514';
+    end if;
     insert into public.content_packages (
       organization_id, brand_id, pipeline_id, opportunity_id, manifest, storage_path, checksum
     ) values (
       target_pipeline.organization_id, target_pipeline.brand_id, target_pipeline.id,
       target_pipeline.opportunity_id, payload -> 'output' -> 'manifest',
       payload -> 'output' ->> 'storagePath', payload -> 'output' ->> 'checksum'
-    ) on conflict (pipeline_id) do update set manifest = excluded.manifest
+    ) on conflict (pipeline_id) do update
+      set manifest = public.content_packages.manifest
+      where public.content_packages.manifest = excluded.manifest
+        and public.content_packages.storage_path is not distinct from excluded.storage_path
+        and public.content_packages.checksum = excluded.checksum
     returning id into package_id_value;
+    if package_id_value is null then
+      raise exception 'Package replay does not match immutable output' using errcode = '23505';
+    end if;
     result := jsonb_build_object('packageId', package_id_value);
   else
     raise exception 'Unsupported lightweight persistence stage' using errcode = '22023';
   end if;
 
+  insert into private.pipeline_stage_outputs (job_id, stage, output_hash, persistence_result)
+  values (target_job.id, stage_value, output_hash_value, result)
+  on conflict (job_id) do update
+    set output_hash = private.pipeline_stage_outputs.output_hash
+  where private.pipeline_stage_outputs.stage = excluded.stage
+    and private.pipeline_stage_outputs.output_hash = excluded.output_hash;
+  if not found then
+    raise exception 'Stage output replay does not match the recorded result' using errcode = '23505';
+  end if;
+
+  perform private.complete_pipeline_job(jsonb_build_object(
+    'jobId', target_job.id,
+    'workerId', target_job.worker_id,
+    'outputRefs', result,
+    'usage', coalesce(payload -> 'usage', '{}'::jsonb),
+    'costUsd', cost_value,
+    'nextStage', next_stage_value,
+    'nextRequest', coalesce(payload -> 'nextRequest', '{}'::jsonb)
+  ));
   return result;
 end;
 $$;
@@ -269,6 +449,7 @@ $$;
 
 revoke all on function private.persist_lightweight_stage_output(jsonb) from public;
 revoke all on function public.persist_lightweight_stage_output(jsonb) from public, anon, authenticated;
+grant execute on function private.persist_lightweight_stage_output(jsonb) to service_role;
 grant execute on function public.persist_lightweight_stage_output(jsonb) to service_role;
 
 comment on table public.content_packages is
@@ -285,24 +466,74 @@ declare
   target_feed public.rss_feeds%rowtype;
   actor_value uuid := auth.uid();
   action_value text := coalesce(payload ->> 'action', 'upsert');
+  is_organization_admin boolean := false;
 begin
   select * into target_brand from public.brands where id = (payload ->> 'brandId')::uuid;
   if actor_value is null or target_brand.id is null or not public.can_edit_brand(target_brand.id) then
     raise exception 'Brand editor permission required' using errcode = '42501';
   end if;
+  if action_value not in ('upsert', 'toggle') then
+    raise exception 'Unsupported feed action' using errcode = '22023';
+  end if;
+  select exists (
+    select 1 from public.organization_members member
+    where member.organization_id = target_brand.organization_id
+      and member.user_id = actor_value
+      and member.role = 'administrator'
+  ) into is_organization_admin;
   if action_value = 'toggle' then
-    update public.rss_feeds
-    set active = (payload ->> 'active')::boolean, updated_at = now()
+    select * into target_feed
+    from public.rss_feeds
     where id = (payload ->> 'feedId')::uuid
       and organization_id = target_brand.organization_id
+    for update;
+    if target_feed.id is null then
+      raise exception 'Feed not found' using errcode = 'P0002';
+    end if;
+    if not is_organization_admin and (
+      not exists (
+        select 1 from public.rss_feed_brand_links link
+        where link.rss_feed_id = target_feed.id and link.brand_id = target_brand.id
+      )
+      or exists (
+        select 1 from public.rss_feed_brand_links link
+        where link.rss_feed_id = target_feed.id and link.brand_id <> target_brand.id
+      )
+    ) then
+      raise exception 'A shared feed can be changed only by an organization administrator'
+        using errcode = '42501';
+    end if;
+    update public.rss_feeds
+    set active = (payload ->> 'active')::boolean, updated_at = now()
+    where id = target_feed.id
     returning * into target_feed;
   else
     if char_length(coalesce(payload ->> 'name', '')) not between 1 and 200
        or coalesce(payload ->> 'feedUrl', '') !~ '^https?://'
+       or char_length(coalesce(payload ->> 'feedUrl', '')) > 2000
+       or coalesce((payload ->> 'authorityScore')::numeric, -1) not between 0 and 100
        or coalesce((payload ->> 'minimumScore')::numeric, 0) not between 60 and 100
        or coalesce((payload ->> 'dailyLimit')::integer, -1) not between 0 and 100
     then
       raise exception 'Invalid feed configuration' using errcode = '22023';
+    end if;
+    select * into target_feed
+    from public.rss_feeds
+    where organization_id = target_brand.organization_id
+      and feed_url = payload ->> 'feedUrl'
+    for update;
+    if target_feed.id is not null and not is_organization_admin and (
+      not exists (
+        select 1 from public.rss_feed_brand_links link
+        where link.rss_feed_id = target_feed.id and link.brand_id = target_brand.id
+      )
+      or exists (
+        select 1 from public.rss_feed_brand_links link
+        where link.rss_feed_id = target_feed.id and link.brand_id <> target_brand.id
+      )
+    ) then
+      raise exception 'A shared feed can be changed only by an organization administrator'
+        using errcode = '42501';
     end if;
     insert into public.rss_feeds (
       organization_id, name, feed_url, authority_score, active, created_by
@@ -336,10 +567,10 @@ $$;
 create or replace function public.manage_lightweight_feed(payload jsonb)
 returns public.rss_feeds
 language sql
+security definer
 set search_path = ''
 as $$ select private.manage_lightweight_feed(payload); $$;
 
 revoke all on function private.manage_lightweight_feed(jsonb) from public;
 revoke all on function public.manage_lightweight_feed(jsonb) from public, anon;
 grant execute on function public.manage_lightweight_feed(jsonb) to authenticated;
-grant execute on function private.manage_lightweight_feed(jsonb) to authenticated;

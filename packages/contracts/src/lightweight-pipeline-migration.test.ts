@@ -40,12 +40,20 @@ describe("lightweight pipeline control plane", () => {
     expect(migration).toContain("grant execute on function public.claim_pipeline_jobs");
   });
 
-  it("keeps all SECURITY DEFINER implementations in the private schema", () => {
+  it("limits exposed SECURITY DEFINER wrappers to audited reviewer entry points", () => {
     const definitions = [
       ...migration.matchAll(/create or replace function ([a-z_]+\.[a-z_]+)[\s\S]*?\$\$;/g),
     ].filter((match) => /security definer/i.test(match[0]));
     expect(definitions.length).toBeGreaterThan(5);
-    expect(definitions.every((match) => match[1]?.startsWith("private."))).toBe(true);
+    const exposed = definitions
+      .map((match) => match[1])
+      .filter((name) => name?.startsWith("public."));
+    expect(exposed).toEqual([
+      "public.request_lightweight_action",
+      "public.save_lightweight_post_edit",
+      "public.review_lightweight_post",
+    ]);
+    expect(migration).not.toMatch(/grant execute on function private\.[^\n]+ to authenticated/);
   });
 
   it("exposes narrow authenticated reviewer actions with audit records", () => {

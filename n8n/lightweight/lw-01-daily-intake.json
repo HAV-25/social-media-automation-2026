@@ -28,14 +28,17 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ contractVersion: '1.0', maxItemsPerFeed: 3 }) }}",
-        "options": { "timeout": 300000 }
+        "body": "={{ JSON.stringify({ contractVersion: '1.0', maxItemsPerFeed: 50 }) }}",
+        "options": { "timeout": 180000 }
       },
       "id": "b1000001-0000-4000-8000-000000000002",
       "name": "Run Safe Daily Intake",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [0, 0]
+      "position": [0, 0],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 30000
     }
   ],
   "connections": {
@@ -50,7 +53,7 @@
     "timezone": "Europe/Berlin",
     "saveDataErrorExecution": "all",
     "saveDataSuccessExecution": "none",
-    "executionTimeout": 600
+    "executionTimeout": 720
   },
   "versionId": "b1000001-0000-4000-8000-000000000003",
   "tags": []

@@ -3,7 +3,9 @@
   "specifiers": {
     "npm:@eslint/js@9.32.0": "9.32.0",
     "npm:@playwright/test@1.61.1": "1.61.1",
+    "npm:@resvg/resvg-wasm@2.6.2": "2.6.2",
     "npm:@supabase/supabase-js@2.53.0": "2.53.0",
+    "npm:@types/node@*": "24.1.0",
     "npm:@types/node@24.1.0": "24.1.0",
     "npm:detect-libc@2.1.2": "2.1.2",
     "npm:eslint@9.32.0": "9.32.0",
@@ -229,6 +231,9 @@
       "dependencies": [
         "playwright"
       ]
+    },
+    "@resvg/resvg-wasm@2.6.2": {
+      "integrity": "sha512-FqALmHI8D4o6lk/LRWDnhw95z5eO+eAa6ORjVg09YRR7BkcM6oPHU9uyC0gtQG5vpFLvgpeU4+zEAz2H8APHNw=="
     },
     "@rollup/rollup-android-arm-eabi@4.62.4": {
       "integrity": "sha512-RrPokAb7dmbxFoeO3TloqHyOjgye8RkBhSqmp4aJMIex4c9r46ZstPnleDQOq1t46VOVjwIuwNogIqbodV1Vvg=="

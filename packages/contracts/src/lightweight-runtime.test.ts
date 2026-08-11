@@ -1,4 +1,5 @@
 import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
@@ -19,6 +20,22 @@ const persistence = readFileSync(
 ).toLowerCase();
 const worker = readFileSync(
   new URL("../../../supabase/functions/lightweight-stage-worker/index.ts", import.meta.url),
+  "utf8",
+);
+const providerRuntime = readFileSync(
+  new URL("../../../supabase/functions/_shared/openai-runtime.ts", import.meta.url),
+  "utf8",
+);
+const imageRuntime = readFileSync(
+  new URL("../../../supabase/functions/_shared/image-runtime.ts", import.meta.url),
+  "utf8",
+);
+const reviewer = readFileSync(
+  new URL("../../../apps/reviewer/src/main.tsx", import.meta.url),
+  "utf8",
+);
+const reviewerData = readFileSync(
+  new URL("../../../apps/reviewer/src/data.ts", import.meta.url),
   "utf8",
 );
 const supabaseConfig = readFileSync(
@@ -63,16 +80,46 @@ describe("lightweight production runtime", () => {
   it("keeps prompts versioned in TypeScript and validates generated output", () => {
     expect(worker).toContain("LIGHTWEIGHT_RESEARCH_PROMPT_VERSION");
     expect(worker).toContain("researchResultSchema.parse");
-    expect(worker).toContain("draftResultSchema.parse");
+    expect(worker).toContain("draftSetResultSchema.parse");
     expect(worker).toContain("blocking: false");
+    expect(worker).toContain("evaluateDraft({");
+    expect(worker).not.toContain("evidenceScore: 80");
+    expect(worker).not.toContain("brandFitScore: 75");
+    expect(providerRuntime).toContain("citations: citations(body)");
+    expect(worker).toContain("research_source_not_observed");
+  });
+
+  it("composes and validates the final branded image instead of adding a border only", () => {
+    expect(imageRuntime).toContain("new Resvg");
+    expect(imageRuntime).toContain("Inter-Bold.ttf");
+    expect(imageRuntime).toContain("headlineFits");
+    expect(imageRuntime).toContain("hasSufficientContrast");
+    expect(worker).toContain("final_image_validation_failed");
+  });
+
+  it("retains the approved reviewer evidence, audit and durable download surfaces", () => {
+    expect(reviewer).toContain("Claims ledger");
+    expect(reviewer).toContain("Activity & audit");
+    expect(reviewer).toContain("Download durable package");
+    expect(reviewer).toContain("Exact image-generation prompt");
+    expect(reviewer).toContain("Inspect normalized source");
+    expect(reviewer).toContain("Explainable score");
+    expect(reviewer).toContain("Research caveats");
+    expect(reviewer).toContain("Material conflicts");
+    expect(reviewer).toContain("downloadBlob");
+    expect(reviewerData).toContain('.eq("status", "ready_for_review")');
+    expect(reviewerData).toContain("image.post_version_id === currentVersionByDraft");
+    expect(reviewerData).toContain("manifestContainsDraftVersion");
+    expect(reviewerData).toContain("expectedVersionId");
+    expect(reviewerData).toContain("idempotencyKey");
   });
 
   it("ships five small n8n schedulers with no application-runtime dependency", () => {
-    const directory = `${root}\\n8n\\lightweight`;
+    const directory = join(root, "n8n", "lightweight");
     const files = readdirSync(directory).filter((file) => file.endsWith(".json"));
     expect(files).toHaveLength(5);
     for (const file of files) {
-      const workflow = readFileSync(`${directory}\\${file}`, "utf8");
+      const workflow = readFileSync(join(directory, file), "utf8");
       expect(() => JSON.parse(workflow)).not.toThrow();
       expect(workflow).toContain("SUPABASE_URL");
       expect(workflow).toContain("LIGHTWEIGHT_WORKER_SECRET");
@@ -80,6 +127,49 @@ describe("lightweight production runtime", () => {
       expect(workflow).not.toContain("SUPABASE_SERVICE_ROLE_KEY");
       expect(workflow).not.toContain("APP_BASE_URL");
       expect(workflow).not.toContain("netlify");
+    }
+  });
+
+  it("keeps daily intake capacity separate from post limits and fits retries inside timeout", () => {
+    const workflow = JSON.parse(
+      readFileSync(join(root, "n8n", "lightweight", "lw-01-daily-intake.json"), "utf8"),
+    ) as {
+      nodes: Array<{
+        name: string;
+        parameters: { body?: string; options?: { timeout?: number } };
+        retryOnFail?: boolean;
+        maxTries?: number;
+        waitBetweenTries?: number;
+      }>;
+      settings: { executionTimeout: number; timezone: string };
+    };
+    const request = workflow.nodes.find((node) => node.name === "Run Safe Daily Intake");
+    expect(request?.parameters.body).toContain("maxItemsPerFeed: 50");
+    expect(request?.retryOnFail).toBe(true);
+    expect(request?.maxTries).toBe(3);
+    const attempts = request?.maxTries ?? 1;
+    const requestSeconds = (request?.parameters.options?.timeout ?? 0) / 1000;
+    const waitSeconds = (request?.waitBetweenTries ?? 0) / 1000;
+    expect(workflow.settings.executionTimeout).toBeGreaterThanOrEqual(
+      attempts * requestSeconds + (attempts - 1) * waitSeconds,
+    );
+    expect(workflow.settings.timezone).toBe("Europe/Berlin");
+  });
+
+  it("does not add synchronous n8n retries around paid durable workers", () => {
+    const directory = join(root, "n8n", "lightweight");
+    for (const file of [
+      "lw-02-research-worker.json",
+      "lw-03-draft-verification-worker.json",
+      "lw-04-image-package-worker.json",
+      "lw-05-retry-recovery.json",
+    ]) {
+      const workflow = JSON.parse(readFileSync(join(directory, file), "utf8")) as {
+        nodes: Array<{ type: string; retryOnFail?: boolean }>;
+      };
+      const requests = workflow.nodes.filter((node) => node.type === "n8n-nodes-base.httpRequest");
+      expect(requests).toHaveLength(1);
+      expect(requests[0]?.retryOnFail).not.toBe(true);
     }
   });
 

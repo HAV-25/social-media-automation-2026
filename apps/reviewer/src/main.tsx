@@ -3,8 +3,8 @@ import {
   AlertTriangle,
   Check,
   FileText,
+  History,
   LogOut,
-  Play,
   Radio,
   RefreshCw,
   Search,
@@ -14,24 +14,28 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   loadBrands,
+  loadActivity,
   loadFeeds,
   loadJobs,
+  loadOpportunityDetail,
   loadOpportunities,
   loadPosts,
   manageFeed,
   requestAction,
   reviewPost,
   savePost,
+  type Activity,
   type Brand,
   type Feed,
   type Job,
   type Opportunity,
+  type OpportunityDetail,
   type Post,
 } from "./data";
 import { reviewerEnvironment } from "./env";
 import "./styles.css";
 
-type View = "inbox" | "posts" | "runs" | "sources";
+type View = "inbox" | "posts" | "runs" | "sources" | "activity";
 
 const configuredClient = reviewerEnvironment.success
   ? createClient(reviewerEnvironment.data.url, reviewerEnvironment.data.key, {
@@ -103,6 +107,22 @@ function Score({ value }: { value: number }) {
   );
 }
 
+async function downloadBlob(url: string, filename: string): Promise<void> {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Download failed (${response.status})`);
+  const objectUrl = URL.createObjectURL(await response.blob());
+  try {
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = filename;
+    document.body.append(link);
+    link.click();
+    link.remove();
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
 function Inbox({
   client,
   brand,
@@ -117,6 +137,8 @@ function Inbox({
   const [filter, setFilter] = useState("");
   const [busy, setBusy] = useState<string>();
   const [message, setMessage] = useState("");
+  const [detail, setDetail] = useState<OpportunityDetail>();
+  const [detailLoading, setDetailLoading] = useState(false);
   const visible = opportunities.filter((item) =>
     `${item.sourceTitle} ${item.value_nucleus}`.toLowerCase().includes(filter.toLowerCase()),
   );
@@ -132,6 +154,171 @@ function Inbox({
     } finally {
       setBusy(undefined);
     }
+  }
+  async function inspect(item: Opportunity) {
+    setDetailLoading(true);
+    setMessage("");
+    try {
+      setDetail(await loadOpportunityDetail(client, item));
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Opportunity details could not load");
+    } finally {
+      setDetailLoading(false);
+    }
+  }
+  if (detail) {
+    const evidence = detail.research?.evidencePackage ?? {};
+    const claims = Array.isArray(evidence.claims)
+      ? (evidence.claims as Array<Record<string, unknown>>)
+      : [];
+    const sources = Array.isArray(evidence.sources)
+      ? (evidence.sources as Array<Record<string, unknown>>)
+      : [];
+    const conflicts = Array.isArray(evidence.conflicts) ? evidence.conflicts : [];
+    const caveats = Array.isArray(evidence.caveats) ? evidence.caveats : [];
+    return (
+      <>
+        <button className="back" onClick={() => setDetail(undefined)}>
+          ← Content inbox
+        </button>
+        <header>
+          <p className="eyebrow">Opportunity detail</p>
+          <h1>{detail.sourceTitle ?? detail.value_nucleus}</h1>
+          <p>
+            Score {Math.round(detail.opportunity_score)}/100 · {detail.status} ·{" "}
+            {detail.recommended_style?.replaceAll("_", " ") ?? "style pending"}
+          </p>
+        </header>
+        {message && <p className="notice">{message}</p>}
+        <div className="detail-grid">
+          <section className="list">
+            <article className="detail-card">
+              <p className="eyebrow">Value nucleus</p>
+              <h2>{detail.value_nucleus}</h2>
+              {detail.source && (
+                <>
+                  <p>
+                    {detail.source.wordCount ?? "—"} normalized words ·{" "}
+                    {detail.source.language ?? "language unknown"}
+                    {detail.source.canonicalUrl && (
+                      <>
+                        {" "}
+                        ·{" "}
+                        <a href={detail.source.canonicalUrl} target="_blank" rel="noreferrer">
+                          Inspect original source
+                        </a>
+                      </>
+                    )}
+                  </p>
+                  <details>
+                    <summary>Inspect normalized source</summary>
+                    <pre>{detail.source.cleanText}</pre>
+                  </details>
+                </>
+              )}
+            </article>
+            <article className="detail-card">
+              <p className="eyebrow">Explainable score</p>
+              <h2>
+                {Math.round(detail.opportunity_score)}/100 · risk penalty {detail.risk_penalty}
+              </h2>
+              <div className="score-breakdown">
+                {Object.entries(detail.score_breakdown).map(([name, value]) => (
+                  <span key={name}>
+                    {name.replaceAll("_", " ")}{" "}
+                    <b>{typeof value === "object" ? JSON.stringify(value) : String(value)}</b>
+                  </span>
+                ))}
+              </div>
+            </article>
+            <article className="detail-card">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">Evidence package</p>
+                  <h2>{detail.research ? "Bounded research complete" : "Research pending"}</h2>
+                </div>
+                <button
+                  className="secondary"
+                  disabled={busy === detail.id}
+                  onClick={() => void act(detail, "research")}
+                >
+                  Run bounded research again
+                </button>
+              </div>
+              {detail.research && (
+                <>
+                  <p>{detail.research.summary}</p>
+                  <p className="muted">
+                    {detail.research.model ?? "model unavailable"} ·{" "}
+                    {detail.research.promptVersion ?? "prompt unavailable"} · ${" "}
+                    {detail.research.costUsd.toFixed(4)}
+                  </p>
+                  <div className="source-links">
+                    {sources.map((source, index) => (
+                      <a
+                        key={String(source.sourceKey ?? index)}
+                        href={String(source.url ?? "#")}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {String(source.publisher ?? source.title ?? `Source ${index + 1}`)}
+                      </a>
+                    ))}
+                  </div>
+                  {caveats.length > 0 && (
+                    <div className="warnings">
+                      <b>Research caveats</b>
+                      <ul>
+                        {caveats.map((item) => (
+                          <li key={String(item)}>{String(item)}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {conflicts.length > 0 && (
+                    <div className="warnings">
+                      <b>Material conflicts</b>
+                      <ul>
+                        {conflicts.map((item) => (
+                          <li key={String(item)}>{String(item)}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </>
+              )}
+            </article>
+            <section className="claims-list">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">Claims ledger</p>
+                  <h2>{claims.length} recorded claims</h2>
+                </div>
+              </div>
+              {claims.map((claim, index) => (
+                <article className="claim-card" key={String(claim.claimKey ?? index)}>
+                  <div className="claim-tags">
+                    <span>{String(claim.claimType ?? "claim")}</span>
+                    <span>{String(claim.verificationState ?? "unverified")}</span>
+                    <span>{String(claim.riskLevel ?? "medium")} risk</span>
+                  </div>
+                  <h3>{String(claim.text ?? "Claim unavailable")}</h3>
+                  <p>{String(claim.caveat ?? "No additional caveat recorded.")}</p>
+                  <b>Confidence {Math.round(Number(claim.confidence ?? 0) * 100)}%</b>
+                </article>
+              ))}
+            </section>
+          </section>
+          <aside className="decision">
+            <h2>Available actions</h2>
+            <p>Research warnings remain visible but do not block draft preparation.</p>
+            <button disabled={busy === detail.id} onClick={() => void act(detail, "draft")}>
+              Generate three post styles
+            </button>
+          </aside>
+        </div>
+      </>
+    );
   }
   return (
     <>
@@ -198,10 +385,7 @@ function Inbox({
             </div>
             <div className="actions">
               {item.opportunity_score >= 75 ? (
-                <button disabled={busy === item.id} onClick={() => act(item, "research")}>
-                  <Play size={15} />
-                  Prepare
-                </button>
+                <span className="state succeeded">Automatic</span>
               ) : item.opportunity_score >= 60 ? (
                 <button
                   disabled={busy === item.id}
@@ -213,6 +397,13 @@ function Inbox({
               ) : (
                 <span className="muted">Stored</span>
               )}
+              <button
+                className="secondary"
+                disabled={detailLoading}
+                onClick={() => void inspect(item)}
+              >
+                Review details
+              </button>
             </div>
           </article>
         ))}
@@ -235,17 +426,46 @@ function Posts({
   const [selected, setSelected] = useState<Post>();
   const [reason, setReason] = useState("");
   const [message, setMessage] = useState("");
-  async function mutate(action: () => Promise<void>, success: string) {
+  const [busy, setBusy] = useState(false);
+  async function mutate(action: (operationKey: string) => Promise<void>, success: string) {
+    if (busy) return;
+    const operationKey = crypto.randomUUID();
+    setBusy(true);
     setMessage("");
     try {
-      await action();
+      await action(operationKey);
       setMessage(success);
       await refresh();
+      setSelected(undefined);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Action failed");
+    } finally {
+      setBusy(false);
     }
   }
-  if (selected)
+  async function download(url: string, filename: string) {
+    if (busy) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      await downloadBlob(url, filename);
+      setMessage("Download completed.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Download failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+  if (selected) {
+    const evaluation =
+      selected.scoreBreakdown?.evaluation && typeof selected.scoreBreakdown.evaluation === "object"
+        ? (selected.scoreBreakdown.evaluation as Record<string, unknown>)
+        : {};
+    const imageFinal =
+      selected.imageValidation?.finalComposition &&
+      typeof selected.imageValidation.finalComposition === "object"
+        ? (selected.imageValidation.finalComposition as Record<string, unknown>)
+        : null;
     return (
       <>
         <button className="back" onClick={() => setSelected(undefined)}>
@@ -273,6 +493,7 @@ function Posts({
             <label>
               Hook
               <textarea
+                disabled={busy}
                 value={selected.hook}
                 onChange={(event) => setSelected({ ...selected, hook: event.target.value })}
               />
@@ -280,6 +501,7 @@ function Posts({
             <label>
               Body
               <textarea
+                disabled={busy}
                 className="body"
                 value={selected.body}
                 onChange={(event) => setSelected({ ...selected, body: event.target.value })}
@@ -288,19 +510,52 @@ function Posts({
             <label>
               Closing
               <textarea
+                disabled={busy}
                 value={selected.closing ?? ""}
                 onChange={(event) => setSelected({ ...selected, closing: event.target.value })}
               />
             </label>
             <button
+              disabled={busy || selected.status !== "ready_for_review"}
               onClick={() =>
-                mutate(() => savePost(client, selected), "Immutable edited version saved.")
+                mutate(
+                  (operationKey) => savePost(client, selected, operationKey),
+                  "Immutable edited version saved.",
+                )
               }
             >
               Save as a new version
             </button>
           </section>
           <aside className="decision">
+            <h2>Quality checkpoint</h2>
+            <div className="quality-grid">
+              <span>
+                Quality <b>{selected.quality_score ?? "—"}</b>
+              </span>
+              <span>
+                Evidence <b>{String(evaluation.evidenceScore ?? "—")}</b>
+              </span>
+              <span>
+                Brand fit <b>{String(evaluation.brandFitScore ?? "—")}</b>
+              </span>
+              <span>
+                Similarity <b>{Math.round(Number(evaluation.sameBrandSimilarity ?? 0) * 100)}</b>
+              </span>
+            </div>
+            {Array.isArray(evaluation.warnings) && evaluation.warnings.length > 0 && (
+              <ul className="warnings">
+                {evaluation.warnings.map((warning) => (
+                  <li key={String(warning)}>{String(warning)}</li>
+                ))}
+              </ul>
+            )}
+            {imageFinal && (
+              <p className="muted">
+                Final image {String(imageFinal.width)}×{String(imageFinal.height)} ·{" "}
+                {imageFinal.readyForReview ? "layout validated" : "layout warning"}
+              </p>
+            )}
             <h2>Human decision</h2>
             <p>Warnings inform your decision; they do not block review.</p>
             <label>
@@ -308,8 +563,20 @@ function Posts({
               <textarea value={reason} onChange={(event) => setReason(event.target.value)} />
             </label>
             <button
+              disabled={busy || selected.status !== "ready_for_review"}
               onClick={() =>
-                mutate(() => reviewPost(client, selected.id, "approve", reason), "Post approved.")
+                mutate(
+                  (operationKey) =>
+                    reviewPost(
+                      client,
+                      selected.id,
+                      "approve",
+                      reason,
+                      selected.current_version_id,
+                      operationKey,
+                    ),
+                  "Post approved.",
+                )
               }
             >
               <Check size={16} />
@@ -317,22 +584,37 @@ function Posts({
             </button>
             <button
               className="danger"
+              disabled={busy || selected.status !== "ready_for_review"}
               onClick={() =>
-                mutate(() => reviewPost(client, selected.id, "reject", reason), "Post rejected.")
+                mutate(
+                  (operationKey) =>
+                    reviewPost(
+                      client,
+                      selected.id,
+                      "reject",
+                      reason,
+                      selected.current_version_id,
+                      operationKey,
+                    ),
+                  "Post rejected.",
+                )
               }
             >
               Reject
             </button>
             <button
               className="secondary"
+              disabled={busy || selected.status !== "ready_for_review"}
               onClick={() =>
                 mutate(
-                  () =>
+                  (operationKey) =>
                     requestAction(client, {
                       action: "image",
                       brandId: brand.id,
                       opportunityId: selected.opportunity_id,
                       postDraftId: selected.id,
+                      expectedVersionId: selected.current_version_id,
+                      idempotencyKey: operationKey,
                     }),
                   "Image generation queued.",
                 )
@@ -342,14 +624,17 @@ function Posts({
             </button>
             <button
               className="secondary"
+              disabled={busy || selected.status !== "ready_for_review"}
               onClick={() =>
                 mutate(
-                  () =>
+                  (operationKey) =>
                     requestAction(client, {
                       action: "draft",
                       brandId: brand.id,
                       opportunityId: selected.opportunity_id,
                       postDraftId: selected.id,
+                      expectedVersionId: selected.current_version_id,
+                      idempotencyKey: operationKey,
                       instruction: reason,
                     }),
                   "Selective regeneration queued.",
@@ -358,25 +643,33 @@ function Posts({
             >
               Regenerate with direction
             </button>
-            <button
-              className="secondary"
-              onClick={() => {
-                const blob = new Blob([JSON.stringify(selected, null, 2)], {
-                  type: "application/json",
-                });
-                const link = document.createElement("a");
-                link.href = URL.createObjectURL(blob);
-                link.download = `post-${selected.id}.json`;
-                link.click();
-                URL.revokeObjectURL(link.href);
-              }}
-            >
-              Download package
-            </button>
+            {selected.imageUrl && (
+              <button
+                className="button-link secondary"
+                disabled={busy}
+                onClick={() => void download(selected.imageUrl!, `post-${selected.id}.png`)}
+              >
+                Download image
+              </button>
+            )}
+            {selected.packageUrl ? (
+              <button
+                className="button-link secondary"
+                disabled={busy}
+                onClick={() =>
+                  void download(selected.packageUrl!, `post-${selected.id}-package.json`)
+                }
+              >
+                Download durable package
+              </button>
+            ) : (
+              <p className="muted">Durable package is still being prepared.</p>
+            )}
           </aside>
         </div>
       </>
     );
+  }
   return (
     <>
       <header>
@@ -387,6 +680,7 @@ function Posts({
           loop.
         </p>
       </header>
+      {message && <p className="notice">{message}</p>}
       <section className="card-grid">
         {posts.map((post) => (
           <article className="post-card" key={post.id}>
@@ -448,6 +742,52 @@ function Runs({ jobs, refresh }: { jobs: Job[]; refresh: () => void }) {
             <b>${Number(job.cost_usd).toFixed(4)}</b>
           </article>
         ))}
+      </section>
+    </>
+  );
+}
+
+function ActivityHistory({ activities, refresh }: { activities: Activity[]; refresh: () => void }) {
+  return (
+    <>
+      <header>
+        <p className="eyebrow">Audit history</p>
+        <h1>Reviewer audit history</h1>
+        <p>
+          Reviewer requests, edits and decisions remain attributable. Pipeline state is under Runs
+          &amp; errors.
+        </p>
+      </header>
+      <section className="list">
+        <div className="section-heading">
+          <h2>Latest 200 audit events</h2>
+          <button className="secondary" onClick={refresh}>
+            <RefreshCw size={16} />
+            Refresh
+          </button>
+        </div>
+        {activities.map((activity) => (
+          <article className="run-row" key={activity.id}>
+            <span className="state succeeded">recorded</span>
+            <div className="grow">
+              <h3>{activity.action.replaceAll("_", " ")}</h3>
+              <p>
+                {activity.entity_type.replaceAll("_", " ")} ·{" "}
+                {new Date(activity.created_at).toLocaleString()}
+              </p>
+              {activity.entity_id && <p className="muted">Reference {activity.entity_id}</p>}
+              {Object.keys(activity.metadata).length > 0 && (
+                <details>
+                  <summary>Inspect audit metadata</summary>
+                  <pre>{JSON.stringify(activity.metadata, null, 2)}</pre>
+                </details>
+              )}
+            </div>
+          </article>
+        ))}
+        {!activities.length && (
+          <p className="muted">No audit events are available for this brand.</p>
+        )}
       </section>
     </>
   );
@@ -649,6 +989,7 @@ function Shell({ client, session }: { client: SupabaseClient; session: Session }
   const [posts, setPosts] = useState<Post[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [feeds, setFeeds] = useState<Feed[]>([]);
+  const [activities, setActivities] = useState<Activity[]>([]);
   const [error, setError] = useState("");
   useEffect(() => {
     loadBrands(client)
@@ -663,16 +1004,20 @@ function Shell({ client, session }: { client: SupabaseClient; session: Session }
     if (!brandId) return;
     setError("");
     try {
-      const [nextOpportunities, nextPosts, nextJobs, nextFeeds] = await Promise.all([
-        loadOpportunities(client, brandId),
-        loadPosts(client, brandId),
-        loadJobs(client, brandId),
-        loadFeeds(client, brandId),
-      ]);
+      const [nextOpportunities, nextPosts, nextJobs, nextFeeds, nextActivities] = await Promise.all(
+        [
+          loadOpportunities(client, brandId),
+          loadPosts(client, brandId),
+          loadJobs(client, brandId),
+          loadFeeds(client, brandId),
+          loadActivity(client, brandId),
+        ],
+      );
       setOpportunities(nextOpportunities);
       setPosts(nextPosts);
       setJobs(nextJobs);
       setFeeds(nextFeeds);
+      setActivities(nextActivities);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Data could not load");
     }
@@ -715,6 +1060,7 @@ function Shell({ client, session }: { client: SupabaseClient; session: Session }
               ["inbox", FileText, "Content inbox"],
               ["sources", Radio, "Sources"],
               ["runs", AlertTriangle, "Runs & errors"],
+              ["activity", History, "Activity & audit"],
               ["posts", ShieldCheck, "Ready posts"],
             ] as const
           ).map(([key, Icon, label]) => (
@@ -751,6 +1097,9 @@ function Shell({ client, session }: { client: SupabaseClient; session: Session }
           <Posts client={client} brand={brand} posts={posts} refresh={refresh} />
         )}{" "}
         {view === "runs" && <Runs jobs={jobs} refresh={() => void refresh()} />}{" "}
+        {view === "activity" && (
+          <ActivityHistory activities={activities} refresh={() => void refresh()} />
+        )}{" "}
         {view === "sources" && (
           <Sources client={client} brand={brand} feeds={feeds} refresh={refresh} />
         )}

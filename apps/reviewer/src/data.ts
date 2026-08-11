@@ -13,6 +13,27 @@ export type Opportunity = {
   created_at: string;
   source_document_id: string | null;
   sourceTitle?: string;
+  risk_penalty: number;
+  score_breakdown: Record<string, unknown>;
+};
+
+export type OpportunityDetail = Opportunity & {
+  source: {
+    title: string;
+    canonicalUrl: string;
+    cleanText: string;
+    language: string | null;
+    wordCount: number | null;
+  } | null;
+  research: {
+    id: string;
+    summary: string;
+    evidencePackage: Record<string, unknown>;
+    model: string | null;
+    promptVersion: string | null;
+    completedAt: string | null;
+    costUsd: number;
+  } | null;
 };
 
 export type Post = {
@@ -31,6 +52,11 @@ export type Post = {
   imagePath?: string | null;
   imageUrl?: string | null;
   imagePrompt?: string | null;
+  imageValidation?: Record<string, unknown> | null;
+  packagePath?: string | null;
+  packageUrl?: string | null;
+  score_breakdown?: Record<string, unknown>;
+  scoreBreakdown?: Record<string, unknown>;
 };
 
 export type Job = {
@@ -61,8 +87,76 @@ export type Feed = {
   excludeKeywords: string[];
 };
 
+export type Activity = {
+  id: string;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+};
+
+const opportunitySchema = z.object({
+  id: z.string().uuid(),
+  value_nucleus: z.string(),
+  opportunity_score: z.coerce.number().min(0).max(100),
+  risk_penalty: z.coerce.number().min(0).max(100),
+  score_breakdown: z.record(z.string(), z.unknown()).default({}),
+  status: z.string(),
+  recommended_style: z.string().nullable(),
+  created_at: z.string(),
+  source_document_id: z.string().uuid().nullable(),
+});
+const postSchema = z.object({
+  id: z.string().uuid(),
+  opportunity_id: z.string().uuid(),
+  content_style: z.string(),
+  tone: z.string(),
+  status: z.string(),
+  quality_score: z.coerce.number().nullable(),
+  score_breakdown: z.record(z.string(), z.unknown()).default({}),
+  current_version_id: z.string().uuid().nullable(),
+  updated_at: z.string(),
+});
+const jobSchema = z.object({
+  id: z.string().uuid(),
+  pipeline_id: z.string().uuid(),
+  stage: z.string(),
+  state: z.string(),
+  attempt: z.coerce.number().int().nonnegative(),
+  max_attempts: z.coerce.number().int().positive(),
+  cost_usd: z.coerce.number().nonnegative(),
+  error_summary: z.string().nullable(),
+  created_at: z.string(),
+});
+const activitySchema = z.object({
+  id: z.string().uuid(),
+  action: z.string(),
+  entity_type: z.string(),
+  entity_id: z.string().uuid().nullable(),
+  metadata: z.record(z.string(), z.unknown()).default({}),
+  created_at: z.string(),
+});
+
 function throwIfError(error: { message: string } | null): void {
   if (error) throw new Error(error.message);
+}
+
+export function manifestContainsDraftVersion(
+  manifest: unknown,
+  postDraftId: string,
+  postVersionId: string,
+): boolean {
+  if (!manifest || typeof manifest !== "object") return false;
+  const posts = (manifest as { posts?: unknown }).posts;
+  if (!Array.isArray(posts)) return false;
+  return posts.some(
+    (post) =>
+      post !== null &&
+      typeof post === "object" &&
+      String((post as Record<string, unknown>).id ?? "") === postDraftId &&
+      String((post as Record<string, unknown>).current_version_id ?? "") === postVersionId,
+  );
 }
 
 export async function loadBrands(client: SupabaseClient): Promise<Brand[]> {
@@ -82,13 +176,13 @@ export async function loadOpportunities(
   const { data, error } = await client
     .from("opportunities")
     .select(
-      "id,value_nucleus,opportunity_score,status,recommended_style,created_at,source_document_id",
+      "id,value_nucleus,opportunity_score,risk_penalty,score_breakdown,status,recommended_style,created_at,source_document_id",
     )
     .eq("brand_id", brandId)
     .order("opportunity_score", { ascending: false })
     .limit(100);
   throwIfError(error);
-  const opportunities = (data ?? []) as Opportunity[];
+  const opportunities = z.array(opportunitySchema).parse(data ?? []) as Opportunity[];
   const sourceIds = opportunities.flatMap((item) =>
     item.source_document_id ? [item.source_document_id] : [],
   );
@@ -111,40 +205,80 @@ export async function loadPosts(client: SupabaseClient, brandId: string): Promis
   const { data, error } = await client
     .from("post_drafts")
     .select(
-      "id,opportunity_id,content_style,tone,status,quality_score,current_version_id,updated_at",
+      "id,opportunity_id,content_style,tone,status,quality_score,score_breakdown,current_version_id,updated_at",
     )
     .eq("brand_id", brandId)
+    .eq("status", "ready_for_review")
     .order("updated_at", { ascending: false })
     .limit(100);
   throwIfError(error);
-  const posts = (data ?? []) as Post[];
+  const posts = z.array(postSchema).parse(data ?? []) as Post[];
   const versionIds = posts.flatMap((post) =>
     post.current_version_id ? [post.current_version_id] : [],
   );
   const draftIds = posts.map((post) => post.id);
-  const [versions, images] = await Promise.all([
+  const opportunityIds = [...new Set(posts.map((post) => post.opportunity_id))];
+  const [versions, images, packages] = await Promise.all([
     versionIds.length
       ? client.from("post_versions").select("id,hook,body,closing,full_text").in("id", versionIds)
       : Promise.resolve({ data: [], error: null }),
     draftIds.length
       ? client
           .from("image_assets")
-          .select("post_draft_id,final_image_path,prompt,created_at")
+          .select("post_draft_id,post_version_id,final_image_path,prompt,validation,created_at")
           .in("post_draft_id", draftIds)
+          .order("created_at", { ascending: false })
+      : Promise.resolve({ data: [], error: null }),
+    opportunityIds.length
+      ? client
+          .from("content_packages")
+          .select("opportunity_id,storage_path,manifest,created_at")
+          .eq("brand_id", brandId)
+          .in("opportunity_id", opportunityIds)
           .order("created_at", { ascending: false })
       : Promise.resolve({ data: [], error: null }),
   ]);
   throwIfError(versions.error);
   throwIfError(images.error);
+  throwIfError(packages.error);
   const byVersion = new Map((versions.data ?? []).map((version) => [String(version.id), version]));
-  const byDraft = new Map<string, { path: string; prompt: string | null }>();
+  const byDraft = new Map<
+    string,
+    { path: string; prompt: string | null; validation: Record<string, unknown> | null }
+  >();
+  const currentVersionByDraft = new Map(posts.map((post) => [post.id, post.current_version_id]));
   for (const image of images.data ?? [])
-    if (!byDraft.has(String(image.post_draft_id)) && image.final_image_path)
+    if (
+      !byDraft.has(String(image.post_draft_id)) &&
+      image.final_image_path &&
+      image.post_version_id === currentVersionByDraft.get(String(image.post_draft_id))
+    )
       byDraft.set(String(image.post_draft_id), {
         path: String(image.final_image_path),
         prompt: image.prompt ? String(image.prompt) : null,
+        validation:
+          image.validation && typeof image.validation === "object"
+            ? (image.validation as Record<string, unknown>)
+            : null,
       });
-  const paths = [...byDraft.values()].map((image) => image.path);
+  const packageByDraftVersion = new Map<string, string>();
+  for (const item of packages.data ?? []) {
+    if (!item.storage_path) continue;
+    for (const post of posts) {
+      if (
+        post.current_version_id &&
+        manifestContainsDraftVersion(item.manifest, post.id, post.current_version_id)
+      ) {
+        const key = `${post.id}:${post.current_version_id}`;
+        if (!packageByDraftVersion.has(key))
+          packageByDraftVersion.set(key, String(item.storage_path));
+      }
+    }
+  }
+  const paths = [
+    ...[...byDraft.values()].map((image) => image.path),
+    ...packageByDraftVersion.values(),
+  ];
   const signed = paths.length
     ? await client.storage.from("generated-images").createSignedUrls(paths, 900)
     : { data: [], error: null };
@@ -164,8 +298,92 @@ export async function loadPosts(client: SupabaseClient, brandId: string): Promis
       imagePath: image?.path ?? null,
       imageUrl: image ? (urls.get(image.path) ?? null) : null,
       imagePrompt: image?.prompt ?? null,
+      imageValidation: image?.validation ?? null,
+      packagePath: post.current_version_id
+        ? (packageByDraftVersion.get(`${post.id}:${post.current_version_id}`) ?? null)
+        : null,
+      packageUrl:
+        post.current_version_id &&
+        packageByDraftVersion.has(`${post.id}:${post.current_version_id}`)
+          ? (urls.get(packageByDraftVersion.get(`${post.id}:${post.current_version_id}`)!) ?? null)
+          : null,
+      scoreBreakdown:
+        post.score_breakdown && typeof post.score_breakdown === "object"
+          ? (post.score_breakdown as Record<string, unknown>)
+          : {},
     };
   });
+}
+
+export async function loadOpportunityDetail(
+  client: SupabaseClient,
+  opportunity: Opportunity,
+): Promise<OpportunityDetail> {
+  const [sourceResult, researchResult] = await Promise.all([
+    opportunity.source_document_id
+      ? client
+          .from("source_documents")
+          .select("title,canonical_url,clean_text,language")
+          .eq("id", opportunity.source_document_id)
+          .single()
+      : Promise.resolve({ data: null, error: null }),
+    client
+      .from("research_runs")
+      .select("id,evidence_package,model,prompt_version,completed_at,cost_metadata,created_at")
+      .eq("opportunity_id", opportunity.id)
+      .eq("status", "succeeded")
+      .order("completed_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  throwIfError(sourceResult.error);
+  throwIfError(researchResult.error);
+  const source = sourceResult.data;
+  const research = researchResult.data;
+  const evidence =
+    research?.evidence_package && typeof research.evidence_package === "object"
+      ? (research.evidence_package as Record<string, unknown>)
+      : {};
+  const cost =
+    research?.cost_metadata && typeof research.cost_metadata === "object"
+      ? Number((research.cost_metadata as Record<string, unknown>).estimatedCostUsd ?? 0)
+      : 0;
+  return {
+    ...opportunity,
+    source: source
+      ? {
+          title: String(source.title ?? "Untitled source"),
+          canonicalUrl: String(source.canonical_url ?? ""),
+          cleanText: String(source.clean_text ?? ""),
+          language: source.language ? String(source.language) : null,
+          wordCount: String(source.clean_text ?? "").trim()
+            ? String(source.clean_text).trim().split(/\s+/).length
+            : null,
+        }
+      : null,
+    research: research
+      ? {
+          id: String(research.id),
+          summary: String(evidence.summary ?? ""),
+          evidencePackage: evidence,
+          model: research.model ? String(research.model) : null,
+          promptVersion: research.prompt_version ? String(research.prompt_version) : null,
+          completedAt: research.completed_at ? String(research.completed_at) : null,
+          costUsd: cost,
+        }
+      : null,
+  };
+}
+
+export async function loadActivity(client: SupabaseClient, brandId: string): Promise<Activity[]> {
+  const { data, error } = await client
+    .from("audit_logs")
+    .select("id,action,entity_type,entity_id,metadata,created_at")
+    .eq("brand_id", brandId)
+    .order("created_at", { ascending: false })
+    .limit(200);
+  throwIfError(error);
+  return z.array(activitySchema).parse(data ?? []) as Activity[];
 }
 
 export async function loadJobs(client: SupabaseClient, brandId: string): Promise<Job[]> {
@@ -176,7 +394,7 @@ export async function loadJobs(client: SupabaseClient, brandId: string): Promise
     .order("created_at", { ascending: false })
     .limit(200);
   throwIfError(error);
-  return (data ?? []) as Job[];
+  return z.array(jobSchema).parse(data ?? []) as Job[];
 }
 
 export async function loadFeeds(client: SupabaseClient, brandId: string): Promise<Feed[]> {
@@ -227,13 +445,29 @@ export async function requestAction(
   client: SupabaseClient,
   input: Record<string, unknown>,
 ): Promise<void> {
-  const { error } = await client.rpc("request_lightweight_action", { payload: input });
+  const payload = {
+    ...input,
+    idempotencyKey:
+      typeof input.idempotencyKey === "string" ? input.idempotencyKey : crypto.randomUUID(),
+  };
+  const { error } = await client.rpc("request_lightweight_action", { payload });
   throwIfError(error);
 }
 
-export async function savePost(client: SupabaseClient, post: Post): Promise<void> {
+export async function savePost(
+  client: SupabaseClient,
+  post: Post,
+  idempotencyKey: string,
+): Promise<void> {
   const { error } = await client.rpc("save_lightweight_post_edit", {
-    payload: { postDraftId: post.id, hook: post.hook, body: post.body, closing: post.closing },
+    payload: {
+      postDraftId: post.id,
+      expectedVersionId: post.current_version_id,
+      idempotencyKey,
+      hook: post.hook,
+      body: post.body,
+      closing: post.closing,
+    },
   });
   throwIfError(error);
 }
@@ -243,9 +477,11 @@ export async function reviewPost(
   postDraftId: string,
   decision: "approve" | "reject",
   reason: string,
+  expectedVersionId: string | null,
+  idempotencyKey: string,
 ): Promise<void> {
   const { error } = await client.rpc("review_lightweight_post", {
-    payload: { postDraftId, decision, reason },
+    payload: { postDraftId, decision, reason, expectedVersionId, idempotencyKey },
   });
   throwIfError(error);
 }

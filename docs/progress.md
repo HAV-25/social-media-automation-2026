@@ -1819,3 +1819,44 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
 - Local Docker/Postgres was unavailable. The additive migrations therefore have
   static and contract coverage but remain intentionally unapplied until the
   approved shadow-validation window.
+
+### 2026-08-11 lightweight production-readiness correction (local, not deployed)
+
+- Completed independent database/security, Edge/provider, and reviewer/n8n QA
+  reviews. The reviews found cross-component defects that source-string tests
+  could not expose, and the release candidate remains untagged and undeployed
+  while the corrections are validated.
+- Added lease-bound atomic stage persistence, final-attempt terminalization,
+  tenant-composite integrity, strict stage transitions, reviewer mutation
+  idempotency, expected-version checks, and a private provider-operation ledger.
+- Prevented automatic repetition of ambiguous paid calls; cached completed
+  research/writing results are reused, deterministic image paths prevent orphan
+  variants, and paid failure cost remains visible.
+- Enforced the two-search research bound, canonicalized provider citations,
+  deterministically downgraded invalid claim/evidence combinations, and added
+  targeted verification warnings for unsafe evidence use.
+- Replaced silent image-text truncation with measured-font layout validation.
+  The final compositor produces 1200x630 output and rejects an unfit headline
+  instead of certifying altered text.
+- Restricted Ready Posts to review-ready drafts, bound images/packages to the
+  current immutable post version, added operation busy/idempotency handling,
+  validated query data with Zod, and exposed score/source/conflict/caveat detail.
+- Increased intake scanning to 50 unseen items per feed (maximum 100) while
+  keeping the daily post limit separate. Intake retries now fit inside the n8n
+  execution timeout; paid workers rely on durable leases rather than synchronous
+  node retries.
+- Completed the local release gate: repository formatting, direct
+  repository-wide ESLint, strict TypeScript for all eight workspaces, all 396
+  Vitest assertions, the static reviewer build, the optimized legacy Next.js
+  build, Edge Deno type-check, three Edge runtime tests, and all four Chromium
+  walking-skeleton journeys pass. The Chromium suite used its CI-mode local
+  development server because production-mode localhost correctly refuses a
+  Secure demo-session cookie over HTTP.
+- A locked dependency restore was required after the desktop pnpm shim removed
+  workspace links. It reused the lockfile/store and changed no committed package
+  version. No paid provider, production database, deployment, or workflow call
+  was made.
+- Disposable Supabase migration/RLS/concurrency execution and a shadow
+  RSS-to-package journey are still open. Production cutover remains blocked
+  until those environment-level gates pass and the product owner accepts the
+  preview.

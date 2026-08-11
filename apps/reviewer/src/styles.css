@@ -416,6 +416,85 @@ header > p:last-child {
   display: grid;
   gap: 18px;
 }
+.detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 310px;
+  gap: 18px;
+}
+.detail-card,
+.claim-card {
+  padding: 22px;
+}
+.claims-list {
+  display: grid;
+  gap: 12px;
+}
+.claim-tags,
+.source-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.claim-tags span,
+.source-links a {
+  border-radius: 999px;
+  background: #e6f0ea;
+  color: #174f3d;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.quality-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.quality-grid span {
+  display: grid;
+  gap: 4px;
+  background: #eef0eb;
+  padding: 12px;
+  border-radius: 10px;
+  font-size: 12px;
+}
+.quality-grid b {
+  font-size: 22px;
+}
+.score-breakdown {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.score-breakdown span {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 8px;
+  background: #f3f2ed;
+  font-size: 12px;
+}
+.warnings {
+  margin: 0;
+  padding-left: 20px;
+  color: #8b5b11;
+  font-size: 13px;
+}
+.button-link {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 12px 16px;
+  border-radius: 9px;
+  text-decoration: none;
+  font-weight: 700;
+}
+.button-link.secondary {
+  border: 1px solid #d7d2c8;
+  background: #fff;
+  color: #1d251f;
+}
 .editor textarea {
   min-height: 90px;
 }
@@ -511,6 +590,9 @@ header > p:last-child {
     display: none;
   }
   .review-grid {
+    grid-template-columns: 1fr;
+  }
+  .detail-grid {
     grid-template-columns: 1fr;
   }
   .source-grid,

@@ -14,6 +14,26 @@ type OpenAIUsage = {
   estimatedCostUsd: number;
 };
 
+export type ProviderCitation = { url: string; title: string };
+
+export function canonicalCitationUrl(value: string): string | null {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:") return null;
+    url.hash = "";
+    url.hostname = url.hostname.toLowerCase();
+    if (url.port === "443") url.port = "";
+    for (const key of [...url.searchParams.keys()]) {
+      if (/^(utm_|fbclid$|gclid$|mc_cid$|mc_eid$)/i.test(key)) url.searchParams.delete(key);
+    }
+    url.searchParams.sort();
+    if (url.pathname !== "/") url.pathname = url.pathname.replace(/\/+$/, "");
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 function apiKey(): string {
   const value = Deno.env.get("OPENAI_API_KEY") ?? "";
   if (!value.startsWith("sk-") || value.length < 30) {
@@ -71,13 +91,61 @@ function usage(response: Record<string, unknown>, webSearchCalls: number): OpenA
   };
 }
 
+function citations(response: Record<string, unknown>): ProviderCitation[] {
+  const found = new Map<string, ProviderCitation>();
+  const output = Array.isArray(response.output) ? response.output : [];
+  for (const item of output) {
+    if (!item || typeof item !== "object") continue;
+    const record = item as Record<string, unknown>;
+    const content = Array.isArray(record.content) ? record.content : [];
+    for (const part of content) {
+      if (!part || typeof part !== "object") continue;
+      const annotations = Array.isArray((part as Record<string, unknown>).annotations)
+        ? ((part as Record<string, unknown>).annotations as unknown[])
+        : [];
+      for (const annotation of annotations) {
+        if (!annotation || typeof annotation !== "object") continue;
+        const value = annotation as Record<string, unknown>;
+        if (typeof value.url === "string") {
+          const canonical = canonicalCitationUrl(value.url);
+          if (canonical)
+            found.set(canonical, { url: canonical, title: String(value.title ?? canonical) });
+        }
+      }
+    }
+    const action =
+      record.action && typeof record.action === "object"
+        ? (record.action as Record<string, unknown>)
+        : {};
+    const sources = Array.isArray(action.sources) ? action.sources : [];
+    for (const source of sources) {
+      if (!source || typeof source !== "object") continue;
+      const value = source as Record<string, unknown>;
+      if (typeof value.url === "string") {
+        const canonical = canonicalCitationUrl(value.url);
+        if (canonical)
+          found.set(canonical, { url: canonical, title: String(value.title ?? canonical) });
+      }
+    }
+  }
+  return [...found.values()].slice(0, 20);
+}
+
 export async function structuredResponse<T>(input: {
   instructions: string;
   prompt: string;
   format: JsonSchemaFormat;
   maxOutputTokens: number;
   webSearch?: boolean;
-}): Promise<{ data: T; responseId: string; model: string; usage: OpenAIUsage }> {
+  maxToolCalls?: number;
+  idempotencyKey: string;
+}): Promise<{
+  data: T;
+  responseId: string;
+  model: string;
+  usage: OpenAIUsage;
+  citations: ProviderCitation[];
+}> {
   const model = Deno.env.get("OPENAI_TEXT_MODEL") ?? "gpt-5-mini";
   const tools = input.webSearch ? [{ type: "web_search", search_context_size: "low" }] : undefined;
   const response = await fetch("https://api.openai.com/v1/responses", {
@@ -86,6 +154,7 @@ export async function structuredResponse<T>(input: {
     headers: {
       authorization: `Bearer ${apiKey()}`,
       "content-type": "application/json",
+      "idempotency-key": input.idempotencyKey,
     },
     body: JSON.stringify({
       model,
@@ -101,6 +170,7 @@ export async function structuredResponse<T>(input: {
         },
       },
       max_output_tokens: input.maxOutputTokens,
+      ...(input.maxToolCalls ? { max_tool_calls: input.maxToolCalls } : {}),
       store: false,
     }),
   });
@@ -136,14 +206,19 @@ export async function structuredResponse<T>(input: {
     responseId: String(body.id ?? "unknown"),
     model: String(body.model ?? model),
     usage: usage(body, calls),
+    citations: citations(body),
   };
 }
 
-export async function generateBaseImage(prompt: string): Promise<{
+export async function generateBaseImage(
+  prompt: string,
+  idempotencyKey: string,
+): Promise<{
   bytes: Uint8Array;
   responseId: string;
   model: string;
   costUsd: number;
+  usage: Record<string, unknown>;
 }> {
   const model = Deno.env.get("OPENAI_IMAGE_MODEL") ?? "gpt-image-1-mini";
   const response = await fetch("https://api.openai.com/v1/images/generations", {
@@ -152,6 +227,7 @@ export async function generateBaseImage(prompt: string): Promise<{
     headers: {
       authorization: `Bearer ${apiKey()}`,
       "content-type": "application/json",
+      "idempotency-key": idempotencyKey,
     },
     body: JSON.stringify({
       model,
@@ -178,8 +254,10 @@ export async function generateBaseImage(prompt: string): Promise<{
   const binary = Uint8Array.from(atob(first.b64_json), (character) => character.charCodeAt(0));
   return {
     bytes: binary,
-    responseId: String(first.revised_prompt ?? crypto.randomUUID()),
+    responseId: response.headers.get("x-request-id") ?? "request-id-unavailable",
     model,
     costUsd: Number(Deno.env.get("OPENAI_IMAGE_ESTIMATED_COST_USD") ?? 0.01),
+    usage:
+      body.usage && typeof body.usage === "object" ? (body.usage as Record<string, unknown>) : {},
   };
 }
