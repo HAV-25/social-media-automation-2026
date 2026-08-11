@@ -1301,3 +1301,29 @@ reviewer, exact warning snapshot, and audit/feedback events, and the reviewer
 package includes source, claim, score, prompt, model, cost, warning, and decision
 provenance. Only WF-05 and WF-07 change orchestration behavior. No publishing or
 scheduling capability is introduced.
+
+## ADR-084: Final social imagery uses template-aware prompts and measured composition
+
+**Date:** 2026-08-01
+
+**Decision:** Direct base-image generation with the versioned
+`image-director.v2` prompt. The prompt declares the 1536×1024 provider canvas,
+the deterministic 1200×630 Facebook crop, the selected composition template,
+and the exact region that must remain visually quiet for the later overlay.
+Keep all generated artwork text-free. Fit the reviewer-visible headline with
+bundled-font metrics inside a template-specific typography box, and validate
+the final composed PNG—not only the provider artwork—against typed dimensions,
+safe-area, text-fit, and contrast checks before marking the asset ready.
+
+**Why:** Image generation cannot reliably validate typography that is added
+afterward by the deterministic compositor. The previous character-count layout
+could overflow even when the base artwork passed validation, as demonstrated by
+the long KUKA Automation Management Platform headline.
+
+**Consequences:** The image model receives precise social-use geometry and
+negative-space instructions, while the compositor remains authoritative for
+brand typography. It performs one deterministic font-size/wrapping adjustment
+without another paid provider call and records whether adjustment occurred.
+Existing validation JSON remains readable because `finalComposition` is
+nullable by default. No database migration, n8n change, publishing behavior, or
+new model spend is introduced.

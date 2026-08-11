@@ -171,6 +171,7 @@ describe("Phase 1 fake-provider operating limits", () => {
     const jobs = Array.from({ length: 4 }, (_, index) => ({
       concept: direction.concepts[index % direction.concepts.length]!,
       idempotencyKey: `operating-limit-image-${index + 1}`,
+      template: "editorial_overlay" as const,
     }));
     const startedAt = performance.now();
     const { results, maximumActive } = await mapWithConcurrency(jobs, 4, (job) =>

@@ -93,6 +93,7 @@ export async function renderReviewImage(input: {
   const generated = await provider.generate({
     concept,
     idempotencyKey: input.baseSeed,
+    template,
   } satisfies ImageProviderRequest);
   const baseImage = Buffer.from(generated.imageBase64, "base64");
   const validation = await validateBaseImage(baseImage);
@@ -106,13 +107,20 @@ export async function renderReviewImage(input: {
     sourceLabel: sanitizeImageDisplayText(input.sourceLabel, 200),
     theme: themeFromBrandContext(input.brandContext),
   });
+  if (!composition.validation.readyForReview) {
+    throw new Error("The composed image failed final layout validation.");
+  }
   return {
     direction,
     concept,
     template,
     generated,
     baseImage,
-    validation,
+    validation: {
+      ...validation,
+      warnings: [...validation.warnings, ...composition.validation.warnings],
+      finalComposition: composition.validation,
+    },
     finalImage: composition.image,
     composition,
   };

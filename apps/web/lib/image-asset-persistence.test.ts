@@ -77,6 +77,20 @@ function validation(overrides: Record<string, unknown> = {}) {
     warnings: [],
     readyForComposition: true,
     humanOverrideRequired: false,
+    finalComposition: {
+      width: 1200,
+      height: 630,
+      mimeType: "image/png",
+      headlineFits: true,
+      brandLabelFits: true,
+      sourceLabelFits: true,
+      safeMarginsClear: true,
+      hasSufficientContrast: true,
+      contrastRatio: 8.2,
+      autoAdjusted: false,
+      warnings: [],
+      readyForReview: true,
+    },
     ...overrides,
   });
 }
@@ -164,6 +178,7 @@ describe("private image asset persistence", () => {
           warnings: ["Generated text was detected."],
           readyForComposition: false,
           humanOverrideRequired: true,
+          finalComposition: null,
         }),
         baseImage: Buffer.from("unsafe-base-image"),
         provider,

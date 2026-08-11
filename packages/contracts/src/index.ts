@@ -1123,6 +1123,24 @@ export const generatedImageSchema = z
   .strict();
 export type GeneratedImage = z.infer<typeof generatedImageSchema>;
 
+export const finalImageValidationSchema = z
+  .object({
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+    mimeType: z.literal("image/png"),
+    headlineFits: z.boolean(),
+    brandLabelFits: z.boolean(),
+    sourceLabelFits: z.boolean(),
+    safeMarginsClear: z.boolean(),
+    hasSufficientContrast: z.boolean(),
+    contrastRatio: z.number().nonnegative(),
+    autoAdjusted: z.boolean(),
+    warnings: z.array(z.string().trim().min(3).max(500)).max(30),
+    readyForReview: z.boolean(),
+  })
+  .strict();
+export type FinalImageValidation = z.infer<typeof finalImageValidationSchema>;
+
 export const imageValidationSchema = z
   .object({
     contractVersion: z.literal("1.0"),
@@ -1143,6 +1161,7 @@ export const imageValidationSchema = z
     warnings: z.array(z.string().trim().min(3).max(500)).max(30),
     readyForComposition: z.boolean(),
     humanOverrideRequired: z.boolean(),
+    finalComposition: finalImageValidationSchema.nullable().default(null),
   })
   .strict();
 export type ImageValidation = z.infer<typeof imageValidationSchema>;

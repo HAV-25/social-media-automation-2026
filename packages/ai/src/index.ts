@@ -61,7 +61,7 @@ export {
 export {
   IMAGE_DIRECTOR_PROMPT_VERSION,
   IMAGE_DIRECTOR_SYSTEM_PROMPT,
-} from "./prompts/image-director.v1";
+} from "./prompts/image-director.v2";
 
 export const draftRequestSchema = z.object({
   opportunityId: z.string().min(1),

@@ -98,8 +98,40 @@ describe("deterministic image compositor", () => {
       expect(metadata).toMatchObject({ width: 1200, height: 630, format: "png" });
       expect(first.checksum).toBe(second.checksum);
       expect(first.checksum).toBe(createHash("sha256").update(first.image).digest("hex"));
+      expect(first.validation.readyForReview).toBe(true);
+      expect(first.validation).toMatchObject({
+        headlineFits: true,
+        brandLabelFits: true,
+        sourceLabelFits: true,
+        safeMarginsClear: true,
+        hasSufficientContrast: true,
+      });
     },
   );
+
+  it("auto-fits the long KUKA headline inside the Concept-frame panel", async () => {
+    const base = await createDeterministicBaseImage({ seed: "kuka-layout-regression", ...theme });
+    const result = await composeBrandedImage({
+      baseImage: base,
+      template: "concept_frame",
+      headline: "KUKA deploys Automation Management Platform for North American automakers",
+      sourceLabel: "KUKA Toledo Production Operations",
+      theme,
+    });
+
+    expect(result.layout.headlineLines.length).toBeLessThanOrEqual(3);
+    expect(result.layout.headlineBounds.x).toBeGreaterThanOrEqual(result.layout.headlineBox.x);
+    expect(result.layout.headlineBounds.y).toBeGreaterThanOrEqual(result.layout.headlineBox.y);
+    expect(result.layout.headlineBounds.x + result.layout.headlineBounds.width).toBeLessThanOrEqual(
+      result.layout.headlineBox.x + result.layout.headlineBox.width,
+    );
+    expect(
+      result.layout.headlineBounds.y + result.layout.headlineBounds.height,
+    ).toBeLessThanOrEqual(result.layout.headlineBox.y + result.layout.headlineBox.height);
+    expect(result.validation.readyForReview).toBe(true);
+    expect(result.validation.headlineFits).toBe(true);
+    expect(result.validation.safeMarginsClear).toBe(true);
+  });
 
   it("blocks unsafe provider observations until a human override", async () => {
     const base = await createDeterministicBaseImage({ seed: "unsafe-fixture", ...theme });

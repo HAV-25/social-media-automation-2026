@@ -21,7 +21,7 @@ import {
   RESEARCH_PLANNER_SYSTEM_PROMPT,
 } from "./research-planner.v1";
 import { SOURCE_ANALYST_PROMPT_VERSION, SOURCE_ANALYST_SYSTEM_PROMPT } from "./source-analyst.v1";
-import { IMAGE_DIRECTOR_PROMPT_VERSION, IMAGE_DIRECTOR_SYSTEM_PROMPT } from "./image-director.v1";
+import { IMAGE_DIRECTOR_PROMPT_VERSION, IMAGE_DIRECTOR_SYSTEM_PROMPT } from "./image-director.v2";
 
 export const PRODUCTION_PROMPTS = [
   {

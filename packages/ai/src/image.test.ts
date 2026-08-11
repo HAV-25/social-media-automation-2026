@@ -12,7 +12,7 @@ import {
   OpenAIImageDirector,
   OpenAIImageProvider,
 } from "./image";
-import { IMAGE_DIRECTOR_SYSTEM_PROMPT } from "./prompts/image-director.v1";
+import { IMAGE_DIRECTOR_SYSTEM_PROMPT } from "./prompts/image-director.v2";
 
 const context: NormalizedBrandContext = {
   contractVersion: "1.0",
@@ -77,6 +77,7 @@ function providerRequest() {
   return {
     idempotencyKey: "image-generation-0001",
     concept: direction.concepts[0]!,
+    template: "editorial_overlay" as const,
   };
 }
 
@@ -237,8 +238,11 @@ describe("image direction and providers", () => {
       moderation: "auto",
     });
     expect(generate.mock.calls[0]?.[0].prompt).toContain("Include no words");
+    expect(generate.mock.calls[0]?.[0].prompt).toContain("delivered at exactly 1200x630");
+    expect(generate.mock.calls[0]?.[0].prompt).toContain("Template: editorial_overlay");
+    expect(generate.mock.calls[0]?.[0].prompt).toContain("bottom 40% visually quiet");
     expect(generate.mock.calls[0]?.[0].prompt).toBe(
-      buildImageGenerationPrompt(providerRequest().concept),
+      buildImageGenerationPrompt(providerRequest().concept, providerRequest().template),
     );
     expect(result.usage).toEqual({
       inputTokens: 100,
@@ -246,6 +250,7 @@ describe("image direction and providers", () => {
       estimatedCostUsd: 0.08,
     });
     expect(result.providerResponseId).toMatch(/^image_sha256_/);
+    expect(result.promptVersion).toBe("image-director.v2");
   });
 
   it("rejects missing live safety configuration, invalid sizes, and malformed output", async () => {

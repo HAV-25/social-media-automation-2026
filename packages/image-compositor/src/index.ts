@@ -2,30 +2,34 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import {
+  finalImageValidationSchema,
   imageTemplateSchema,
   imageValidationSchema,
+  type FinalImageValidation,
   type ImageTemplate,
   type ImageValidation,
 } from "@content-engine/contracts";
 import type { Font } from "opentype.js";
+import type sharpType from "sharp";
 import type { OverlayOptions } from "sharp";
 
 let opentypeRuntime: typeof import("opentype.js") | undefined;
-type SharpRuntime = typeof import("sharp");
-let sharpRuntime: SharpRuntime | undefined;
+let sharpRuntime: typeof sharpType | undefined;
 const bundledFontRelativePath = "packages/image-compositor/assets/Inter-Bold.ttf";
 let bundledFont: Font | undefined;
 
-async function getSharpRuntime() {
-  let sharpModule: unknown;
-  try {
-    sharpModule = await import("sharp");
-  } catch {
-    throw new Error("The image-compositor Sharp runtime is unavailable.");
+function getSharpRuntime() {
+  if (sharpRuntime) return sharpRuntime;
+  const moduleRuntime = process.getBuiltinModule("node:module");
+  if (!moduleRuntime) throw new Error("The image-compositor module runtime is unavailable.");
+  const loaded = moduleRuntime.createRequire(path.join(process.cwd(), "package.json"))("sharp") as
+    | typeof sharpType
+    | { default?: typeof sharpType };
+  const candidate = typeof loaded === "function" ? loaded : loaded.default;
+  if (typeof candidate !== "function") {
+    throw new Error("The image-compositor Sharp runtime has an unsupported module shape.");
   }
-  sharpRuntime ??=
-    (sharpModule as unknown as { default?: SharpRuntime }).default ??
-    (sharpModule as unknown as SharpRuntime);
+  sharpRuntime = candidate;
   return sharpRuntime;
 }
 
@@ -80,7 +84,7 @@ export const CANONICAL_IMAGE_WIDTH = 1536;
 export const CANONICAL_IMAGE_HEIGHT = 1024;
 
 export async function preflightImageCompositor() {
-  const sharp = await getSharpRuntime();
+  const sharp = getSharpRuntime();
   await loadBundledFont();
   await sharp({
     create: {
@@ -127,8 +131,16 @@ export type CompositionResult = {
     fontSize: number;
     textColor: string;
     logoSafeArea: { x: number; y: number; width: number; height: number };
+    headlineBox: LayoutBox;
+    headlineBounds: LayoutBox;
+    brandBounds: LayoutBox;
+    sourceBounds: LayoutBox | null;
+    autoAdjusted: boolean;
   };
+  validation: FinalImageValidation;
 };
+
+type LayoutBox = { x: number; y: number; width: number; height: number };
 
 const hexColorPattern = /^#[0-9a-f]{6}$/i;
 
@@ -204,14 +216,151 @@ export function wrapHeadline(
 function templateRules(template: ImageTemplate) {
   switch (template) {
     case "insight_split":
-      return { maxCharactersPerLine: 18, maxLines: 4, fontSize: 60 };
+      return { maxLines: 4, fontSize: 60, minFontSize: 36, lineHeightRatio: 1.08 };
     case "headline_panel":
-      return { maxCharactersPerLine: 22, maxLines: 4, fontSize: 66 };
+      return { maxLines: 4, fontSize: 66, minFontSize: 38, lineHeightRatio: 1.08 };
     case "concept_frame":
-      return { maxCharactersPerLine: 28, maxLines: 3, fontSize: 54 };
+      return { maxLines: 3, fontSize: 50, minFontSize: 30, lineHeightRatio: 1.05 };
     case "editorial_overlay":
-      return { maxCharactersPerLine: 30, maxLines: 3, fontSize: 58 };
+      return { maxLines: 3, fontSize: 58, minFontSize: 36, lineHeightRatio: 1.12 };
   }
+}
+
+function templateHeadlineBox(template: ImageTemplate, width: number, height: number): LayoutBox {
+  switch (template) {
+    case "insight_split":
+      return { x: 58, y: 126, width: width * 0.49 - 116, height: height - 216 };
+    case "headline_panel":
+      return { x: 64, y: 126, width: width * 0.57 - 96, height: height - 236 };
+    case "concept_frame":
+      return { x: 70, y: height - 202, width: width - 140, height: 116 };
+    case "editorial_overlay":
+      return { x: 64, y: height - 220, width: width - 128, height: 154 };
+  }
+}
+
+function measureTextWidth(value: string, font: Font, fontSize: number) {
+  return Array.from(value).reduce((width, character) => {
+    const glyph = font.charToGlyph(character);
+    return width + ((glyph.advanceWidth ?? font.unitsPerEm) / font.unitsPerEm) * fontSize;
+  }, 0);
+}
+
+function textHeight(font: Font, fontSize: number) {
+  return ((font.ascender - font.descender) / font.unitsPerEm) * fontSize;
+}
+
+function truncateToWidth(value: string, maxWidth: number, font: Font, fontSize: number) {
+  if (measureTextWidth(value, font, fontSize) <= maxWidth) return value;
+  const suffix = "…";
+  let truncated = value.replace(/[\s.…]+$/g, "");
+  while (truncated && measureTextWidth(`${truncated}${suffix}`, font, fontSize) > maxWidth) {
+    truncated = truncated.slice(0, -1).replace(/\s+$/g, "");
+  }
+  return `${truncated || value.slice(0, 1)}${suffix}`;
+}
+
+function wrapHeadlineMeasured(
+  headline: string,
+  input: { maxWidth: number; maxLines: number; font: Font; fontSize: number },
+) {
+  const normalized = headline.replace(/\s+/g, " ").trim();
+  if (!normalized) throw new Error("Headline is required.");
+  const words = normalized.split(" ");
+  const lines: string[] = [];
+  let current = "";
+  let consumedWords = 0;
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (measureTextWidth(candidate, input.font, input.fontSize) <= input.maxWidth) {
+      current = candidate;
+      consumedWords += 1;
+      continue;
+    }
+    if (current) lines.push(current);
+    if (lines.length === input.maxLines) break;
+    current = truncateToWidth(word, input.maxWidth, input.font, input.fontSize);
+    consumedWords += 1;
+  }
+  if (current && lines.length < input.maxLines) lines.push(current);
+  const truncated = consumedWords < words.length || lines.some((line) => line.endsWith("…"));
+  if (truncated && lines.length > 0) {
+    lines[lines.length - 1] = truncateToWidth(
+      `${lines[lines.length - 1]!.replace(/[\s.…]+$/g, "")}…`,
+      input.maxWidth,
+      input.font,
+      input.fontSize,
+    );
+  }
+  return { lines, truncated };
+}
+
+function fitHeadline(input: {
+  headline: string;
+  box: LayoutBox;
+  font: Font;
+  preferredFontSize: number;
+  minFontSize: number;
+  maxLines: number;
+  lineHeightRatio: number;
+}) {
+  for (let fontSize = input.preferredFontSize; fontSize >= input.minFontSize; fontSize -= 2) {
+    const wrapped = wrapHeadlineMeasured(input.headline, {
+      maxWidth: input.box.width,
+      maxLines: input.maxLines,
+      font: input.font,
+      fontSize,
+    });
+    const lineHeight = fontSize * input.lineHeightRatio;
+    const height = textHeight(input.font, fontSize) + lineHeight * (wrapped.lines.length - 1);
+    if (height <= input.box.height) {
+      const width = Math.max(
+        ...wrapped.lines.map((line) => measureTextWidth(line, input.font, fontSize)),
+      );
+      return {
+        ...wrapped,
+        fontSize,
+        lineHeight,
+        bounds: { x: input.box.x, y: input.box.y, width, height },
+        autoAdjusted: fontSize !== input.preferredFontSize || wrapped.truncated,
+      };
+    }
+  }
+  throw new Error("The headline cannot fit inside the selected image template.");
+}
+
+function fitSingleLine(
+  value: string,
+  box: LayoutBox,
+  font: Font,
+  preferredFontSize: number,
+  minimumFontSize: number,
+) {
+  for (let fontSize = preferredFontSize; fontSize >= minimumFontSize; fontSize -= 2) {
+    const width = measureTextWidth(value, font, fontSize);
+    const height = textHeight(font, fontSize);
+    if (width <= box.width && height <= box.height) {
+      return {
+        value,
+        fontSize,
+        bounds: { x: box.x, y: box.y, width, height },
+        autoAdjusted: fontSize !== preferredFontSize,
+      };
+    }
+  }
+  const fontSize = minimumFontSize;
+  const fittedValue = truncateToWidth(value, box.width, font, fontSize);
+  return {
+    value: fittedValue,
+    fontSize,
+    bounds: {
+      x: box.x,
+      y: box.y,
+      width: measureTextWidth(fittedValue, font, fontSize),
+      height: textHeight(font, fontSize),
+    },
+    autoAdjusted: true,
+  };
 }
 
 async function fontForTheme(theme: BrandImageTheme) {
@@ -270,80 +419,61 @@ async function overlaySvg(input: {
   template: ImageTemplate;
   headlineLines: string[];
   fontSize: number;
+  headlineBox: LayoutBox;
+  lineHeight: number;
   theme: BrandImageTheme;
   textColor: string;
-  sourceLabel: string;
+  font: Font;
+  brand: { value: string; fontSize: number; box: LayoutBox };
+  source: { value: string; fontSize: number; box: LayoutBox } | null;
 }) {
-  const { width, height, template, headlineLines, fontSize, theme, textColor } = input;
+  const { width, height, template, headlineLines, fontSize, theme, textColor, font } = input;
   const primary = assertHexColor(theme.primaryColor, "Primary color");
   const secondary = assertHexColor(theme.secondaryColor, "Secondary color");
   const accent = assertHexColor(theme.accentColor, "Accent color");
-  const font = await fontForTheme(theme);
   let shapes = "";
-  let headline = "";
   if (template === "editorial_overlay") {
     shapes = `<defs><linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="${primary}" stop-opacity="0"/>
       <stop offset="100%" stop-color="${primary}" stop-opacity="0.96"/>
     </linearGradient></defs><rect x="0" y="${height * 0.34}" width="${width}" height="${height * 0.66}" fill="url(#fade)"/>
     <rect x="64" y="${height - 268}" width="92" height="8" rx="4" fill="${accent}"/>`;
-    headline = headlineText(headlineLines, {
-      x: 64,
-      y: height - 196,
-      lineHeight: fontSize * 1.12,
-      fontSize,
-      fill: textColor,
-      font,
-    });
   } else if (template === "insight_split") {
     shapes = `<rect x="0" y="0" width="${width * 0.49}" height="${height}" fill="${primary}"/>
       <rect x="${width * 0.49 - 10}" y="0" width="10" height="${height}" fill="${accent}"/>`;
-    headline = headlineText(headlineLines, {
-      x: 58,
-      y: 174,
-      lineHeight: fontSize * 1.08,
-      fontSize,
-      fill: textColor,
-      font,
-    });
   } else if (template === "concept_frame") {
     shapes = `<rect x="26" y="26" width="${width - 52}" height="${height - 52}" rx="20" fill="none" stroke="${accent}" stroke-width="8"/>
-      <rect x="44" y="${height - 190}" width="${width - 88}" height="146" rx="14" fill="${primary}" fill-opacity="0.92"/>`;
-    headline = headlineText(headlineLines, {
-      x: 70,
-      y: height - 130,
-      lineHeight: fontSize * 1.05,
-      fontSize,
-      fill: textColor,
-      font,
-    });
+      <rect x="44" y="${height - 220}" width="${width - 88}" height="176" rx="14" fill="${primary}" fill-opacity="0.92"/>`;
   } else {
     shapes = `<rect x="0" y="0" width="${width}" height="${height}" fill="${primary}"/>
       <path d="M${width * 0.68} 0 H${width} V${height} H${width * 0.43} Z" fill="${secondary}"/>
       <circle cx="${width - 120}" cy="110" r="58" fill="${accent}"/>`;
-    headline = headlineText(headlineLines, {
-      x: 64,
-      y: 188,
-      lineHeight: fontSize * 1.08,
-      fontSize,
-      fill: textColor,
-      font,
-    });
   }
-  const brand = vectorText(theme.brandName.toLocaleUpperCase("en"), {
-    x: 64,
-    y: 58,
-    fontSize: 24,
+  const headlineBaseline = input.headlineBox.y + (font.ascender / font.unitsPerEm) * input.fontSize;
+  const headline = headlineText(headlineLines, {
+    x: input.headlineBox.x,
+    y: headlineBaseline,
+    lineHeight: input.lineHeight,
+    fontSize,
     fill: textColor,
     font,
   });
-  const source = vectorText(input.sourceLabel, {
-    x: 64,
-    y: height - 28,
-    fontSize: 20,
+  const brand = vectorText(input.brand.value, {
+    x: input.brand.box.x,
+    y: input.brand.box.y + (font.ascender / font.unitsPerEm) * input.brand.fontSize,
+    fontSize: input.brand.fontSize,
     fill: textColor,
     font,
   });
+  const source = input.source
+    ? vectorText(input.source.value, {
+        x: input.source.box.x,
+        y: input.source.box.y + (font.ascender / font.unitsPerEm) * input.source.fontSize,
+        fontSize: input.source.fontSize,
+        fill: textColor,
+        font,
+      })
+    : "";
   return Buffer.from(`<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
     ${shapes}
     <g>${headline}</g>
@@ -360,7 +490,7 @@ export async function createDeterministicBaseImage(input: {
   width?: number;
   height?: number;
 }) {
-  const sharp = await getSharpRuntime();
+  const sharp = getSharpRuntime();
   const width = input.width ?? CANONICAL_IMAGE_WIDTH;
   const height = input.height ?? CANONICAL_IMAGE_HEIGHT;
   const digest = createHash("sha256").update(input.seed).digest();
@@ -389,7 +519,7 @@ export async function validateBaseImage(
     focalSafeAreaClear?: boolean;
   } = {},
 ): Promise<ImageValidation> {
-  const sharp = await getSharpRuntime();
+  const sharp = getSharpRuntime();
   const metadata = await sharp(image).metadata();
   const width = metadata.width ?? 0;
   const height = metadata.height ?? 0;
@@ -443,8 +573,76 @@ export async function validateBaseImage(
   });
 }
 
+function containsBox(outer: LayoutBox, inner: LayoutBox) {
+  return (
+    inner.x >= outer.x &&
+    inner.y >= outer.y &&
+    inner.x + inner.width <= outer.x + outer.width &&
+    inner.y + inner.height <= outer.y + outer.height
+  );
+}
+
+export async function validateFinalImage(
+  image: Buffer,
+  input: {
+    expectedWidth: number;
+    expectedHeight: number;
+    headlineBox: LayoutBox;
+    headlineBounds: LayoutBox;
+    brandBounds: LayoutBox;
+    sourceBounds: LayoutBox | null;
+    contrastRatio: number;
+    autoAdjusted: boolean;
+  },
+): Promise<FinalImageValidation> {
+  const sharp = getSharpRuntime();
+  const metadata = await sharp(image).metadata();
+  const width = metadata.width ?? 0;
+  const height = metadata.height ?? 0;
+  const mimeType = metadata.format === "png" ? "image/png" : null;
+  if (!width || !height || !mimeType) throw new Error("The final image is not a readable PNG.");
+  const canvas = { x: 0, y: 0, width, height };
+  const safeCanvas = { x: 26, y: 18, width: width - 52, height: height - 36 };
+  const dimensionsMatch = width === input.expectedWidth && height === input.expectedHeight;
+  const headlineFits =
+    containsBox(input.headlineBox, input.headlineBounds) &&
+    containsBox(canvas, input.headlineBounds);
+  const brandLabelFits = containsBox(safeCanvas, input.brandBounds);
+  const sourceLabelFits = input.sourceBounds ? containsBox(safeCanvas, input.sourceBounds) : true;
+  const safeMarginsClear =
+    containsBox(safeCanvas, input.headlineBounds) && brandLabelFits && sourceLabelFits;
+  const hasSufficientContrast = input.contrastRatio >= 4.5;
+  const warnings: string[] = [];
+  if (!dimensionsMatch) warnings.push("The final image dimensions do not match 1200x630.");
+  if (!headlineFits) warnings.push("The headline exceeds its template typography region.");
+  if (!brandLabelFits) warnings.push("The brand label exceeds the image safe area.");
+  if (!sourceLabelFits) warnings.push("The source label exceeds the image safe area.");
+  if (!safeMarginsClear) warnings.push("Composed typography violates a canvas safe margin.");
+  if (!hasSufficientContrast) warnings.push("Composed typography has insufficient contrast.");
+  return finalImageValidationSchema.parse({
+    width,
+    height,
+    mimeType,
+    headlineFits,
+    brandLabelFits,
+    sourceLabelFits,
+    safeMarginsClear,
+    hasSufficientContrast,
+    contrastRatio: input.contrastRatio,
+    autoAdjusted: input.autoAdjusted,
+    warnings,
+    readyForReview:
+      dimensionsMatch &&
+      headlineFits &&
+      brandLabelFits &&
+      sourceLabelFits &&
+      safeMarginsClear &&
+      hasSufficientContrast,
+  });
+}
+
 export async function composeBrandedImage(input: CompositionInput): Promise<CompositionResult> {
-  const sharp = await getSharpRuntime();
+  const sharp = getSharpRuntime();
   const template = imageTemplateSchema.parse(input.template);
   const width = input.width ?? FACEBOOK_IMAGE_WIDTH;
   const height = input.height ?? FACEBOOK_IMAGE_HEIGHT;
@@ -452,24 +650,57 @@ export async function composeBrandedImage(input: CompositionInput): Promise<Comp
     throw new Error("Output dimensions are outside the supported composition range.");
   }
   const rules = templateRules(template);
-  const headlineLines = wrapHeadline(input.headline, rules);
+  const font = await fontForTheme(input.theme);
+  const headlineBox = templateHeadlineBox(template, width, height);
+  const fittedHeadline = fitHeadline({
+    headline: input.headline,
+    box: headlineBox,
+    font,
+    preferredFontSize: rules.fontSize,
+    minFontSize: rules.minFontSize,
+    maxLines: rules.maxLines,
+    lineHeightRatio: rules.lineHeightRatio,
+  });
   const background =
     template === "headline_panel" || template === "insight_split"
       ? input.theme.primaryColor
       : "#111111";
   const textColor = chooseTextColor(background, input.theme.preferredTextColor);
-  if (contrastRatio(textColor, background) < 4.5) {
+  const measuredContrast = contrastRatio(textColor, background);
+  if (measuredContrast < 4.5) {
     throw new Error("No accessible text color is available for this template.");
   }
+  const brandBox = { x: 64, y: 30, width: width - (input.theme.logo ? 274 : 128), height: 34 };
+  const fittedBrand = fitSingleLine(
+    input.theme.brandName.toLocaleUpperCase("en"),
+    brandBox,
+    font,
+    24,
+    14,
+  );
+  const sourceValue = input.sourceLabel?.trim().slice(0, 120) ?? "";
+  const sourceBox = {
+    x: template === "concept_frame" ? 70 : 64,
+    y: template === "concept_frame" ? height - 72 : height - 48,
+    width: template === "concept_frame" ? width - 140 : width - 128,
+    height: 28,
+  };
+  const fittedSource = sourceValue ? fitSingleLine(sourceValue, sourceBox, font, 20, 12) : null;
   const overlay = await overlaySvg({
     width,
     height,
     template,
-    headlineLines,
-    fontSize: rules.fontSize,
+    headlineLines: fittedHeadline.lines,
+    fontSize: fittedHeadline.fontSize,
+    headlineBox,
+    lineHeight: fittedHeadline.lineHeight,
     theme: input.theme,
     textColor,
-    sourceLabel: input.sourceLabel?.trim().slice(0, 120) ?? "",
+    font,
+    brand: { value: fittedBrand.value, fontSize: fittedBrand.fontSize, box: brandBox },
+    source: fittedSource
+      ? { value: fittedSource.value, fontSize: fittedSource.fontSize, box: sourceBox }
+      : null,
   });
   const composites: OverlayOptions[] = [{ input: overlay, top: 0, left: 0 }];
   if (input.theme.logo) {
@@ -485,6 +716,18 @@ export async function composeBrandedImage(input: CompositionInput): Promise<Comp
     .png({ compressionLevel: 9, adaptiveFiltering: false })
     .withMetadata({ density: 72 })
     .toBuffer();
+  const autoAdjusted =
+    fittedHeadline.autoAdjusted || fittedBrand.autoAdjusted || Boolean(fittedSource?.autoAdjusted);
+  const validation = await validateFinalImage(image, {
+    expectedWidth: width,
+    expectedHeight: height,
+    headlineBox,
+    headlineBounds: fittedHeadline.bounds,
+    brandBounds: fittedBrand.bounds,
+    sourceBounds: fittedSource?.bounds ?? null,
+    contrastRatio: measuredContrast,
+    autoAdjusted,
+  });
   return {
     image,
     width,
@@ -493,10 +736,16 @@ export async function composeBrandedImage(input: CompositionInput): Promise<Comp
     checksum: createHash("sha256").update(image).digest("hex"),
     layout: {
       template,
-      headlineLines,
-      fontSize: rules.fontSize,
+      headlineLines: fittedHeadline.lines,
+      fontSize: fittedHeadline.fontSize,
       textColor,
       logoSafeArea: { x: width - 210, y: 18, width: 190, height: 92 },
+      headlineBox,
+      headlineBounds: fittedHeadline.bounds,
+      brandBounds: fittedBrand.bounds,
+      sourceBounds: fittedSource?.bounds ?? null,
+      autoAdjusted,
     },
+    validation,
   };
 }

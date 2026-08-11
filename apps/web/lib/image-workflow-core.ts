@@ -68,24 +68,29 @@ export async function executeImageWorkflow(
   const generated = await dependencies.provider.generate({
     concept: selected,
     idempotencyKey: request.idempotencyKey,
+    template: request.template,
   } satisfies ImageProviderRequest);
   const baseImage = Buffer.from(generated.imageBase64, "base64");
-  const validation = await validateBaseImage(baseImage);
-  const finalImage =
-    validation.readyForComposition && !validation.humanOverrideRequired
-      ? (
-          await composeBrandedImage({
-            baseImage,
-            template: request.template,
-            headline: sanitizeImageDisplayText(selected.headlineOverlay || context.post.hook, 200),
-            sourceLabel: sanitizeImageDisplayText(
-              selected.sourceLabel || context.post.sourceTitle,
-              200,
-            ),
-            theme: themeFromBrandContext(context.brandContext),
-          })
-        ).image
-      : undefined;
+  const baseValidation = await validateBaseImage(baseImage);
+  const composition =
+    baseValidation.readyForComposition && !baseValidation.humanOverrideRequired
+      ? await composeBrandedImage({
+          baseImage,
+          template: request.template,
+          headline: sanitizeImageDisplayText(selected.headlineOverlay || context.post.hook, 200),
+          sourceLabel: sanitizeImageDisplayText(
+            selected.sourceLabel || context.post.sourceTitle,
+            200,
+          ),
+          theme: themeFromBrandContext(context.brandContext),
+        })
+      : null;
+  const validation = {
+    ...baseValidation,
+    warnings: [...baseValidation.warnings, ...(composition?.validation.warnings ?? [])],
+    finalComposition: composition?.validation ?? null,
+  };
+  const finalImage = composition?.validation.readyForReview ? composition.image : undefined;
   const identityHash = sha256Hex(
     `${context.post.organizationId}:${context.post.id}:${request.idempotencyKey}`,
   );
@@ -106,7 +111,7 @@ export async function executeImageWorkflow(
       baseImage,
       finalImage,
       provider: generated,
-      prompt: buildImageGenerationPrompt(selected),
+      prompt: buildImageGenerationPrompt(selected, request.template),
     },
     dependencies.persistence,
   );

@@ -283,7 +283,9 @@ export function PostImageReview({
               Validation: {state.validation.width}×{state.validation.height} base ·{" "}
               {state.validation.warnings.length
                 ? state.validation.warnings.join(" ")
-                : "all deterministic checks passed"}
+                : state.validation.finalComposition?.readyForReview
+                  ? `base and final layout passed${state.validation.finalComposition.autoAdjusted ? " after automatic text fitting" : ""}`
+                  : "base checks passed; final layout was not recorded"}
               <br />
               Model: {state.model ?? "not recorded"} · Cost: ${state.estimatedCostUsd.toFixed(3)}
             </div>

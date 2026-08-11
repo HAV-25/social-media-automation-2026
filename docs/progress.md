@@ -1709,3 +1709,70 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   approval-gated production actions. Docker/Supabase local services were not
   available, so the SQL behavior is covered by migration contract and pgTAP
   tests but has not been executed against a disposable local Postgres instance.
+
+### 2026-08-01 template-aware image composition and final validation (local, not deployed)
+
+- Updated only the approved image prompt, typed image contract, deterministic
+  compositor, and final-image validator, plus their direct UI/persistence call
+  sites. No database schema, Supabase policy, n8n workflow, or deployment was
+  changed.
+- Added `image-director.v2`, which records the intended Facebook use, provider
+  canvas, final 1200×630 crop, selected template, and template-specific quiet
+  zone in the exact persisted prompt. Generated base artwork remains text-free.
+- Added a backward-compatible typed `finalComposition` validation record with
+  final dimensions, safe-area, measured headline/brand/source fit, contrast,
+  automatic fitting status, issue list, and final review readiness.
+- Replaced character-count wrapping with bundled-font measurement, bounded
+  font-size fitting, explicit typography boxes, and ellipsis protection. A
+  regression fixture using the full KUKA Automation Management Platform
+  headline fits cleanly without clipping; all four templates pass final-image
+  validation.
+- Verified the change with 30 targeted tests, all 379 package/application tests,
+  repository formatting, repository-wide ESLint, strict TypeScript across all
+  packages, the optimized Next.js production build, and all four Chromium
+  walking-skeleton journeys. The browser image journey now creates and validates
+  the final composed asset successfully. No paid AI or image-provider call was
+  made.
+
+### 2026-08-02 coordinated WF-05 through WF-08 production publication
+
+- Published the already-tested WF-05 Research, WF-06 Angle and Post Generation,
+  WF-07 Post Verification, and WF-08 Image Generation definitions to their
+  existing production workflow IDs; all four remained active in the intended
+  n8n project and folder.
+- Resumed the existing Klaank opportunity `Google DeepMind says Gemini Robotics
+2 enables full body control` through the signed production intake. Its durable
+  evidence package was reused and the idempotent resume created no duplicate
+  drafts.
+- Verified three materially different review-ready posts: Newsworthy Authority
+  (quality 83), Perspective & Conversation (quality 80), and Educational
+  Breakdown (quality 77).
+- Verified that all three posts have a completed branded visual, exact image
+  prompt provenance, and working image/package download controls. No image-action
+  failure is present on any of the three review pages.
+- The content-package ledger records an exact lifetime cost of `$0.2054` for the
+  completed opportunity, including `$0.0784` bounded research and all downstream
+  writing/image work. The controlled resume reused persisted work rather than
+  creating a second content package.
+- No Supabase migration, application deployment, source-policy change, or change
+  to WF-01 through WF-04, WF-09, or WF-10 was made in this publication step.
+
+### 2026-08-11 current-architecture archive candidate
+
+- Created the isolated archive branch
+  `archive/current-architecture-v0.9.0-20260811` from GitHub `main` at
+  `a42426f9ff2ce41c9502462a3c2be3bd203b0c13`; `main` was not changed.
+- Included the previously uncommitted, already documented template-aware image
+  prompt, typed final-composition contract, measured compositor, final validator,
+  persistence, UI, and regression coverage in the archive candidate.
+- Added the versioned release and restoration record at
+  `docs/releases/v0.9.0-current-architecture.20260811.md` and set the archive
+  package version to `0.9.0`.
+- Passed formatting, direct repository ESLint, strict TypeScript for all seven
+  workspaces, all 379 Vitest assertions, the optimized Next.js production build,
+  and all four Chromium walking-skeleton journeys. No paid provider call was
+  made.
+- The local pnpm command shim attempted a non-interactive dependency refresh;
+  validation therefore invoked the same locked workspace binaries and scripts
+  directly. The dependency restore reused the locked pnpm store and changed no
+  committed dependency version.

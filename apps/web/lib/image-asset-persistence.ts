@@ -108,13 +108,14 @@ function resolvePersistenceState(input: { validation: ImageValidation; finalImag
   if (
     input.validation.readyForComposition &&
     !input.validation.humanOverrideRequired &&
+    input.validation.finalComposition?.readyForReview &&
     input.finalImage
   ) {
     return "ready" as const;
   }
   if (
-    !input.validation.readyForComposition &&
-    input.validation.humanOverrideRequired &&
+    ((!input.validation.readyForComposition && input.validation.humanOverrideRequired) ||
+      input.validation.finalComposition?.readyForReview === false) &&
     !input.finalImage
   ) {
     return "validation_required" as const;

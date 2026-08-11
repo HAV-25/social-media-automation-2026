@@ -121,7 +121,7 @@ function demoState(record: DemoImageRecord): PostImageReviewState {
     template: record.template,
     validation: record.validation,
     model: record.model,
-    prompt: concept ? buildImageGenerationPrompt(concept) : null,
+    prompt: concept ? buildImageGenerationPrompt(concept, record.template) : null,
     promptVersion: record.promptVersion,
     providerResponseId: record.providerResponseId,
     estimatedCostUsd: record.estimatedCostUsd,

@@ -12,6 +12,7 @@
     "./prompts/research-planner.v1": "./src/prompts/research-planner.v1.ts",
     "./prompts/evidence-synthesizer.v1": "./src/prompts/evidence-synthesizer.v1.ts",
     "./prompts/image-director.v1": "./src/prompts/image-director.v1.ts",
+    "./prompts/image-director.v2": "./src/prompts/image-director.v2.ts",
     "./prompts/registry": "./src/prompts/registry.ts"
   },
   "scripts": {
