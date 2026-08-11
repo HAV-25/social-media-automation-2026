@@ -1,0 +1,57 @@
+{
+  "name": "LW-01 Daily RSS Intake",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "cronExpression", "expression": "0 1 * * *" }] }
+      },
+      "id": "b1000001-0000-4000-8000-000000000001",
+      "name": "Daily at 1 AM Berlin",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-240, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL + '/functions/v1/lightweight-daily-intake' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "content-type", "value": "application/json" },
+            {
+              "name": "x-lightweight-worker-secret",
+              "value": "={{ $env.LIGHTWEIGHT_WORKER_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ contractVersion: '1.0', maxItemsPerFeed: 3 }) }}",
+        "options": { "timeout": 300000 }
+      },
+      "id": "b1000001-0000-4000-8000-000000000002",
+      "name": "Run Safe Daily Intake",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [0, 0]
+    }
+  ],
+  "connections": {
+    "Daily at 1 AM Berlin": {
+      "main": [[{ "node": "Run Safe Daily Intake", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Berlin",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none",
+    "executionTimeout": 600
+  },
+  "versionId": "b1000001-0000-4000-8000-000000000003",
+  "tags": []
+}

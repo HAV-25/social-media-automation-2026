@@ -14,13 +14,16 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   loadBrands,
+  loadFeeds,
   loadJobs,
   loadOpportunities,
   loadPosts,
+  manageFeed,
   requestAction,
   reviewPost,
   savePost,
   type Brand,
+  type Feed,
   type Job,
   type Opportunity,
   type Post,
@@ -258,6 +261,15 @@ function Posts({
         {message && <p className="notice">{message}</p>}
         <div className="review-grid">
           <section className="editor">
+            {selected.imageUrl && (
+              <div className="review-image">
+                <img src={selected.imageUrl} alt="Generated branded editorial visual" />
+                <details>
+                  <summary>Exact image-generation prompt</summary>
+                  <pre>{selected.imagePrompt ?? "Prompt provenance unavailable."}</pre>
+                </details>
+              </div>
+            )}
             <label>
               Hook
               <textarea
@@ -441,6 +453,194 @@ function Runs({ jobs, refresh }: { jobs: Job[]; refresh: () => void }) {
   );
 }
 
+function Sources({
+  client,
+  brand,
+  feeds,
+  refresh,
+}: {
+  client: SupabaseClient;
+  brand: Brand;
+  feeds: Feed[];
+  refresh: () => Promise<void>;
+}) {
+  const [form, setForm] = useState({
+    name: "",
+    feedUrl: "",
+    authorityScore: 60,
+    minimumScore: 75,
+    dailyLimit: 3,
+    includeKeywords: "",
+    excludeKeywords: "",
+  });
+  const [message, setMessage] = useState("");
+  async function save(event: React.FormEvent) {
+    event.preventDefault();
+    setMessage("");
+    try {
+      await manageFeed(client, {
+        action: "upsert",
+        brandId: brand.id,
+        ...form,
+        includeKeywords: form.includeKeywords
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean),
+        excludeKeywords: form.excludeKeywords
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean),
+        active: true,
+      });
+      setForm({
+        name: "",
+        feedUrl: "",
+        authorityScore: 60,
+        minimumScore: 75,
+        dailyLimit: 3,
+        includeKeywords: "",
+        excludeKeywords: "",
+      });
+      setMessage("Feed policy saved.");
+      await refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Feed could not be saved");
+    }
+  }
+  async function toggle(feed: Feed) {
+    try {
+      await manageFeed(client, {
+        action: "toggle",
+        brandId: brand.id,
+        feedId: feed.id,
+        active: !feed.active,
+      });
+      await refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Feed could not be updated");
+    }
+  }
+  return (
+    <>
+      <header>
+        <p className="eyebrow">Source operations</p>
+        <h1>RSS feeds and routing</h1>
+        <p>
+          Each feed runs independently. Configure the automatic threshold and daily limit per brand.
+        </p>
+      </header>
+      {message && <p className="notice">{message}</p>}
+      <div className="source-grid">
+        <section className="list">
+          {feeds.map((feed) => (
+            <article className="feed-card" key={feed.id}>
+              <div className="section-heading">
+                <div>
+                  <p className="meta">{feed.active ? "ACTIVE" : "PAUSED"}</p>
+                  <h2>{feed.name}</h2>
+                  <p>{feed.feed_url}</p>
+                </div>
+                <button className="secondary" onClick={() => void toggle(feed)}>
+                  {feed.active ? "Pause" : "Resume"}
+                </button>
+              </div>
+              <div className="feed-metrics">
+                <span>
+                  Authority <b>{feed.authority_score}</b>
+                </span>
+                <span>
+                  Automatic ≥ <b>{feed.minimumScore}</b>
+                </span>
+                <span>
+                  Daily max <b>{feed.dailyLimit}</b>
+                </span>
+                <span>
+                  Failures <b>{feed.consecutive_failures}</b>
+                </span>
+              </div>
+              <p className="muted">
+                Last success:{" "}
+                {feed.last_success_at ? new Date(feed.last_success_at).toLocaleString() : "Not yet"}
+                {feed.last_error ? ` · ${feed.last_error}` : ""}
+              </p>
+            </article>
+          ))}
+        </section>
+        <form className="source-form" onSubmit={save}>
+          <p className="eyebrow orange">Add feed</p>
+          <h2>Routing policy</h2>
+          <label>
+            Name
+            <input
+              required
+              value={form.name}
+              onChange={(event) => setForm({ ...form, name: event.target.value })}
+            />
+          </label>
+          <label>
+            RSS or Atom URL
+            <input
+              type="url"
+              required
+              value={form.feedUrl}
+              onChange={(event) => setForm({ ...form, feedUrl: event.target.value })}
+            />
+          </label>
+          <div className="form-pair">
+            <label>
+              Authority
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={form.authorityScore}
+                onChange={(event) =>
+                  setForm({ ...form, authorityScore: Number(event.target.value) })
+                }
+              />
+            </label>
+            <label>
+              Automatic score
+              <input
+                type="number"
+                min="60"
+                max="100"
+                value={form.minimumScore}
+                onChange={(event) => setForm({ ...form, minimumScore: Number(event.target.value) })}
+              />
+            </label>
+          </div>
+          <label>
+            Daily maximum
+            <input
+              type="number"
+              min="0"
+              max="100"
+              value={form.dailyLimit}
+              onChange={(event) => setForm({ ...form, dailyLimit: Number(event.target.value) })}
+            />
+          </label>
+          <label>
+            Include keywords (comma separated)
+            <input
+              value={form.includeKeywords}
+              onChange={(event) => setForm({ ...form, includeKeywords: event.target.value })}
+            />
+          </label>
+          <label>
+            Exclude keywords (comma separated)
+            <input
+              value={form.excludeKeywords}
+              onChange={(event) => setForm({ ...form, excludeKeywords: event.target.value })}
+            />
+          </label>
+          <button>Save feed</button>
+        </form>
+      </div>
+    </>
+  );
+}
+
 function Shell({ client, session }: { client: SupabaseClient; session: Session }) {
   const [view, setView] = useState<View>("inbox");
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -448,6 +648,7 @@ function Shell({ client, session }: { client: SupabaseClient; session: Session }
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [feeds, setFeeds] = useState<Feed[]>([]);
   const [error, setError] = useState("");
   useEffect(() => {
     loadBrands(client)
@@ -462,14 +663,16 @@ function Shell({ client, session }: { client: SupabaseClient; session: Session }
     if (!brandId) return;
     setError("");
     try {
-      const [nextOpportunities, nextPosts, nextJobs] = await Promise.all([
+      const [nextOpportunities, nextPosts, nextJobs, nextFeeds] = await Promise.all([
         loadOpportunities(client, brandId),
         loadPosts(client, brandId),
         loadJobs(client, brandId),
+        loadFeeds(client, brandId),
       ]);
       setOpportunities(nextOpportunities);
       setPosts(nextPosts);
       setJobs(nextJobs);
+      setFeeds(nextFeeds);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Data could not load");
     }
@@ -549,24 +752,7 @@ function Shell({ client, session }: { client: SupabaseClient; session: Session }
         )}{" "}
         {view === "runs" && <Runs jobs={jobs} refresh={() => void refresh()} />}{" "}
         {view === "sources" && (
-          <>
-            <header>
-              <p className="eyebrow">Source operations</p>
-              <h1>Feeds continue independently</h1>
-              <p>
-                Feed management remains stored in Supabase. One feed failure cannot stop the other
-                feeds or the reviewer interface.
-              </p>
-            </header>
-            <div className="empty">
-              <Radio size={38} />
-              <h2>Source configuration is preserved</h2>
-              <p>
-                Use the current administration screen during the compatibility release. The final
-                cutover will expose the same RLS-protected feed records here.
-              </p>
-            </div>
-          </>
+          <Sources client={client} brand={brand} feeds={feeds} refresh={refresh} />
         )}
       </main>
     </div>

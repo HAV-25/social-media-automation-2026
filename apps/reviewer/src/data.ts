@@ -29,6 +29,8 @@ export type Post = {
   closing?: string | null;
   fullText?: string;
   imagePath?: string | null;
+  imageUrl?: string | null;
+  imagePrompt?: string | null;
 };
 
 export type Job = {
@@ -41,6 +43,22 @@ export type Job = {
   cost_usd: number;
   error_summary: string | null;
   created_at: string;
+};
+
+export type Feed = {
+  id: string;
+  name: string;
+  feed_url: string;
+  active: boolean;
+  authority_score: number;
+  last_polled_at: string | null;
+  last_success_at: string | null;
+  last_error: string | null;
+  consecutive_failures: number;
+  minimumScore: number;
+  dailyLimit: number;
+  includeKeywords: string[];
+  excludeKeywords: string[];
 };
 
 function throwIfError(error: { message: string } | null): void {
@@ -111,7 +129,7 @@ export async function loadPosts(client: SupabaseClient, brandId: string): Promis
     draftIds.length
       ? client
           .from("image_assets")
-          .select("post_draft_id,final_image_path,created_at")
+          .select("post_draft_id,final_image_path,prompt,created_at")
           .in("post_draft_id", draftIds)
           .order("created_at", { ascending: false })
       : Promise.resolve({ data: [], error: null }),
@@ -119,19 +137,33 @@ export async function loadPosts(client: SupabaseClient, brandId: string): Promis
   throwIfError(versions.error);
   throwIfError(images.error);
   const byVersion = new Map((versions.data ?? []).map((version) => [String(version.id), version]));
-  const byDraft = new Map<string, string>();
+  const byDraft = new Map<string, { path: string; prompt: string | null }>();
   for (const image of images.data ?? [])
     if (!byDraft.has(String(image.post_draft_id)) && image.final_image_path)
-      byDraft.set(String(image.post_draft_id), String(image.final_image_path));
+      byDraft.set(String(image.post_draft_id), {
+        path: String(image.final_image_path),
+        prompt: image.prompt ? String(image.prompt) : null,
+      });
+  const paths = [...byDraft.values()].map((image) => image.path);
+  const signed = paths.length
+    ? await client.storage.from("generated-images").createSignedUrls(paths, 900)
+    : { data: [], error: null };
+  throwIfError(signed.error);
+  const urls = new Map(
+    (signed.data ?? []).map((item, index) => [paths[index], item.signedUrl ?? null]),
+  );
   return posts.map((post) => {
     const version = post.current_version_id ? byVersion.get(post.current_version_id) : undefined;
+    const image = byDraft.get(post.id);
     return {
       ...post,
       hook: String(version?.hook ?? ""),
       body: String(version?.body ?? ""),
       closing: version?.closing ? String(version.closing) : null,
       fullText: String(version?.full_text ?? ""),
-      imagePath: byDraft.get(post.id) ?? null,
+      imagePath: image?.path ?? null,
+      imageUrl: image ? (urls.get(image.path) ?? null) : null,
+      imagePrompt: image?.prompt ?? null,
     };
   });
 }
@@ -145,6 +177,50 @@ export async function loadJobs(client: SupabaseClient, brandId: string): Promise
     .limit(200);
   throwIfError(error);
   return (data ?? []) as Job[];
+}
+
+export async function loadFeeds(client: SupabaseClient, brandId: string): Promise<Feed[]> {
+  const { data, error } = await client
+    .from("rss_feeds")
+    .select(
+      "id,name,feed_url,active,authority_score,last_polled_at,last_success_at,last_error,consecutive_failures,rss_feed_brand_links!inner(brand_id,minimum_score,daily_generation_limit,include_keywords,exclude_keywords)",
+    )
+    .eq("rss_feed_brand_links.brand_id", brandId)
+    .order("name");
+  throwIfError(error);
+  return (data ?? []).map((row) => {
+    const links = Array.isArray(row.rss_feed_brand_links)
+      ? row.rss_feed_brand_links
+      : [row.rss_feed_brand_links];
+    const link = (links[0] ?? {}) as Record<string, unknown>;
+    return {
+      id: String(row.id),
+      name: String(row.name),
+      feed_url: String(row.feed_url),
+      active: Boolean(row.active),
+      authority_score: Number(row.authority_score),
+      last_polled_at: row.last_polled_at ? String(row.last_polled_at) : null,
+      last_success_at: row.last_success_at ? String(row.last_success_at) : null,
+      last_error: row.last_error ? String(row.last_error) : null,
+      consecutive_failures: Number(row.consecutive_failures),
+      minimumScore: Number(link.minimum_score ?? 75),
+      dailyLimit: Number(link.daily_generation_limit ?? 3),
+      includeKeywords: Array.isArray(link.include_keywords)
+        ? link.include_keywords.map(String)
+        : [],
+      excludeKeywords: Array.isArray(link.exclude_keywords)
+        ? link.exclude_keywords.map(String)
+        : [],
+    };
+  });
+}
+
+export async function manageFeed(
+  client: SupabaseClient,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const { error } = await client.rpc("manage_lightweight_feed", { payload });
+  throwIfError(error);
 }
 
 export async function requestAction(

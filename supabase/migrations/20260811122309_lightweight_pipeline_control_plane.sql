@@ -28,6 +28,7 @@ create table public.pipeline_instances (
   opportunity_id uuid references public.opportunities(id) on delete cascade,
   source_document_id uuid references public.source_documents(id) on delete cascade,
   correlation_id uuid not null default gen_random_uuid(),
+  idempotency_key text not null check (char_length(idempotency_key) between 8 and 300),
   state public.pipeline_job_state not null default 'queued',
   current_stage public.pipeline_stage not null default 'ingest',
   trigger_type text not null check (trigger_type in ('schedule', 'manual', 'retry', 'resurface')),
@@ -38,6 +39,7 @@ create table public.pipeline_instances (
   updated_at timestamptz not null default now(),
   unique (id, organization_id),
   unique (correlation_id),
+  unique (organization_id, idempotency_key),
   foreign key (brand_id, organization_id)
     references public.brands(id, organization_id) on delete cascade
 );
@@ -126,19 +128,32 @@ begin
   if target_brand.id is null or target_brand.status <> 'active' then
     raise exception 'Active brand not found' using errcode = 'P0002';
   end if;
+  if char_length(coalesce(payload ->> 'idempotencyKey', '')) not between 8 and 300 then
+    raise exception 'Invalid pipeline idempotency key' using errcode = '22023';
+  end if;
 
   insert into public.pipeline_instances (
     organization_id, brand_id, opportunity_id, source_document_id,
-    correlation_id, current_stage, trigger_type
+    correlation_id, idempotency_key, current_stage, trigger_type
   ) values (
     target_brand.organization_id,
     target_brand.id,
     nullif(payload ->> 'opportunityId', '')::uuid,
     nullif(payload ->> 'sourceDocumentId', '')::uuid,
     coalesce(nullif(payload ->> 'correlationId', '')::uuid, gen_random_uuid()),
+    payload ->> 'idempotencyKey',
     first_stage,
     coalesce(nullif(payload ->> 'triggerType', ''), 'schedule')
-  ) returning * into result;
+  )
+  on conflict (organization_id, idempotency_key) do nothing
+  returning * into result;
+
+  if result.id is null then
+    select * into result
+    from public.pipeline_instances
+    where organization_id = target_brand.organization_id
+      and idempotency_key = payload ->> 'idempotencyKey';
+  end if;
 
   perform private.enqueue_pipeline_job(jsonb_build_object(
     'pipelineId', result.id,
@@ -463,6 +478,191 @@ begin
 end;
 $$;
 
+create or replace function private.qualify_lightweight_source(payload jsonb)
+returns table (
+  opportunity_id uuid,
+  pipeline_id uuid,
+  score numeric,
+  decision text,
+  used_today integer,
+  daily_limit integer
+)
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  source_record public.source_documents%rowtype;
+  route_record public.rss_feed_brand_links%rowtype;
+  cluster_id uuid;
+  opportunity_id_value uuid;
+  pipeline_id_value uuid;
+  score_value numeric := (payload ->> 'score')::numeric;
+  risk_value numeric := coalesce((payload ->> 'riskPenalty')::numeric, 0);
+  cluster_key_value text := payload ->> 'clusterKey';
+  decision_value text;
+  used_count integer;
+  actor_value uuid := nullif(payload ->> 'actorId', '')::uuid;
+  berlin_day text := to_char(timezone('Europe/Berlin', now()), 'YYYY-MM-DD');
+begin
+  if score_value not between 0 and 100
+     or risk_value not between 0 and 100
+     or char_length(coalesce(payload ->> 'valueNucleus', '')) not between 20 and 2000
+     or coalesce(cluster_key_value, '') !~ '^[0-9a-f]{64}$'
+     or jsonb_typeof(payload -> 'scoreBreakdown') <> 'object'
+     or jsonb_typeof(payload -> 'classification') <> 'object'
+  then
+    raise exception 'Invalid lightweight qualification payload' using errcode = '22023';
+  end if;
+
+  select * into source_record
+  from public.source_documents
+  where id = (payload ->> 'sourceDocumentId')::uuid
+    and source_type = 'rss'
+  for update;
+  select * into route_record
+  from public.rss_feed_brand_links
+  where rss_feed_id = (payload ->> 'feedId')::uuid
+    and brand_id = (payload ->> 'brandId')::uuid
+    and organization_id = source_record.organization_id;
+
+  if source_record.id is null or route_record.brand_id is null then
+    raise exception 'Routed RSS source not found' using errcode = 'P0002';
+  end if;
+
+  update public.source_documents
+  set clean_text = payload ->> 'cleanText',
+      language = coalesce(nullif(payload ->> 'language', ''), 'en'),
+      extraction_confidence = coalesce((payload ->> 'extractionConfidence')::numeric, 1),
+      status = 'analyzed',
+      status_reason = null,
+      metadata = metadata || jsonb_build_object(
+        'lightweightRuntime', true,
+        'namedEntities', coalesce(payload -> 'classification' -> 'namedEntities', '[]'::jsonb),
+        'topicTags', coalesce(payload -> 'classification' -> 'topicTags', '[]'::jsonb),
+        'classificationReasons', coalesce(payload -> 'classification' -> 'reasons', '[]'::jsonb)
+      ),
+      updated_at = now()
+  where id = source_record.id;
+
+  insert into public.content_clusters (
+    organization_id, cluster_key, cluster_type, canonical_topic
+  ) values (
+    source_record.organization_id, cluster_key_value, 'event',
+    left(coalesce(nullif(payload ->> 'canonicalTopic', ''), payload ->> 'valueNucleus'), 1000)
+  )
+  on conflict (organization_id, cluster_key) do update
+    set updated_at = now()
+  returning id into cluster_id;
+
+  insert into public.cluster_sources (
+    organization_id, cluster_id, source_document_id, relationship_type, similarity
+  ) values (
+    source_record.organization_id, cluster_id, source_record.id, 'primary', 1
+  ) on conflict (cluster_id, source_document_id) do nothing;
+
+  insert into public.opportunities (
+    organization_id, brand_id, source_document_id, cluster_id, value_nucleus,
+    recommended_style, opportunity_score, risk_penalty, score_breakdown, status
+  ) values (
+    source_record.organization_id,
+    route_record.brand_id,
+    source_record.id,
+    cluster_id,
+    payload ->> 'valueNucleus',
+    (payload -> 'classification' ->> 'recommendedStyle')::public.content_style,
+    score_value,
+    risk_value,
+    payload -> 'scoreBreakdown',
+    'candidate'
+  )
+  on conflict (brand_id, source_document_id) where source_document_id is not null
+  do update set
+    cluster_id = excluded.cluster_id,
+    value_nucleus = excluded.value_nucleus,
+    recommended_style = excluded.recommended_style,
+    opportunity_score = excluded.opportunity_score,
+    risk_penalty = excluded.risk_penalty,
+    score_breakdown = excluded.score_breakdown,
+    updated_at = now()
+  returning id into opportunity_id_value;
+
+  select count(*)::integer into used_count
+  from public.pipeline_instances instance
+  where instance.brand_id = route_record.brand_id
+    and instance.trigger_type = 'schedule'
+    and timezone('Europe/Berlin', instance.created_at)::date
+      = timezone('Europe/Berlin', now())::date
+    and instance.current_stage >= 'research'::public.pipeline_stage;
+
+  decision_value := case
+    when route_record.generation_policy = 'ingest_only' then 'ingest_only'
+    when score_value < 60 then 'stored'
+    when score_value < route_record.minimum_score then 'manual_review'
+    when used_count >= route_record.daily_generation_limit then 'daily_limit'
+    else 'selected'
+  end;
+
+  if decision_value = 'selected' then
+    select started.id into pipeline_id_value
+    from private.start_pipeline(jsonb_build_object(
+      'brandId', route_record.brand_id,
+      'opportunityId', opportunity_id_value,
+      'sourceDocumentId', source_record.id,
+      'correlationId', coalesce(nullif(payload ->> 'correlationId', '')::uuid, gen_random_uuid()),
+      'idempotencyKey', 'rss-auto:' || route_record.brand_id::text || ':' || opportunity_id_value::text || ':' || berlin_day,
+      'triggerType', 'schedule',
+      'stage', 'research',
+      'request', jsonb_build_object(
+        'actorId', actor_value,
+        'brandId', route_record.brand_id,
+        'opportunityId', opportunity_id_value
+      ),
+      'maxAttempts', 4
+    )) started;
+    used_count := used_count + 1;
+    update public.opportunities set status = 'research_pending' where id = opportunity_id_value;
+  end if;
+
+  insert into public.pipeline_events (
+    organization_id, brand_id, entity_type, entity_id, event_type,
+    to_status, correlation_id, actor_id, metadata
+  ) values (
+    source_record.organization_id, route_record.brand_id, 'opportunity', opportunity_id_value,
+    'lightweight.opportunity_qualified', decision_value,
+    coalesce(nullif(payload ->> 'correlationId', '')::uuid, gen_random_uuid()),
+    actor_value,
+    jsonb_build_object(
+      'score', score_value, 'decision', decision_value, 'feedId', route_record.rss_feed_id,
+      'usedToday', used_count, 'dailyLimit', route_record.daily_generation_limit
+    )
+  );
+
+  return query select opportunity_id_value, pipeline_id_value, score_value,
+    decision_value, used_count, route_record.daily_generation_limit;
+end;
+$$;
+
+create or replace function public.qualify_lightweight_source(payload jsonb)
+returns table (
+  opportunity_id uuid,
+  pipeline_id uuid,
+  score numeric,
+  decision text,
+  used_today integer,
+  daily_limit integer
+)
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if current_user <> 'service_role' then
+    raise exception 'Service role required' using errcode = '42501';
+  end if;
+  return query select * from private.qualify_lightweight_source(payload);
+end;
+$$;
+
 create or replace function private.request_lightweight_action(payload jsonb)
 returns public.pipeline_instances
 language plpgsql
@@ -484,7 +684,7 @@ begin
   if action_value not in ('research', 'draft', 'verify', 'image', 'package', 'resurface') then
     raise exception 'Unsupported lightweight action' using errcode = '22023';
   end if;
-  stage_value := case when action_value = 'resurface' then 'qualify'::public.pipeline_stage
+  stage_value := case when action_value = 'resurface' then 'research'::public.pipeline_stage
                       else action_value::public.pipeline_stage end;
 
   if target_draft_id is not null then
@@ -498,9 +698,10 @@ begin
 
   insert into public.pipeline_instances (
     organization_id, brand_id, opportunity_id, correlation_id,
-    current_stage, trigger_type
+    idempotency_key, current_stage, trigger_type
   ) values (
     organization_value, target_brand_id, target_opportunity_id, gen_random_uuid(),
+    'reviewer:' || action_value || ':' || gen_random_uuid()::text,
     stage_value, case when action_value = 'resurface' then 'resurface' else 'manual' end
   ) returning * into result;
 
@@ -653,6 +854,7 @@ revoke all on function private.start_pipeline(jsonb) from public;
 revoke all on function private.claim_pipeline_jobs(text, public.pipeline_stage[], integer, integer) from public;
 revoke all on function private.complete_pipeline_job(jsonb) from public;
 revoke all on function private.fail_pipeline_job(jsonb) from public;
+revoke all on function private.qualify_lightweight_source(jsonb) from public;
 revoke all on function private.request_lightweight_action(jsonb) from public;
 revoke all on function private.save_lightweight_post_edit(jsonb) from public;
 revoke all on function private.review_lightweight_post(jsonb) from public;
@@ -661,6 +863,7 @@ revoke all on function public.start_pipeline(jsonb) from public, anon, authentic
 revoke all on function public.claim_pipeline_jobs(text, public.pipeline_stage[], integer, integer) from public, anon, authenticated;
 revoke all on function public.complete_pipeline_job(jsonb) from public, anon, authenticated;
 revoke all on function public.fail_pipeline_job(jsonb) from public, anon, authenticated;
+revoke all on function public.qualify_lightweight_source(jsonb) from public, anon, authenticated;
 revoke all on function public.request_lightweight_action(jsonb) from public, anon;
 revoke all on function public.save_lightweight_post_edit(jsonb) from public, anon;
 revoke all on function public.review_lightweight_post(jsonb) from public, anon;
@@ -675,13 +878,35 @@ grant execute on function private.start_pipeline(jsonb) to service_role;
 grant execute on function private.claim_pipeline_jobs(text, public.pipeline_stage[], integer, integer) to service_role;
 grant execute on function private.complete_pipeline_job(jsonb) to service_role;
 grant execute on function private.fail_pipeline_job(jsonb) to service_role;
+grant execute on function private.qualify_lightweight_source(jsonb) to service_role;
 grant execute on function public.enqueue_pipeline_job(jsonb) to service_role;
 grant execute on function public.start_pipeline(jsonb) to service_role;
 grant execute on function public.claim_pipeline_jobs(text, public.pipeline_stage[], integer, integer) to service_role;
 grant execute on function public.complete_pipeline_job(jsonb) to service_role;
 grant execute on function public.fail_pipeline_job(jsonb) to service_role;
+grant execute on function public.qualify_lightweight_source(jsonb) to service_role;
 
 create trigger pipeline_instances_set_updated_at before update on public.pipeline_instances
 for each row execute function public.set_updated_at();
 create trigger pipeline_jobs_set_updated_at before update on public.pipeline_jobs
 for each row execute function public.set_updated_at();
+
+-- The legacy RSS intake implementation validates the legacy JWT role claim.
+-- Supabase opaque sb_secret keys authenticate as the service_role database role
+-- without carrying that claim, so the invoker wrapper establishes the trusted
+-- transaction-local claim only after checking the actual Postgres role.
+create or replace function public.ingest_rss_item(payload jsonb)
+returns jsonb
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if current_user <> 'service_role' then
+    raise exception 'Service role required' using errcode = '42501';
+  end if;
+  perform set_config('request.jwt.claim.role', 'service_role', true);
+  return private.ingest_rss_item(payload);
+end;
+$$;
+revoke all on function public.ingest_rss_item(jsonb) from public, anon, authenticated;
+grant execute on function public.ingest_rss_item(jsonb) to service_role;

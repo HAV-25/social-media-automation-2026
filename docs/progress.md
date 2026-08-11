@@ -1789,3 +1789,33 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   Netlify function or server route dependency.
 - Added isolated deployment and cutover/rollback documentation. Production
   remains unchanged pending complete shadow validation and product-owner approval.
+
+### 2026-08-11 lightweight runtime implementation (local, not deployed)
+
+- Added feed-isolated RSS/Atom fetching with SSRF/DNS/redirect/size/XML controls,
+  deterministic normalization, deduplication, brand routing, scoring, daily-limit
+  selection, and durable research-job creation.
+- Added atomic stage workers for bounded research, three Facebook styles,
+  non-blocking verification warnings, image generation, deterministic 1200×630
+  branded framing, package storage, cost capture, classified retries, and recovery.
+- Added five importable n8n schedulers containing no product prompts and no
+  `APP_BASE_URL` or Netlify dependency.
+- Completed the static feed administration surface and image/prompt review in
+  `apps/reviewer`; manual resurface, selective draft regeneration, selected image
+  regeneration, review decisions, and downloads use authenticated durable RPCs.
+- Added contract tests for queue concurrency, retry ceilings, opaque service-key
+  authorization, private payloads, output persistence, no-publishing scope, and
+  the five workflow boundary. Production remains unchanged.
+- Validated the complete local release with repository formatting and ESLint,
+  strict reviewer TypeScript, Deno compilation of both Edge functions, 390
+  package/application assertions, the optimized static reviewer and legacy Next
+  builds, and all four Chromium journeys. Six lightweight boundary assertions
+  additionally verify that n8n receives neither a Supabase secret key nor an
+  application URL. No paid model, image, production database, or workflow call
+  was made.
+- Limited each scheduled worker invocation to one claimed AI job. This keeps
+  each n8n/Edge request below the synchronous timeout boundary while the durable
+  queue and two-minute cadence continue processing additional work safely.
+- Local Docker/Postgres was unavailable. The additive migrations therefore have
+  static and contract coverage but remain intentionally unapplied until the
+  approved shadow-validation window.

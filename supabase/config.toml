@@ -382,6 +382,16 @@ inspector_port = 8083
 # The Deno major version to use.
 deno_version = 2
 
+[functions.lightweight-daily-intake]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/lightweight-daily-intake/index.ts"
+
+[functions.lightweight-stage-worker]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/lightweight-stage-worker/index.ts"
+
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 

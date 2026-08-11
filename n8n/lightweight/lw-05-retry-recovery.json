@@ -1,0 +1,55 @@
+{
+  "name": "LW-05 Retry and Recovery",
+  "nodes": [
+    {
+      "parameters": { "rule": { "interval": [{ "field": "minutes", "minutesInterval": 5 }] } },
+      "id": "b5000005-0000-4000-8000-000000000001",
+      "name": "Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-240, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL + '/functions/v1/lightweight-stage-worker' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "content-type", "value": "application/json" },
+            {
+              "name": "x-lightweight-worker-secret",
+              "value": "={{ $env.LIGHTWEIGHT_WORKER_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ contractVersion: '1.0', stages: ['research','draft','verify','image','package'], limit: 1, workerId: 'n8n-recovery-' + $execution.id }) }}",
+        "options": { "timeout": 300000 }
+      },
+      "id": "b5000005-0000-4000-8000-000000000002",
+      "name": "Recover Due or Expired Jobs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [0, 0]
+    }
+  ],
+  "connections": {
+    "Every 5 Minutes": {
+      "main": [[{ "node": "Recover Due or Expired Jobs", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Berlin",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none",
+    "executionTimeout": 900
+  },
+  "versionId": "b5000005-0000-4000-8000-000000000003",
+  "tags": []
+}

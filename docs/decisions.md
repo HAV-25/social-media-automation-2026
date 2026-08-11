@@ -1339,3 +1339,24 @@ new model spend is introduced.
   restorable. Cutover requires explicit product-owner approval after shadow UAT.
 - Image constraint: final composition must use an n8n worker-compatible renderer
   or WebAssembly renderer; Supabase Edge does not support the legacy Sharp path.
+
+## ADR-086: Lightweight workers own typed execution; n8n owns schedules only
+
+**Date:** 2026-08-11
+
+**Decision:** Replace the ten application-calling workflows with five small n8n
+schedulers. They call authenticated Supabase workers for daily intake, bounded
+research, drafting/verification, image/package creation, and recovery. Prompts,
+hostile-input handling, model contracts, deterministic image framing, and output
+persistence remain in versioned TypeScript and Postgres—not n8n JSON.
+
+**Why:** This removes Netlify runtime availability, synchronous webhook chains,
+and duplicated workflow code from the autonomous path while retaining visible
+n8n scheduling. Durable leases and idempotency ensure that retries resume a
+missing stage without repeating completed paid work.
+
+**Consequences:** n8n requires only the Supabase URL and a separate worker
+secret. Supabase workers alone receive the database service credential; the
+browser receives only the publishable key. Production migration, function
+deployment, workflow activation, and legacy deactivation are still
+approval-gated shadow-cutover steps.

@@ -37,8 +37,8 @@ client of those stored results.
 | Sources, opportunities, claims, posts, images, costs, audit | Supabase                             | Durable system of record                           |
 | Stage queue, leases, idempotency, retries                   | Supabase                             | Atomic transitions survive worker and UI outages   |
 | Scheduling and stage orchestration                          | n8n                                  | Visible operational workflow with bounded nodes    |
-| Model prompts and structured-output contracts               | Versioned TypeScript                 | Reviewable, testable and absent from workflow JSON |
-| AI and image provider calls                                 | n8n worker invoking typed stage code | Provider credentials never enter the browser       |
+| Model prompts and structured-output contracts               | Versioned Supabase worker TypeScript | Reviewable, testable and absent from workflow JSON |
+| AI and image provider calls                                 | Supabase stage worker                | Provider credentials never enter n8n or browser    |
 | Reviewer navigation and human decisions                     | Static reviewer application          | No server/API runtime dependency                   |
 | Final assets                                                | Supabase Storage                     | Signed, RLS-authorized downloads                   |
 
@@ -54,6 +54,10 @@ and cost in the same transaction that creates the next stage. The next-stage
 idempotency key derives from the predecessor, so retries cannot duplicate a paid
 stage. Retry delay is bounded exponential backoff and attempts stop at the
 configured ceiling.
+
+Each n8n worker invocation claims one expensive job. The durable queue—not a
+long synchronous request—provides throughput, so scaling does not recreate the
+gateway-timeout and repeated-dispatch failure mode of the archived architecture.
 
 The normal state sequence is:
 
@@ -77,12 +81,14 @@ The release candidate includes:
 - opportunity feed ordered by score with automatic/manual thresholds;
 - Ready Posts review, immutable manual edits, regeneration requests,
   approval/rejection and package download;
+- RSS feed add/pause/resume, brand routing, thresholds, keywords and daily limits;
+- generated-image preview and exact image-prompt provenance;
 - durable stage history with retries, errors and exact recorded cost;
 - 30-second read refresh without starting automation.
 
-Existing brand/feed administration remains available in the compatibility app
-until the final static feed editor is accepted. This deliberate compatibility
-boundary prevents an all-at-once cutover.
+Brand profile editing remains a cutover-gated compatibility capability. Feed
+administration is implemented directly against RLS-protected Supabase records
+through a narrow authenticated RPC.
 
 ## Deployment isolation
 
@@ -95,6 +101,8 @@ access; no pipeline restart is required.
 
 - New public tables have RLS and brand-scoped read policies.
 - Queue payloads are private and unavailable through PostgREST.
+- Edge worker endpoints require a separate constant-time-checked 32+ character
+  worker secret; it never enters URLs or stored output.
 - Worker mutation RPCs require the actual Postgres `service_role`, supporting
   Supabase opaque secret keys without relying on absent JWT claims.
 - Reviewer RPCs require `auth.uid()` and brand edit permission.
