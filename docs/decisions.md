@@ -1327,3 +1327,15 @@ without another paid provider call and records whether adjustment occurred.
 Existing validation JSON remains readable because `finalComposition` is
 nullable by default. No database migration, n8n change, publishing behavior, or
 new model spend is introduced.
+
+# 2026-08-11: Separate automation runtime from reviewer hosting
+
+- Decision: adopt the lightweight Option 2 architecture on a release-candidate
+  branch. Supabase owns durable state, authorization and atomic pipeline jobs;
+  n8n owns scheduling/orchestration; the reviewer is a static Supabase client.
+- Reason: all legacy workflows called Netlify-hosted internal APIs, making a UI
+  deployment an automation dependency and amplifying timeout/retry failures.
+- Compatibility: the tagged `v0.9.0-current-architecture.20260811` release remains
+  restorable. Cutover requires explicit product-owner approval after shadow UAT.
+- Image constraint: final composition must use an n8n worker-compatible renderer
+  or WebAssembly renderer; Supabase Edge does not support the legacy Sharp path.

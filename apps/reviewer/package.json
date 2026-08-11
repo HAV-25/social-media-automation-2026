@@ -1,0 +1,26 @@
+{
+  "name": "@content-engine/reviewer",
+  "version": "1.0.0-lightweight-rc.1",
+  "private": true,
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "vite",
+    "lint": "eslint src build.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.53.0",
+    "lucide-react": "0.468.0",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "zod": "4.0.17"
+  },
+  "devDependencies": {
+    "@types/react": "19.1.9",
+    "@types/react-dom": "19.1.7",
+    "typescript": "5.8.3",
+    "vite": "7.3.6",
+    "vitest": "3.2.4"
+  }
+}

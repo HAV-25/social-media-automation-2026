@@ -1776,3 +1776,16 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   validation therefore invoked the same locked workspace binaries and scripts
   directly. The dependency restore reused the locked pnpm store and changed no
   committed dependency version.
+
+# 2026-08-11 — Lightweight architecture release candidate started
+
+- Preserved and published the complete legacy architecture as annotated tag and
+  GitHub prerelease `v0.9.0-current-architecture.20260811` at commit `8cdccd3`.
+- Created `codex/lightweight-architecture-v1` from that immutable baseline.
+- Added an additive Supabase durable control plane with atomic claims, leases,
+  idempotency, bounded retries, private payloads, exact stage cost/error fields,
+  RLS summaries and narrow authenticated reviewer actions.
+- Added `apps/reviewer`, a static Supabase-authenticated reviewer console with no
+  Netlify function or server route dependency.
+- Added isolated deployment and cutover/rollback documentation. Production
+  remains unchanged pending complete shadow validation and product-owner approval.
