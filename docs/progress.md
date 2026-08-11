@@ -1872,3 +1872,10 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
 - Added `docs/lightweight-shadow-validation.md` with the database, Edge, n8n,
   happy-path, recovery-matrix, acceptance and branch-cleanup evidence required
   before cutover.
+- Product-owner-approved operational pause completed on 2026-08-11: the exact
+  recurring legacy workflows `WF-01 RSS Intake` (`dM0P0cJrH38bTCWt`) and
+  `WF-10 Error and Recovery` (`sng38lo5ezbWXQrj`) were deactivated through the
+  n8n API. A post-change query confirmed both inactive and found no running
+  execution for either workflow. `scripts/pause-legacy-n8n.mjs` preserves the
+  duplicate-name guard and exact-target verification as a repeatable command;
+  no webhook workflow or execution history was changed.

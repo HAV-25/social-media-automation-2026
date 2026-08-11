@@ -20,6 +20,7 @@
     "runtime:preflight": "node scripts/check-runtime-bridge.mjs --remote",
     "n8n:plan": "node scripts/publish-n8n-workflows.mjs",
     "n8n:publish": "node scripts/publish-n8n-workflows.mjs --apply --publish",
+    "n8n:legacy:pause": "node scripts/pause-legacy-n8n.mjs --apply",
     "n8n:lightweight:plan": "node scripts/publish-n8n-workflows.mjs --profile=lightweight",
     "n8n:lightweight:import": "node scripts/publish-n8n-workflows.mjs --profile=lightweight --apply"
   },
