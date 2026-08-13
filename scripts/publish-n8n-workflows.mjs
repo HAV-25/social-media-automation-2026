@@ -276,6 +276,7 @@ export async function publishWorkflows({
       name: local.name,
       action,
       destination: `${projectId}/${folderId}`,
+      active: current?.active ?? false,
       published: Boolean(apply && publish),
       workflowId: workflowId ?? null,
       folderPlacement:

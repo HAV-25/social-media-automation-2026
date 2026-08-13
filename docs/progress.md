@@ -1879,3 +1879,15 @@ https://docs.google.com/spreadsheets/d/1MpzufCl83QU4vtGC4PiYYq5Ga1R5LAgfcMXXk5mS
   execution for either workflow. `scripts/pause-legacy-n8n.mjs` preserves the
   duplicate-name guard and exact-target verification as a repeatable command;
   no webhook workflow or execution history was changed.
+- Imported all five lightweight workflows into n8n on 2026-08-13 using the
+  guarded lightweight profile. A subsequent remote plan proved every workflow
+  definition unchanged and `active=false`: LW-01 `0rZNf37feyCRsoWi`, LW-02
+  `D8yKO3kX2Nagpt6M`, LW-03 `8wUcEeM22hj1OOEr`, LW-04 `mNL7sBzzBHKykCoA`, and
+  LW-05 `K2KRBlEzPQmpkDuS`. No workflow executed and no AI/provider usage was
+  incurred. The importer now reports actual remote activation state explicitly.
+- Supabase development-branch creation was attempted only after the quoted
+  `$0.01344/hour` cost was confirmed, but Supabase rejected it because branching
+  requires Pro; no branch or charge was created. A separate `$0/month` project
+  was then approved but rejected because the organization already has the two
+  permitted active free projects. Production remains unchanged; hosted database
+  validation awaits an approved test-environment option.
