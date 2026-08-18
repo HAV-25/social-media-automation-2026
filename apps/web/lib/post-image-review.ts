@@ -1,9 +1,11 @@
 import "server-only";
 import { buildImageGenerationPrompt } from "@content-engine/ai/image";
 import {
+  imageDirectionSchema,
   imageReviewActionRequestSchema,
   imageReviewActionResultSchema,
   imageTemplateSchema,
+  imageValidationSchema,
   type ImageDirection,
   type ImageReviewActionRequest,
   type ImageTemplate,
@@ -49,12 +51,10 @@ const modelRecordSchema = z
 const persistentImageRowSchema = z.object({
   id: z.uuid(),
   post_version_id: z.uuid(),
-  // The lightweight pipeline writes thinner concept/validation payloads than the
-  // original strict contract; read them loosely and normalize at the call site.
-  concept_key: z.string(),
-  concept_direction: z.unknown(),
-  template: z.string(),
-  validation: z.unknown(),
+  concept_key: z.string().regex(/^concept_[a-z0-9]{6,40}$/),
+  concept_direction: imageDirectionSchema,
+  template: imageTemplateSchema,
+  validation: imageValidationSchema,
   base_image_path: z.string().min(1),
   final_image_path: z.string().min(1).nullable(),
   status: z.enum(["generating", "validation_required", "ready", "failed"]),
@@ -137,10 +137,10 @@ function persistentState(row: PersistentImageRow): PostImageReviewState {
     status: row.status === "ready" ? "ready" : "validation_required",
     imageAssetId: row.id,
     postVersionId: row.post_version_id,
-    direction: row.concept_direction as ImageDirection,
+    direction: row.concept_direction,
     selectedConceptKey: row.concept_key,
-    template: row.template as ImageTemplate,
-    validation: (row.validation ?? null) as ImageValidation | null,
+    template: row.template,
+    validation: row.validation,
     model: row.model,
     prompt: row.prompt,
     promptVersion: row.prompt_version,
