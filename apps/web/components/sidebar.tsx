@@ -1,4 +1,4 @@
-import { CircleUserRound, LogOut, Settings2 } from "lucide-react";
+import { BookOpenText, CircleUserRound, LogOut, Settings2 } from "lucide-react";
 import type { WorkspaceBrand } from "@/lib/workspace";
 import { BrandSwitcher } from "./brand-switcher";
 import { SidebarNav } from "./sidebar-nav";
@@ -45,6 +45,12 @@ export function Sidebar({
           className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white/60 transition hover:bg-white/8 hover:text-white"
         >
           <Settings2 size={18} /> Settings
+        </a>
+        <a
+          href="/styles"
+          className="ml-4 flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-white/55 transition hover:bg-white/8 hover:text-white"
+        >
+          <BookOpenText size={16} /> Styles
         </a>
         <div className="mt-2 flex items-center gap-3 px-3 py-3">
           <CircleUserRound size={30} className="text-white/70" />
