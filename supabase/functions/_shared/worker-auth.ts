@@ -44,6 +44,21 @@ export function safeErrorResponse(error: unknown): Response {
   if (error instanceof WorkerHttpError) {
     return jsonResponse({ error: { code: error.code, message: error.message } }, error.status);
   }
+  if (
+    error instanceof Error &&
+    error.name === "ZodError" &&
+    Array.isArray((error as Error & { issues?: unknown }).issues)
+  ) {
+    return jsonResponse(
+      {
+        error: {
+          code: "request_validation_failed",
+          message: "The request payload is invalid.",
+        },
+      },
+      400,
+    );
+  }
   return jsonResponse(
     { error: { code: "lightweight_worker_failed", message: "The worker request failed safely." } },
     500,

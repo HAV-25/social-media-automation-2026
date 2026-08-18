@@ -241,7 +241,7 @@ const providerOperationSchema = z
   .object({
     state: z.enum(["started", "succeeded", "ambiguous"]),
     execute: z.boolean(),
-    result: z.record(z.string(), z.unknown()).optional(),
+    result: z.record(z.string(), z.unknown()).nullish(),
     model: z.string().optional(),
     responseId: z.string().optional(),
     usage: z.record(z.string(), z.unknown()).optional(),
@@ -438,7 +438,7 @@ async function loadContext(client: Client, job: Job) {
   const brand = await client
     .from("brands")
     .select(
-      "id,name,brand_profiles(audience_definition,positioning,content_pillars,restricted_topics,voice_traits,visual_system)",
+      "id,name,brand_profiles(audience_definition,positioning,content_pillars,restricted_topics,voice_settings,generation_defaults,visual_system)",
     )
     .eq("id", job.brand_id)
     .single();

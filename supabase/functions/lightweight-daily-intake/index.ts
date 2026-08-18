@@ -27,8 +27,6 @@ const requestSchema = z
 const linkSchema = z.object({
   brand_id: z.uuid(),
   generation_policy: z.string(),
-  minimum_score: z.coerce.number(),
-  daily_generation_limit: z.number().int(),
   include_keywords: z.array(z.string()),
   exclude_keywords: z.array(z.string()),
   brands: z
@@ -69,6 +67,20 @@ Deno.serve(async (request) => {
     requireWorkerSecret(request);
     const input = requestSchema.parse(await request.json());
     const correlationId = input.correlationId ?? crypto.randomUUID();
+    const runDate = new Date().toISOString().slice(0, 10);
+    // Per-pipeline correlation id. pipeline_instances.correlation_id is UNIQUE, so the
+    // invocation-level id above cannot be reused across multiple qualifying items in one run.
+    // Derived deterministically from brand + source document + run date so same-day re-runs
+    // stay idempotent instead of colliding.
+    const deterministicUuid = async (value: string): Promise<string> => {
+      const bytes = new Uint8Array(
+        await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)),
+      ).slice(0, 16);
+      bytes[6] = (bytes[6]! & 0x0f) | 0x50;
+      bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+      const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+      return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+    };
     const url = Deno.env.get("SUPABASE_URL");
     let key =
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_SECRET_KEY") ?? "";
@@ -95,7 +107,7 @@ Deno.serve(async (request) => {
     let query = supabase
       .from("rss_feeds")
       .select(
-        "id,organization_id,name,feed_url,created_by,rss_feed_brand_links(brand_id,generation_policy,minimum_score,daily_generation_limit,include_keywords,exclude_keywords,brands(brand_profiles(audience_definition,positioning,content_pillars,restricted_topics)))",
+        "id,organization_id,name,feed_url,created_by,rss_feed_brand_links(brand_id,generation_policy,include_keywords,exclude_keywords,brands(brand_profiles(audience_definition,positioning,content_pillars,restricted_topics)))",
       )
       .eq("active", true)
       .order("name");
@@ -196,7 +208,9 @@ Deno.serve(async (request) => {
             const qualified = await supabase.rpc("qualify_lightweight_source", {
               payload: {
                 contractVersion: "1.0",
-                correlationId,
+                correlationId: await deterministicUuid(
+                  `lw-corr:${link.brand_id}:${intakeData.sourceDocumentId}:${runDate}`,
+                ),
                 actorId,
                 feedId: feed.id,
                 brandId: link.brand_id,
