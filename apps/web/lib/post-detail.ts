@@ -18,6 +18,13 @@ const promptSnapshotSchema = z.object({
   checksum: z.string().regex(/^[a-f0-9]{64}$/),
 });
 
+// The lightweight pipeline writes a richer evaluation than the strict contract
+// (it adds postDraftId and uses a different sentenceClaims shape). Read it
+// leniently so verification data renders instead of silently becoming null.
+const lightweightEvaluationSchema = draftEvaluationSchema
+  .extend({ sentenceClaims: z.array(z.unknown()).default([]) })
+  .passthrough();
+
 export type PostDetail = {
   id: string;
   brandId: string;
@@ -196,14 +203,17 @@ export async function getPostDetail(postDraftId: string): Promise<PostDetail | n
       promptSnapshot: promptSnapshotSchema.nullable().optional(),
     })
     .parse(runs?.[0]?.model_usage ?? {});
-  const editorialMetadata = z
+  // Parse angles and evaluation independently so a shape drift in one does not
+  // discard the other (verification would otherwise vanish whenever angles differ).
+  const breakdown = (draft.score_breakdown ?? {}) as Record<string, unknown>;
+  const angleMetadata = z
     .object({
       angles: z.array(angleCandidateSchema).length(3),
       selectedAngleKey: z.string().regex(/^angle_[a-z0-9]{6,40}$/),
-      evaluation: draftEvaluationSchema,
       revisionCount: z.number().int().min(0).max(2),
     })
-    .safeParse(draft.score_breakdown);
+    .safeParse(breakdown);
+  const evaluationMetadata = lightweightEvaluationSchema.safeParse(breakdown.evaluation);
 
   return {
     id: draft.id,
@@ -215,10 +225,12 @@ export async function getPostDetail(postDraftId: string): Promise<PostDetail | n
     tone: draft.tone,
     status: postStatusSchema.parse(draft.status),
     qualityScore: draft.quality_score === null ? null : Number(draft.quality_score),
-    angles: editorialMetadata.success ? editorialMetadata.data.angles : [],
-    selectedAngleKey: editorialMetadata.success ? editorialMetadata.data.selectedAngleKey : null,
-    evaluation: editorialMetadata.success ? editorialMetadata.data.evaluation : null,
-    revisionCount: editorialMetadata.success ? editorialMetadata.data.revisionCount : 0,
+    angles: angleMetadata.success ? angleMetadata.data.angles : [],
+    selectedAngleKey: angleMetadata.success ? angleMetadata.data.selectedAngleKey : null,
+    evaluation: evaluationMetadata.success
+      ? (evaluationMetadata.data as unknown as DraftEvaluation)
+      : null,
+    revisionCount: angleMetadata.success ? angleMetadata.data.revisionCount : 0,
     currentVersion: {
       id: version.id,
       versionNumber: version.version_number,
