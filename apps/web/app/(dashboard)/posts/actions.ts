@@ -22,6 +22,7 @@ import { getOpportunityDetail } from "@/lib/opportunity-detail";
 import { getPostDetail } from "@/lib/post-detail";
 import { assertCurrentVersion, nextPostStatus } from "@/lib/post-state";
 import { getResearchEvidence } from "@/lib/research";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 function fail(postDraftId: string, message: string): never {
@@ -171,6 +172,33 @@ export async function reviewPost(
     redirect(`/posts/${postDraftId}?saved=${action}`);
   }
 
+  // Approve/reject go through the lightweight pipeline RPC, called as the signed-in
+  // user (review_lightweight_post checks auth.uid()/can_edit_brand). The approval
+  // gate above (evaluation present, warnings acknowledged, reason) is preserved.
+  // Edit and request_changes stay on the existing evaluated-post path below.
+  if (validated.action === "approve" || validated.action === "reject") {
+    const authedClient = await createSupabaseServerClient();
+    const { error: reviewError } = await authedClient.rpc("review_lightweight_post", {
+      payload: {
+        postDraftId,
+        decision: validated.action,
+        reason: decisionReason,
+        expectedVersionId,
+        idempotencyKey: validated.idempotencyKey,
+      },
+    });
+    if (reviewError) {
+      if (reviewError.code === "40001") {
+        fail(postDraftId, "This post changed in another session. Reload before saving.");
+      }
+      if (reviewError.code === "23505") {
+        fail(postDraftId, "This review key was reused for a different action.");
+      }
+      fail(postDraftId, "The review action could not be persisted.");
+    }
+    redirect(`/posts/${postDraftId}?saved=${action}`);
+  }
+
   const requestHash = sha256Hex(
     JSON.stringify({
       postDraftId,
@@ -179,8 +207,6 @@ export async function reviewPost(
       content: editedContent,
       evaluation: nextEvaluation ?? undefined,
       reason: decisionReason || undefined,
-      warningsAcknowledged:
-        validated.action === "approve" ? validated.warningsAcknowledged : undefined,
     }),
   );
   const supabase = createSupabaseServiceClient();
@@ -192,21 +218,7 @@ export async function reviewPost(
         postDraftId,
         requestHash,
         evaluation: nextEvaluation,
-        warningSnapshot:
-          validated.action === "approve" && !post.evaluation?.readyForReview
-            ? {
-                readyForReview: false,
-                warnings: post.evaluation?.warnings ?? [],
-                evidenceScore: post.evaluation?.evidenceScore ?? null,
-                brandFitScore: post.evaluation?.brandFitScore ?? null,
-                unsupportedHighRiskClaims: post.evaluation?.unsupportedHighRiskClaims ?? null,
-                contradictions: post.evaluation?.contradictions ?? null,
-                prohibitedPhrases: post.evaluation?.prohibitedPhrases ?? [],
-                restrictedTopics: post.evaluation?.restrictedTopics ?? [],
-                sourceSimilarity: post.evaluation?.sourceSimilarity ?? null,
-                sameBrandSimilarity: post.evaluation?.sameBrandSimilarity ?? null,
-              }
-            : undefined,
+        warningSnapshot: undefined,
       },
     })
     .single();
