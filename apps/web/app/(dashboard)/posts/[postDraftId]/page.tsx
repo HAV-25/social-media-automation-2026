@@ -14,6 +14,7 @@ import { notFound } from "next/navigation";
 import { CopyPostButton } from "@/components/copy-post-button";
 import { PostImageReview } from "@/components/post-image-review";
 import { SelectiveRegeneration } from "@/components/selective-regeneration";
+import { SubmitButton } from "@/components/submit-button";
 import { getCurrentUser } from "@/lib/auth";
 import { canManageBrand, canReviewContent } from "@/lib/permissions";
 import { getPostDetail } from "@/lib/post-detail";
@@ -145,10 +146,13 @@ export default async function PostReviewPage({
                   />
                 </label>
                 {editable ? (
-                  <button className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--sage)] px-5 py-3 text-sm font-bold text-white">
+                  <SubmitButton
+                    pendingLabel="Saving…"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--sage)] px-5 py-3 text-sm font-bold text-white"
+                  >
                     <Save size={17} /> Save as immutable Version{" "}
                     {post.currentVersion.versionNumber + 1}
-                  </button>
+                  </SubmitButton>
                 ) : null}
               </fieldset>
             </form>
@@ -398,9 +402,12 @@ export default async function PostReviewPage({
                     <input type="hidden" name="expectedVersionId" value={post.currentVersion.id} />
                     <input type="hidden" name="idempotencyKey" value={reviewKey("approve")} />
                     <input type="hidden" name="reason" value="" />
-                    <button className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white">
+                    <SubmitButton
+                      pendingLabel="Approving…"
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white"
+                    >
                       <ThumbsUp size={16} /> Approve post
-                    </button>
+                    </SubmitButton>
                   </form>
                 ) : null}
                 {post.status === "ready_for_review" &&
@@ -442,9 +449,12 @@ export default async function PostReviewPage({
                         I reviewed the warnings and accept responsibility for this decision.
                       </span>
                     </label>
-                    <button className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-700 px-4 py-3 text-sm font-bold text-white">
+                    <SubmitButton
+                      pendingLabel="Approving…"
+                      className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-700 px-4 py-3 text-sm font-bold text-white"
+                    >
                       <ThumbsUp size={16} /> Approve with warnings
-                    </button>
+                    </SubmitButton>
                   </form>
                 ) : null}
                 {post.status === "ready_for_review" && !post.evaluation ? (
@@ -473,9 +483,12 @@ export default async function PostReviewPage({
                         className="mt-1.5 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-xs font-normal leading-5 text-[var(--ink)]"
                       />
                     </label>
-                    <button className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-bold text-amber-900">
+                    <SubmitButton
+                      pendingLabel="Requesting…"
+                      className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-bold text-amber-900"
+                    >
                       <MessageSquareWarning size={16} /> Request changes
-                    </button>
+                    </SubmitButton>
                   </form>
                 ) : null}
 
@@ -493,9 +506,12 @@ export default async function PostReviewPage({
                       className="mt-1.5 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-xs font-normal leading-5 text-[var(--ink)]"
                     />
                   </label>
-                  <button className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-bold text-red-800">
+                  <SubmitButton
+                    pendingLabel="Rejecting…"
+                    className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-bold text-red-800"
+                  >
                     <ThumbsDown size={16} /> Reject post
-                  </button>
+                  </SubmitButton>
                 </form>
               </section>
             ) : null}
