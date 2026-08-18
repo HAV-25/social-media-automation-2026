@@ -1,11 +1,9 @@
 import "server-only";
 import { buildImageGenerationPrompt } from "@content-engine/ai/image";
 import {
-  imageDirectionSchema,
   imageReviewActionRequestSchema,
   imageReviewActionResultSchema,
   imageTemplateSchema,
-  imageValidationSchema,
   type ImageDirection,
   type ImageReviewActionRequest,
   type ImageTemplate,
@@ -51,10 +49,12 @@ const modelRecordSchema = z
 const persistentImageRowSchema = z.object({
   id: z.uuid(),
   post_version_id: z.uuid(),
-  concept_key: z.string().regex(/^concept_[a-z0-9]{6,40}$/),
-  concept_direction: imageDirectionSchema,
-  template: imageTemplateSchema,
-  validation: imageValidationSchema,
+  // Lightweight pipeline writes thinner concept/validation payloads than the
+  // original strict contract; read them loosely and normalize in persistentState.
+  concept_key: z.string(),
+  concept_direction: z.unknown(),
+  template: z.string(),
+  validation: z.unknown(),
   base_image_path: z.string().min(1),
   final_image_path: z.string().min(1).nullable(),
   status: z.enum(["generating", "validation_required", "ready", "failed"]),
@@ -131,16 +131,53 @@ function demoState(record: DemoImageRecord): PostImageReviewState {
   };
 }
 
+function normalizeConcept(raw: unknown, index: number) {
+  const concept = (raw ?? {}) as Record<string, unknown>;
+  return {
+    conceptKey: String(concept.conceptKey ?? `concept_${index + 1}`),
+    title: String(concept.title ?? "Concept"),
+    visualNucleus: String(concept.visualNucleus ?? ""),
+    imageStyle: String(concept.imageStyle ?? "editorial_hero"),
+    literalOrConceptual: String(concept.literalOrConceptual ?? "conceptual"),
+    composition: String(concept.composition ?? ""),
+    palette: Array.isArray(concept.palette) ? concept.palette : [],
+    avoid: Array.isArray(concept.avoid) ? concept.avoid : [],
+    headlineOverlay: String(concept.headlineOverlay ?? ""),
+    sourceLabel: String(concept.sourceLabel ?? ""),
+    rank: typeof concept.rank === "number" ? concept.rank : index + 1,
+    score: typeof concept.score === "number" ? concept.score : 0,
+    rankExplanation: String(concept.rankExplanation ?? ""),
+  };
+}
+
 function persistentState(row: PersistentImageRow): PostImageReviewState {
   const modelRecord = modelRecordSchema.safeParse(row.metadata.modelRecord);
+  // The lightweight pipeline stores thinner concept/validation payloads; normalize
+  // them into the exact shape the review UI reads so rendering never hits undefined.
+  const rawDirection = (row.concept_direction ?? {}) as Record<string, unknown>;
+  const rawConcepts = Array.isArray(rawDirection.concepts) ? rawDirection.concepts : [];
+  const direction = {
+    contractVersion: "1.0",
+    selectedConceptKey: String(rawDirection.selectedConceptKey ?? row.concept_key),
+    concepts: rawConcepts.map((concept, index) => normalizeConcept(concept, index)),
+  } as unknown as ImageDirection;
+  const rawValidation = (row.validation ?? null) as Record<string, unknown> | null;
+  const validation = rawValidation
+    ? ({
+        ...rawValidation,
+        width: typeof rawValidation.width === "number" ? rawValidation.width : 1200,
+        height: typeof rawValidation.height === "number" ? rawValidation.height : 630,
+        warnings: Array.isArray(rawValidation.warnings) ? rawValidation.warnings : [],
+      } as unknown as ImageValidation)
+    : null;
   return {
     status: row.status === "ready" ? "ready" : "validation_required",
     imageAssetId: row.id,
     postVersionId: row.post_version_id,
-    direction: row.concept_direction,
+    direction,
     selectedConceptKey: row.concept_key,
-    template: row.template,
-    validation: row.validation,
+    template: row.template as ImageTemplate,
+    validation,
     model: row.model,
     prompt: row.prompt,
     promptVersion: row.prompt_version,

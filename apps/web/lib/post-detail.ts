@@ -1,6 +1,5 @@
 import {
   angleCandidateSchema,
-  draftEvaluationSchema,
   postContentSchema,
   type AngleCandidate,
   type DraftEvaluation,
@@ -196,14 +195,53 @@ export async function getPostDetail(postDraftId: string): Promise<PostDetail | n
       promptSnapshot: promptSnapshotSchema.nullable().optional(),
     })
     .parse(runs?.[0]?.model_usage ?? {});
-  const editorialMetadata = z
+  const breakdown = (draft.score_breakdown ?? {}) as Record<string, unknown>;
+  const angleMetadata = z
     .object({
       angles: z.array(angleCandidateSchema).length(3),
       selectedAngleKey: z.string().regex(/^angle_[a-z0-9]{6,40}$/),
-      evaluation: draftEvaluationSchema,
       revisionCount: z.number().int().min(0).max(2),
     })
-    .safeParse(draft.score_breakdown);
+    .safeParse(breakdown);
+  // The lightweight pipeline writes a richer evaluation than the original strict
+  // contract (extra postDraftId, a different sentenceClaims shape). Validate the
+  // numeric fields the UI renders, tolerate the rest, then normalize sentenceClaims
+  // into the { sentence, state, claimKeys } shape the review UI reads.
+  const evaluationParse = z
+    .object({
+      contractVersion: z.literal("1.0"),
+      evidenceScore: z.number(),
+      brandFitScore: z.number(),
+      qualityScore: z.number(),
+      sourceSimilarity: z.number(),
+      sameBrandSimilarity: z.number(),
+      crossBrandSimilarity: z.number(),
+      hookReuseSimilarity: z.number(),
+      unsupportedHighRiskClaims: z.number(),
+      contradictions: z.number(),
+      prohibitedPhrases: z.array(z.string()).default([]),
+      restrictedTopics: z.array(z.string()).default([]),
+      cliches: z.array(z.string()).default([]),
+      warnings: z.array(z.string()).default([]),
+      sentenceClaims: z.array(z.record(z.string(), z.unknown())).default([]),
+      readyForReview: z.boolean(),
+    })
+    .passthrough()
+    .safeParse(breakdown.evaluation);
+  const evaluation: DraftEvaluation | null = evaluationParse.success
+    ? ({
+        ...evaluationParse.data,
+        sentenceClaims: evaluationParse.data.sentenceClaims.map((claim) => ({
+          sentence: String(claim.sentence ?? ""),
+          state: String(claim.state ?? claim.verificationState ?? "unsupported"),
+          claimKeys: Array.isArray(claim.claimKeys)
+            ? (claim.claimKeys as string[])
+            : claim.claimKey
+              ? [String(claim.claimKey)]
+              : [],
+        })),
+      } as unknown as DraftEvaluation)
+    : null;
 
   return {
     id: draft.id,
@@ -215,10 +253,10 @@ export async function getPostDetail(postDraftId: string): Promise<PostDetail | n
     tone: draft.tone,
     status: postStatusSchema.parse(draft.status),
     qualityScore: draft.quality_score === null ? null : Number(draft.quality_score),
-    angles: editorialMetadata.success ? editorialMetadata.data.angles : [],
-    selectedAngleKey: editorialMetadata.success ? editorialMetadata.data.selectedAngleKey : null,
-    evaluation: editorialMetadata.success ? editorialMetadata.data.evaluation : null,
-    revisionCount: editorialMetadata.success ? editorialMetadata.data.revisionCount : 0,
+    angles: angleMetadata.success ? angleMetadata.data.angles : [],
+    selectedAngleKey: angleMetadata.success ? angleMetadata.data.selectedAngleKey : null,
+    evaluation,
+    revisionCount: angleMetadata.success ? angleMetadata.data.revisionCount : 0,
     currentVersion: {
       id: version.id,
       versionNumber: version.version_number,
