@@ -11,6 +11,16 @@ import {
 } from "./ready-post-filters";
 import { createSupabaseServerClient } from "./supabase/server";
 
+// The review queue shows every post that has reached a reviewable state — both
+// the ones still awaiting a decision and the ones already approved/rejected, so
+// a decision no longer makes a post vanish from the list.
+const REVIEW_QUEUE_STATUSES = [
+  "ready_for_review",
+  "changes_requested",
+  "approved",
+  "rejected",
+] as const;
+
 function filterAndSortReadyPosts(posts: ReadyPost[], filters: ReadyPostFilters) {
   const start = readyPostWindowStart(filters.window);
   return posts
@@ -59,7 +69,7 @@ export async function getReadyPosts(
         .filter(
           (draft) =>
             draft.brandId === brandId &&
-            (draft.status === "ready_for_review" || draft.status === "changes_requested"),
+            (REVIEW_QUEUE_STATUSES as readonly string[]).includes(draft.status),
         )
         .map((draft) => ({
           id: draft.postDraftId,
@@ -85,7 +95,7 @@ export async function getReadyPosts(
       "id,opportunity_id,content_style,tone,status,quality_score,current_version_id,updated_at,opportunities(source_documents(title))",
     )
     .eq("brand_id", brandId)
-    .in("status", ["ready_for_review", "changes_requested"]);
+    .in("status", REVIEW_QUEUE_STATUSES as unknown as string[]);
   if (filters.status !== "all") draftQuery = draftQuery.eq("status", filters.status);
   if (filters.style !== "all") draftQuery = draftQuery.eq("content_style", filters.style);
   if (filters.tone !== "all") draftQuery = draftQuery.eq("tone", filters.tone);
