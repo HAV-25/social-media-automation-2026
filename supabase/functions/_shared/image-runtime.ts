@@ -1,6 +1,19 @@
 import { initWasm, Resvg } from "npm:@resvg/resvg-wasm@2.6.2";
 import { PNG } from "npm:pngjs@7.0.0";
 import { Buffer } from "node:buffer";
+import { INTER_BOLD_BASE64 } from "./assets/inter-bold-font.ts";
+
+// The edge bundler (--use-api) cannot include binary assets read via Deno.readFile.
+// The font is embedded as base64 above; the resvg wasm is fetched from a version-pinned
+// CDN at cold start (cached in wasmReady for the lifetime of the isolate).
+const RESVG_WASM_URL = "https://cdn.jsdelivr.net/npm/@resvg/resvg-wasm@2.6.2/index_bg.wasm";
+
+function base64ToBytes(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return bytes;
+}
 
 export const FACEBOOK_WIDTH = 1200;
 export const FACEBOOK_HEIGHT = 630;
@@ -36,8 +49,7 @@ let wasmReady: Promise<void> | undefined;
 let fontBytes: Promise<Uint8Array> | undefined;
 
 function initializeResvg() {
-  wasmReady ??= Deno.readFile(new URL("./assets/resvg-2.6.2.wasm", import.meta.url))
-    .then((bytes) => initWasm(bytes))
+  wasmReady ??= initWasm(fetch(RESVG_WASM_URL))
     .catch((error) => {
       if (error instanceof Error && /already initialized/i.test(error.message)) return;
       throw error;
@@ -46,7 +58,7 @@ function initializeResvg() {
 }
 
 function loadFont() {
-  fontBytes ??= Deno.readFile(new URL("./assets/Inter-Bold.ttf", import.meta.url));
+  fontBytes ??= Promise.resolve(base64ToBytes(INTER_BOLD_BASE64));
   return fontBytes;
 }
 
