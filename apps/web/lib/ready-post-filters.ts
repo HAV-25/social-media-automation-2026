@@ -1,8 +1,25 @@
 import { contentStyleSchema, toneSchema } from "@content-engine/contracts";
 import { z } from "zod";
 
-export const readyPostStatusSchema = z.enum(["ready_for_review", "changes_requested"]);
+export const readyPostStatusSchema = z.enum([
+  "ready_for_review",
+  "changes_requested",
+  "approved",
+  "rejected",
+]);
 export type ReadyPostStatus = z.infer<typeof readyPostStatusSchema>;
+
+// Statuses that still need a human decision. Groups containing any of these
+// float to the top of the review queue; the rest are "decided".
+const PENDING_READY_STATUSES: ReadonlySet<ReadyPostStatus> = new Set([
+  "ready_for_review",
+  "changes_requested",
+]);
+
+export function isPendingReadyStatus(status: ReadyPostStatus): boolean {
+  return PENDING_READY_STATUSES.has(status);
+}
+
 const readyPostDateWindowSchema = z.enum(["all", "24h", "7d", "30d"]);
 const readyPostSortSchema = z.enum(["updated_desc", "updated_asc", "quality_desc", "quality_asc"]);
 
