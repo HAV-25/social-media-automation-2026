@@ -51,6 +51,7 @@ export function PostImageReview({
   ) {
     setError("");
     startTransition(async () => {
+      const previousAssetId = state.imageAssetId;
       const response = await fetch(`/api/posts/${postDraftId}/images`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -65,15 +66,42 @@ export function PostImageReview({
       });
       const body = (await response.json().catch(() => null)) as {
         error?: { message?: string };
+        status?: string;
       } | null;
       if (!response.ok) {
         setError(
-          body?.error?.message ??
-            "Image generation is taking longer than expected and may still be finishing. Wait a few seconds, then refresh — if it doesn't appear, try again.",
+          body?.error?.message ?? "The image action could not be completed. Please try again.",
         );
         return;
       }
-      router.refresh();
+      // Demo/in-process mode returns the finished result immediately.
+      if (body?.status !== "queued") {
+        router.refresh();
+        return;
+      }
+      // Real mode: the lightweight worker is generating the image. Poll the
+      // status endpoint until a new ready image lands, then refresh.
+      const deadline = Date.now() + 120_000;
+      while (Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 4_000));
+        const statusResponse = await fetch(`/api/posts/${postDraftId}/images`, { method: "GET" });
+        const statusBody = (await statusResponse.json().catch(() => null)) as {
+          status?: string;
+          imageAssetId?: string | null;
+        } | null;
+        if (
+          statusResponse.ok &&
+          statusBody?.status === "ready" &&
+          statusBody.imageAssetId &&
+          statusBody.imageAssetId !== previousAssetId
+        ) {
+          router.refresh();
+          return;
+        }
+      }
+      setError(
+        "The image is still generating on the server. Wait a moment, then refresh to see it.",
+      );
     });
   }
 
@@ -278,6 +306,12 @@ export function PostImageReview({
           {error ? (
             <p className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs leading-5 text-red-800">
               {error}
+            </p>
+          ) : null}
+
+          {pending ? (
+            <p className="text-xs leading-5 text-[var(--muted)]">
+              Generating on the server — this can take up to a minute…
             </p>
           ) : null}
 

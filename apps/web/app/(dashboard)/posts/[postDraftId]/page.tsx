@@ -49,6 +49,8 @@ export default async function PostReviewPage({
   const post = await getPostDetail(postDraftId);
   if (!post) notFound();
   const imageState = await getPostImageReviewState(post);
+  // A post is only ready to approve once its branded image has been generated.
+  const imageReady = imageState.status === "ready";
   const editable = Boolean(
     user && canManageBrand(user.role) && !["approved", "rejected"].includes(post.status),
   );
@@ -397,7 +399,14 @@ export default async function PostReviewPage({
             {reviewable ? (
               <section className="rounded-3xl border border-[var(--line)] bg-[var(--paper)] p-6">
                 <h2 className="serif text-xl">Human decision</h2>
-                {post.status === "ready_for_review" && post.evaluation?.readyForReview ? (
+                {post.status === "ready_for_review" && post.evaluation && !imageReady ? (
+                  <p className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs leading-5 text-amber-950">
+                    This post has no branded image yet. Generate the image below before approving.
+                  </p>
+                ) : null}
+                {post.status === "ready_for_review" &&
+                imageReady &&
+                post.evaluation?.readyForReview ? (
                   <form action={approveAction} className="mt-4">
                     <input type="hidden" name="expectedVersionId" value={post.currentVersion.id} />
                     <input type="hidden" name="idempotencyKey" value={reviewKey("approve")} />
@@ -411,6 +420,7 @@ export default async function PostReviewPage({
                   </form>
                 ) : null}
                 {post.status === "ready_for_review" &&
+                imageReady &&
                 post.evaluation &&
                 !post.evaluation.readyForReview ? (
                   <form
