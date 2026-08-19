@@ -77,119 +77,127 @@ export async function POST(
       "Evidence and brand context are required for selective regeneration.",
     );
   }
-  const content = selectivelyRegeneratePost({
-    content: post.currentVersion.content,
-    request: input.data,
-    valueNucleus: opportunity.valueNucleus,
-  });
-  const evaluation = evaluateEditorialDraft({
-    content,
-    brandContext: brandConfiguration.context,
-    evidence: research.evidencePackage,
-    sourceText: opportunity.cleanText,
-  });
-  const requestHash = sha256Hex(
-    JSON.stringify({
-      postDraftId,
-      expectedVersionId: input.data.expectedVersionId,
-      component: input.data.component,
-      instruction: input.data.instruction,
+  try {
+    const content = selectivelyRegeneratePost({
+      content: post.currentVersion.content,
+      request: input.data,
+      valueNucleus: opportunity.valueNucleus,
+    });
+    const evaluation = evaluateEditorialDraft({
       content,
-      evaluation,
-    }),
-  );
-
-  if (process.env.NEXT_PUBLIC_DEMO_MODE !== "false") {
-    const drafts = parseDemoDraftRecords(request.cookies.get("demo-draft-records")?.value);
-    const draft = drafts.find((candidate) => candidate.postDraftId === postDraftId);
-    if (!draft) return errorResponse(404, "post_not_found", "Demo post is no longer available.");
-    const versionNumber = draft.versionNumber + 1;
-    const postVersionId = uuidFromDeterministicHash(
-      sha256Hex(`${postDraftId}:${input.data.idempotencyKey}:regeneration`),
-    );
-    const updated = {
-      ...draft,
-      postVersionId,
-      versionNumber,
-      status: "ready_for_review" as const,
-      content,
-      versions: [
-        ...draft.versions,
-        {
-          id: postVersionId,
-          versionNumber,
-          content,
-          generationType: "selective_regeneration" as const,
-          createdAt: new Date().toISOString(),
-        },
-      ].slice(-10),
-      evaluation,
-      feedback: [
-        {
-          eventType: "selective_regeneration",
-          reason: `${input.data.component}: ${input.data.instruction}`,
-          createdAt: new Date().toISOString(),
-        },
-        ...draft.feedback,
-      ].slice(0, 10),
-    };
-    const response = NextResponse.json(
-      postRegenerationResultSchema.parse({
-        contractVersion: "1.0",
+      brandContext: brandConfiguration.context,
+      evidence: research.evidencePackage,
+      sourceText: opportunity.cleanText,
+    });
+    const requestHash = sha256Hex(
+      JSON.stringify({
         postDraftId,
-        postVersionId,
-        versionNumber,
-        status: "ready_for_review",
-        duplicate: false,
-      }),
-      { status: 201 },
-    );
-    response.cookies.set(
-      "demo-draft-records",
-      serializeDemoDraftRecords([updated, ...drafts.filter((candidate) => candidate !== draft)]),
-      {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
-        path: "/",
-        maxAge: 60 * 60 * 8,
-      },
-    );
-    return response;
-  }
-
-  const { data, error } = await createSupabaseServiceClient()
-    .rpc("regenerate_post_component", {
-      payload: {
-        actorId: user.id,
-        postDraftId,
-        ...input.data,
-        requestHash,
+        expectedVersionId: input.data.expectedVersionId,
+        component: input.data.component,
+        instruction: input.data.instruction,
         content,
         evaluation,
-      },
-    })
-    .single();
-  if (error) {
-    const conflict = ["23505", "40001"].includes(error.code ?? "");
+      }),
+    );
+
+    if (process.env.NEXT_PUBLIC_DEMO_MODE !== "false") {
+      const drafts = parseDemoDraftRecords(request.cookies.get("demo-draft-records")?.value);
+      const draft = drafts.find((candidate) => candidate.postDraftId === postDraftId);
+      if (!draft) return errorResponse(404, "post_not_found", "Demo post is no longer available.");
+      const versionNumber = draft.versionNumber + 1;
+      const postVersionId = uuidFromDeterministicHash(
+        sha256Hex(`${postDraftId}:${input.data.idempotencyKey}:regeneration`),
+      );
+      const updated = {
+        ...draft,
+        postVersionId,
+        versionNumber,
+        status: "ready_for_review" as const,
+        content,
+        versions: [
+          ...draft.versions,
+          {
+            id: postVersionId,
+            versionNumber,
+            content,
+            generationType: "selective_regeneration" as const,
+            createdAt: new Date().toISOString(),
+          },
+        ].slice(-10),
+        evaluation,
+        feedback: [
+          {
+            eventType: "selective_regeneration",
+            reason: `${input.data.component}: ${input.data.instruction}`,
+            createdAt: new Date().toISOString(),
+          },
+          ...draft.feedback,
+        ].slice(0, 10),
+      };
+      const response = NextResponse.json(
+        postRegenerationResultSchema.parse({
+          contractVersion: "1.0",
+          postDraftId,
+          postVersionId,
+          versionNumber,
+          status: "ready_for_review",
+          duplicate: false,
+        }),
+        { status: 201 },
+      );
+      response.cookies.set(
+        "demo-draft-records",
+        serializeDemoDraftRecords([updated, ...drafts.filter((candidate) => candidate !== draft)]),
+        {
+          httpOnly: true,
+          sameSite: "lax",
+          secure: process.env.NODE_ENV === "production",
+          path: "/",
+          maxAge: 60 * 60 * 8,
+        },
+      );
+      return response;
+    }
+
+    const { data, error } = await createSupabaseServiceClient()
+      .rpc("regenerate_post_component", {
+        payload: {
+          actorId: user.id,
+          postDraftId,
+          ...input.data,
+          requestHash,
+          content,
+          evaluation,
+        },
+      })
+      .single();
+    if (error) {
+      const conflict = ["23505", "40001"].includes(error.code ?? "");
+      return errorResponse(
+        conflict ? 409 : 500,
+        conflict ? "regeneration_conflict" : "regeneration_persistence_failed",
+        conflict
+          ? "The post changed or this regeneration key was reused."
+          : "The regenerated version could not be persisted.",
+      );
+    }
+    const row = rpcRowSchema.parse(data);
+    return NextResponse.json(
+      postRegenerationResultSchema.parse({
+        contractVersion: "1.0",
+        postDraftId: row.post_draft_id,
+        postVersionId: row.post_version_id,
+        versionNumber: row.version_number,
+        status: "ready_for_review",
+        duplicate: row.duplicate,
+      }),
+      { status: row.duplicate ? 200 : 201 },
+    );
+  } catch {
     return errorResponse(
-      conflict ? 409 : 500,
-      conflict ? "regeneration_conflict" : "regeneration_persistence_failed",
-      conflict
-        ? "The post changed or this regeneration key was reused."
-        : "The regenerated version could not be persisted.",
+      500,
+      "regeneration_failed",
+      "The regeneration could not be completed. Please try again.",
     );
   }
-  const row = rpcRowSchema.parse(data);
-  return NextResponse.json(
-    postRegenerationResultSchema.parse({
-      contractVersion: "1.0",
-      postDraftId: row.post_draft_id,
-      postVersionId: row.post_version_id,
-      versionNumber: row.version_number,
-      status: "ready_for_review",
-      duplicate: row.duplicate,
-    }),
-    { status: row.duplicate ? 200 : 201 },
-  );
 }

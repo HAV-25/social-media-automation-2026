@@ -67,7 +67,10 @@ export function PostImageReview({
         error?: { message?: string };
       } | null;
       if (!response.ok) {
-        setError(body?.error?.message ?? "The image action could not be completed.");
+        setError(
+          body?.error?.message ??
+            "Image generation is taking longer than expected and may still be finishing. Wait a few seconds, then refresh — if it doesn't appear, try again.",
+        );
         return;
       }
       router.refresh();
