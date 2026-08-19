@@ -31,10 +31,18 @@ export function SelectiveRegeneration({
           instruction: String(formData.get("instruction")),
         }),
       });
-      const payload: unknown = await response.json();
+      const payload: unknown = await response.json().catch(() => null);
       if (!response.ok) {
-        const failure = payload as { error?: { message?: string } };
-        throw new Error(failure.error?.message ?? "Selective regeneration failed.");
+        const failure = payload as { error?: { message?: string } } | null;
+        throw new Error(
+          failure?.error?.message ??
+            (response.status >= 500
+              ? "Regeneration hit a server error or took too long. Please try again."
+              : "Selective regeneration failed."),
+        );
+      }
+      if (!payload) {
+        throw new Error("The server returned an unexpected response. Please try again.");
       }
       postRegenerationResultSchema.parse(payload);
       router.refresh();

@@ -8,6 +8,10 @@ import { performPostImageAction } from "@/lib/post-image-review";
 import { isSameOriginRequest } from "@/lib/request-origin";
 
 export const runtime = "nodejs";
+// Base-art generation calls the image model, which regularly exceeds Netlify's
+// 10s default. Raise to the 26s synchronous cap so directed generation fits;
+// the permanent fix moves this to the async worker.
+export const maxDuration = 26;
 
 function failure(status: number, code: string, message: string) {
   return NextResponse.json({ error: { code, message } }, { status });
