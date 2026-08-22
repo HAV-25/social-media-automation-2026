@@ -6,6 +6,7 @@ import {
   brandAssetMetadataSchema,
   brandExampleInputSchema,
   brandProfileInputSchema,
+  brandVisualIdentitySchema,
   opportunitySelectionPolicySchema,
   validateBrandAssetBytes,
 } from "@content-engine/brand-memory";
@@ -18,6 +19,7 @@ import { canManageBrand, canManageOrganization } from "@/lib/permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const DEMO_OVERRIDE_PREFIX = "brand-memory-demo-";
+const DEMO_VISUAL_IDENTITY_PREFIX = "brand-visual-identity-demo-";
 
 function list(value: FormDataEntryValue | null) {
   return [
@@ -202,6 +204,75 @@ export async function saveBrandProfile(brandId: string, formData: FormData) {
     userId: user.id,
   });
   redirect(`/brands/${brandId}?saved=profile`);
+}
+
+function optionalHex(value: FormDataEntryValue | null) {
+  const trimmed = String(value ?? "").trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function visualIdentityFromForm(formData: FormData) {
+  const preferredStyle = String(formData.get("preferredStyle") ?? "").trim();
+  return brandVisualIdentitySchema.safeParse({
+    primaryMedium: String(formData.get("primaryMedium") ?? "mixed"),
+    palette: {
+      primary: optionalHex(formData.get("palettePrimary")),
+      accent: optionalHex(formData.get("paletteAccent")),
+      neutral: optionalHex(formData.get("paletteNeutral")),
+    },
+    mood: String(formData.get("mood") ?? ""),
+    typographyNote: String(formData.get("typographyNote") ?? ""),
+    doList: list(formData.get("doList")),
+    dontList: list(formData.get("dontList")),
+    artDirection: String(formData.get("artDirection") ?? ""),
+    enabledConceptIds: formData
+      .getAll("enabledConceptIds")
+      .map((value) => String(value))
+      .filter(Boolean),
+    preferredStyle: preferredStyle.length > 0 ? preferredStyle : undefined,
+  });
+}
+
+export async function saveBrandVisualIdentity(brandId: string, formData: FormData) {
+  const user = await requireAuthorizedBrand(brandId);
+  const parsed = visualIdentityFromForm(formData);
+  if (!parsed.success) {
+    formError(brandId, parsed.error.issues[0]?.message ?? "Invalid visual identity settings.");
+  }
+
+  if (process.env.NEXT_PUBLIC_DEMO_MODE !== "false") {
+    const cookieStore = await cookies();
+    cookieStore.set(`${DEMO_VISUAL_IDENTITY_PREFIX}${brandId}`, JSON.stringify(parsed.data), {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 60 * 60 * 8,
+    });
+    redirect(`/brands/${brandId}?saved=visual-identity`);
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.from("brand_profiles").upsert({
+    brand_id: brandId,
+    visual_identity: parsed.data,
+    updated_at: new Date().toISOString(),
+  });
+  if (error) formError(brandId, error.message);
+  await audit({
+    action: "brand.visual_identity.updated",
+    brandId,
+    entityId: brandId,
+    entityType: "brand",
+    metadata: {
+      primaryMedium: parsed.data.primaryMedium,
+      enabledConceptIds: parsed.data.enabledConceptIds,
+      preferredStyle: parsed.data.preferredStyle ?? null,
+    },
+    organizationId: user.organizationId,
+    userId: user.id,
+  });
+  redirect(`/brands/${brandId}?saved=visual-identity`);
 }
 
 function embeddingProvider() {

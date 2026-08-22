@@ -1,3 +1,4 @@
+import type { BrandVisualIdentity } from "@content-engine/brand-memory";
 import type { ImageStyle } from "@content-engine/contracts";
 
 // A concept archetype is a *distinct visual approach* to a topic — not a topic.
@@ -126,26 +127,81 @@ function hashSeed(seed: string): number {
   return Math.abs(hash);
 }
 
-// Picks three archetypes that are guaranteed to diverge: one photographic, one
-// conceptual, and one structured — which also yields three distinct render
-// styles. The seed rotates *which* photographic and structured archetype is used
-// so different topics don't all land on the same trio. `preferredStyle` (when a
-// brand sets a default) biases the lead archetype.
+// Resolves the effective catalog for a brand: the enabled subset of the system
+// catalog (empty = all) plus any brand-authored custom concepts. Falls back to
+// the full system catalog when a brand has no visual identity configured, so
+// unconfigured brands behave exactly as before.
+export function resolveBrandCatalog(visualIdentity?: BrandVisualIdentity): ConceptArchetype[] {
+  if (!visualIdentity) return [...CONCEPT_ARCHETYPES];
+  const enabled = visualIdentity.enabledConceptIds ?? [];
+  const system =
+    enabled.length > 0
+      ? CONCEPT_ARCHETYPES.filter((archetype) => enabled.includes(archetype.id))
+      : [...CONCEPT_ARCHETYPES];
+  const custom: ConceptArchetype[] = (visualIdentity.customConcepts ?? []).map((entry) => ({
+    id: entry.id,
+    title: entry.title,
+    imageStyle: entry.imageStyle,
+    treatment: entry.treatment,
+    group: entry.treatment === "literal" ? "photographic" : "conceptual",
+    brief: (topic: string) => `${entry.brief}: ${topic}`,
+    composition: entry.composition,
+    rationale: `Brand-defined concept "${entry.title}".`,
+    baseScore: 85,
+  }));
+  const combined = [...system, ...custom];
+  return combined.length > 0 ? combined : [...CONCEPT_ARCHETYPES];
+}
+
+// Picks three archetypes that diverge: one photographic, one conceptual, and one
+// structured — which also yields distinct render styles. The seed rotates which
+// archetype within each group is used, so different topics don't all land on the
+// same trio. `preferredStyle` biases the lead. Robust to a brand's catalog that
+// omits whole groups: it still returns three distinct archetypes, preferring
+// group and style divergence.
 export function selectDivergentConcepts(input: {
   seed: string;
   preferredStyle?: ImageStyle;
+  catalog?: readonly ConceptArchetype[];
 }): ConceptArchetype[] {
+  const catalog = input.catalog && input.catalog.length > 0 ? input.catalog : CONCEPT_ARCHETYPES;
   const seed = hashSeed(input.seed);
-  const photographic = CONCEPT_ARCHETYPES.filter((archetype) => archetype.group === "photographic");
-  const conceptual = CONCEPT_ARCHETYPES.filter((archetype) => archetype.group === "conceptual");
-  const structured = CONCEPT_ARCHETYPES.filter((archetype) => archetype.group === "structured");
+  const picked: ConceptArchetype[] = [];
+  const usedIds = new Set<string>();
+  const usedStyles = new Set<string>();
+  const usedGroups = new Set<string>();
 
-  const lead =
-    (input.preferredStyle
-      ? photographic.find((archetype) => archetype.imageStyle === input.preferredStyle)
-      : undefined) ?? photographic[seed % photographic.length]!;
-  const middle = conceptual[Math.floor(seed / 7) % conceptual.length]!;
-  const tail = structured[Math.floor(seed / 13) % structured.length]!;
+  const take = (archetype: ConceptArchetype | undefined) => {
+    if (!archetype || usedIds.has(archetype.id) || picked.length >= 3) return;
+    picked.push(archetype);
+    usedIds.add(archetype.id);
+    usedStyles.add(archetype.imageStyle);
+    usedGroups.add(archetype.group);
+  };
 
-  return [lead, middle, tail];
+  if (input.preferredStyle) {
+    const leadOptions = catalog.filter(
+      (archetype) => archetype.imageStyle === input.preferredStyle,
+    );
+    if (leadOptions.length > 0) take(leadOptions[seed % leadOptions.length]);
+  }
+
+  for (const group of ["photographic", "conceptual", "structured"] as const) {
+    if (picked.length >= 3 || usedGroups.has(group)) continue;
+    const options = catalog.filter(
+      (archetype) => archetype.group === group && !usedIds.has(archetype.id),
+    );
+    if (options.length === 0) continue;
+    const fresh = options.filter((archetype) => !usedStyles.has(archetype.imageStyle));
+    const pool = fresh.length > 0 ? fresh : options;
+    take(pool[seed % pool.length]);
+  }
+
+  if (picked.length < 3) {
+    const remaining = catalog.filter((archetype) => !usedIds.has(archetype.id));
+    const fresh = remaining.filter((archetype) => !usedStyles.has(archetype.imageStyle));
+    for (const archetype of [...fresh, ...remaining]) take(archetype);
+  }
+
+  return picked.slice(0, 3);
 }

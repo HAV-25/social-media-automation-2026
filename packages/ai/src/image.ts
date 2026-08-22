@@ -1,5 +1,6 @@
 import {
   normalizedBrandContextSchema,
+  type BrandVisualIdentity,
   type NormalizedBrandContext,
 } from "@content-engine/brand-memory";
 import {
@@ -22,7 +23,11 @@ import {
   IMAGE_DIRECTOR_PROMPT_VERSION,
   IMAGE_DIRECTOR_SYSTEM_PROMPT,
 } from "./prompts/image-director.v1";
-import { CONCEPT_AVOID, selectDivergentConcepts } from "./image-concept-catalog";
+import {
+  CONCEPT_AVOID,
+  resolveBrandCatalog,
+  selectDivergentConcepts,
+} from "./image-concept-catalog";
 
 const imageDirectionRequestSchema = z
   .object({
@@ -79,15 +84,51 @@ function visualPalette(context: NormalizedBrandContext) {
   return [...new Set(valid)].slice(0, 4).concat(["#10243E", "#F5B942"]).slice(0, 4);
 }
 
+// A brand-set palette leads (padded by the asset/fallback palette to stay within
+// the 2-6 colour contract); otherwise the existing asset-derived palette is used.
+function brandPaletteOrFallback(
+  visualIdentity: BrandVisualIdentity | undefined,
+  context: NormalizedBrandContext,
+): string[] {
+  const brandColors = [
+    visualIdentity?.palette.primary,
+    visualIdentity?.palette.accent,
+    visualIdentity?.palette.neutral,
+  ].filter((color): color is string => typeof color === "string");
+  if (brandColors.length === 0) return visualPalette(context);
+  return [...new Set([...brandColors, ...visualPalette(context)])].slice(0, 4);
+}
+
+// Brand-wide art direction appended to each concept's composition. Empty when
+// the brand has no visual identity, so the prompt is unchanged from before.
+function composeArtDirection(visualIdentity: BrandVisualIdentity | undefined): string {
+  if (!visualIdentity) return "";
+  const parts: string[] = [];
+  if (visualIdentity.primaryMedium !== "mixed") {
+    parts.push(`Preferred medium: ${visualIdentity.primaryMedium}.`);
+  }
+  if (visualIdentity.mood) parts.push(`Mood: ${visualIdentity.mood}.`);
+  if (visualIdentity.artDirection)
+    parts.push(`Brand art direction: ${visualIdentity.artDirection}.`);
+  return parts.length > 0 ? ` ${parts.join(" ")}` : "";
+}
+
 export function createImageDirection(request: ImageDirectionRequest): ImageDirection {
   const parsed = imageDirectionRequestSchema.parse(request);
   const brandName = compact(parsed.brandContext.identity.name, 80);
   const nucleus = sanitizeImageDisplayText(parsed.valueNucleus, 500);
   const audience = compact(parsed.brandContext.identity.audience || "the intended audience", 160);
-  const palette = visualPalette(parsed.brandContext);
+  const visualIdentity = parsed.brandContext.visualIdentity;
+  const palette = brandPaletteOrFallback(visualIdentity, parsed.brandContext);
+  const artDirection = composeArtDirection(visualIdentity);
+  const avoid = [
+    ...CONCEPT_AVOID,
+    ...(visualIdentity?.dontList ?? []).filter((item) => item.length >= 2),
+  ].slice(0, 20);
   const archetypes = selectDivergentConcepts({
     seed: parsed.postDraftId,
-    preferredStyle: parsed.preferredStyle,
+    preferredStyle: visualIdentity?.preferredStyle ?? parsed.preferredStyle,
+    catalog: resolveBrandCatalog(visualIdentity),
   });
   const concepts: ImageConcept[] = archetypes.map((archetype, index) => {
     const rank = index + 1;
@@ -97,9 +138,9 @@ export function createImageDirection(request: ImageDirectionRequest): ImageDirec
       visualNucleus: compact(archetype.brief(nucleus), 1_400),
       imageStyle: archetype.imageStyle,
       literalOrConceptual: archetype.treatment,
-      composition: archetype.composition,
+      composition: compact(`${archetype.composition}${artDirection}`, 1_400),
       palette,
-      avoid: [...CONCEPT_AVOID],
+      avoid,
       headlineOverlay: compact(nucleus, 96),
       sourceLabel: compact(`${brandName} editorial`, 120),
       rank,

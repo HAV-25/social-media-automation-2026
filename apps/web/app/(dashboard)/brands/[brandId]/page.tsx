@@ -4,6 +4,7 @@ import {
   FileImage,
   FileText,
   LockKeyhole,
+  Palette,
   RotateCcw,
   Save,
   ShieldCheck,
@@ -19,9 +20,35 @@ import {
   removeBrandAsset,
   removeBrandExample,
   saveBrandProfile,
+  saveBrandVisualIdentity,
   setBrandArchived,
   uploadBrandAsset,
 } from "../actions";
+
+// Mirrors the system catalog in packages/ai/src/image-concept-catalog.ts. Kept
+// inline so this settings page does not bundle the AI package.
+const IMAGE_CONCEPT_SUMMARY = [
+  { id: "literal_hero", title: "Literal hero", group: "Photographic" },
+  { id: "macro_detail", title: "Macro detail", group: "Photographic" },
+  { id: "human_context", title: "Human context", group: "Photographic" },
+  { id: "conceptual_metaphor", title: "Conceptual metaphor", group: "Conceptual" },
+  { id: "process_flow", title: "Process flow", group: "Structured" },
+  { id: "data_signal", title: "Data signal", group: "Structured" },
+] as const;
+
+const IMAGE_STYLE_OPTIONS = [
+  { value: "", label: "Auto (recommended)" },
+  { value: "editorial_hero", label: "Editorial hero" },
+  { value: "conceptual_illustration", label: "Conceptual illustration" },
+  { value: "insight_card", label: "Insight card" },
+  { value: "branded_headline_card", label: "Branded headline card" },
+] as const;
+
+const PRIMARY_MEDIUM_OPTIONS = [
+  { value: "mixed", label: "Mixed (varies per angle)" },
+  { value: "photographic", label: "Photographic" },
+  { value: "illustration", label: "Illustration" },
+] as const;
 
 export const dynamic = "force-dynamic";
 
@@ -88,9 +115,11 @@ export default async function BrandConfigurationPage({
   const [{ brandId }, query, user] = await Promise.all([params, searchParams, getCurrentUser()]);
   const configuration = await getBrandConfiguration(brandId);
   if (!configuration) notFound();
-  const { brand, profile, opportunityPolicy, examples, assets, context } = configuration;
+  const { brand, profile, opportunityPolicy, visualIdentity, examples, assets, context } =
+    configuration;
   const editable = user ? canManageBrand(user.role) : false;
   const boundSaveProfile = saveBrandProfile.bind(null, brandId);
+  const boundSaveVisualIdentity = saveBrandVisualIdentity.bind(null, brandId);
   const boundAddExample = addBrandExample.bind(null, brandId);
   const boundRemoveExample = removeBrandExample.bind(null, brandId);
   const boundUploadAsset = uploadBrandAsset.bind(null, brandId);
@@ -455,6 +484,165 @@ export default async function BrandConfigurationPage({
               {editable ? (
                 <button className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--sage)] px-5 py-3 text-sm font-bold text-white">
                   <Save size={17} /> Save brand memory
+                </button>
+              ) : null}
+            </form>
+
+            <form
+              action={boundSaveVisualIdentity}
+              className="rounded-3xl border border-[var(--line)] bg-[var(--paper)] p-6 lg:p-8"
+            >
+              <div className="flex items-start gap-3">
+                <Palette size={20} className="mt-0.5 text-[var(--sage)]" />
+                <div>
+                  <h2 className="serif text-2xl">Visual identity &amp; image direction</h2>
+                  <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
+                    Controls how post images look for {brand.name}. Brand-wide choices stay
+                    consistent; the three angles of each topic deliberately vary within them.
+                  </p>
+                </div>
+              </div>
+
+              <fieldset disabled={!editable} className="mt-6 space-y-5 disabled:opacity-70">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="text-xs font-bold text-[var(--muted)]">
+                    Primary medium
+                    <select
+                      name="primaryMedium"
+                      defaultValue={visualIdentity.primaryMedium}
+                      className="mt-1.5 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm text-[var(--ink)] outline-none focus:border-[var(--sage)]"
+                    >
+                      {PRIMARY_MEDIUM_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="text-xs font-bold text-[var(--muted)]">
+                    Preferred lead style
+                    <select
+                      name="preferredStyle"
+                      defaultValue={visualIdentity.preferredStyle ?? ""}
+                      className="mt-1.5 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm text-[var(--ink)] outline-none focus:border-[var(--sage)]"
+                    >
+                      {IMAGE_STYLE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  <label className="text-xs font-bold text-[var(--muted)]">
+                    Primary colour
+                    <input
+                      name="palettePrimary"
+                      defaultValue={visualIdentity.palette.primary ?? ""}
+                      placeholder="#0F172A"
+                      className="mt-1.5 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm font-normal text-[var(--ink)] outline-none focus:border-[var(--sage)]"
+                    />
+                  </label>
+                  <label className="text-xs font-bold text-[var(--muted)]">
+                    Accent colour
+                    <input
+                      name="paletteAccent"
+                      defaultValue={visualIdentity.palette.accent ?? ""}
+                      placeholder="#F5B942"
+                      className="mt-1.5 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm font-normal text-[var(--ink)] outline-none focus:border-[var(--sage)]"
+                    />
+                  </label>
+                  <label className="text-xs font-bold text-[var(--muted)]">
+                    Neutral colour
+                    <input
+                      name="paletteNeutral"
+                      defaultValue={visualIdentity.palette.neutral ?? ""}
+                      placeholder="#E2E8F0"
+                      className="mt-1.5 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm font-normal text-[var(--ink)] outline-none focus:border-[var(--sage)]"
+                    />
+                  </label>
+                </div>
+
+                <label className="text-xs font-bold text-[var(--muted)]">
+                  Mood
+                  <input
+                    name="mood"
+                    defaultValue={visualIdentity.mood}
+                    placeholder="Clinical, precise, optimistic"
+                    className="mt-1.5 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm font-normal text-[var(--ink)] outline-none focus:border-[var(--sage)]"
+                  />
+                </label>
+                <label className="text-xs font-bold text-[var(--muted)]">
+                  Typography note
+                  <input
+                    name="typographyNote"
+                    defaultValue={visualIdentity.typographyNote}
+                    placeholder="Geometric sans, generous spacing"
+                    className="mt-1.5 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm font-normal text-[var(--ink)] outline-none focus:border-[var(--sage)]"
+                  />
+                </label>
+                <label className="text-xs font-bold text-[var(--muted)]">
+                  Art direction
+                  <textarea
+                    name="artDirection"
+                    rows={3}
+                    defaultValue={visualIdentity.artDirection}
+                    placeholder="Restrained editorial photography, real environments, no stock clichés."
+                    className="mt-1.5 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm font-normal leading-5 text-[var(--ink)] outline-none focus:border-[var(--sage)]"
+                  />
+                </label>
+
+                <LinesField
+                  label="Do"
+                  name="doList"
+                  defaultValue={visualIdentity.doList}
+                  help="One visual instruction per line."
+                />
+                <LinesField
+                  label="Don't"
+                  name="dontList"
+                  defaultValue={visualIdentity.dontList}
+                  help="One thing to avoid per line."
+                />
+
+                <div>
+                  <p className="text-xs font-bold text-[var(--muted)]">Enabled concepts</p>
+                  <p className="mt-1 text-[10px] leading-4 text-[var(--muted)]">
+                    The three angles of each topic are drawn from these. Leave all checked to allow
+                    the full catalog.
+                  </p>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    {IMAGE_CONCEPT_SUMMARY.map((concept) => {
+                      const checked =
+                        visualIdentity.enabledConceptIds.length === 0 ||
+                        visualIdentity.enabledConceptIds.includes(concept.id);
+                      return (
+                        <label
+                          key={concept.id}
+                          className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm"
+                        >
+                          <input
+                            type="checkbox"
+                            name="enabledConceptIds"
+                            value={concept.id}
+                            defaultChecked={checked}
+                          />
+                          <span>
+                            {concept.title}{" "}
+                            <span className="text-[10px] text-[var(--muted)]">{concept.group}</span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              </fieldset>
+
+              {editable ? (
+                <button className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--sage)] px-5 py-3 text-sm font-bold text-white">
+                  <Save size={17} /> Save visual identity
                 </button>
               ) : null}
             </form>

@@ -62,6 +62,58 @@ export const defaultOpportunitySelectionPolicy: OpportunitySelectionPolicy = {
   dailyDraftLimit: 3,
 };
 
+// Brand-level visual identity + image direction settings. Everything is
+// defaulted so an unconfigured brand behaves exactly as before this feature
+// existed (no regression). Stored as brand_profiles.visual_identity (jsonb).
+const hexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+export const brandPrimaryMediumSchema = z.enum(["photographic", "illustration", "mixed"]);
+// Mirrors the image style catalog; kept local so brand-memory stays decoupled
+// from the contracts package.
+export const brandImageStyleSchema = z.enum([
+  "editorial_hero",
+  "insight_card",
+  "conceptual_illustration",
+  "branded_headline_card",
+]);
+
+export const brandCustomConceptSchema = z.object({
+  id: z
+    .string()
+    .trim()
+    .min(1)
+    .max(60)
+    .regex(/^[a-z0-9_]+$/),
+  title: trimmedText(120).min(1),
+  imageStyle: brandImageStyleSchema,
+  treatment: z.enum(["literal", "conceptual"]),
+  brief: trimmedText(600).min(10),
+  composition: trimmedText(600).min(10),
+});
+export type BrandCustomConcept = z.infer<typeof brandCustomConceptSchema>;
+
+export const brandVisualIdentitySchema = z.object({
+  primaryMedium: brandPrimaryMediumSchema.default("mixed"),
+  palette: z
+    .object({
+      primary: hexColorSchema.optional(),
+      accent: hexColorSchema.optional(),
+      neutral: hexColorSchema.optional(),
+    })
+    .default({}),
+  mood: trimmedText(300).default(""),
+  typographyNote: trimmedText(300).default(""),
+  doList: z.array(trimmedText(200).min(1)).max(20).default([]),
+  dontList: z.array(trimmedText(200).min(1)).max(20).default([]),
+  artDirection: trimmedText(2_000).default(""),
+  // Empty means "all system concepts allowed".
+  enabledConceptIds: z.array(trimmedText(60).min(1)).max(50).default([]),
+  preferredStyle: brandImageStyleSchema.optional(),
+  customConcepts: z.array(brandCustomConceptSchema).max(20).default([]),
+});
+export type BrandVisualIdentity = z.infer<typeof brandVisualIdentitySchema>;
+
+export const defaultBrandVisualIdentity: BrandVisualIdentity = brandVisualIdentitySchema.parse({});
+
 export const brandProfileInputSchema = z.object({
   name: trimmedText(120).min(1),
   slug: z
@@ -172,6 +224,7 @@ export type BrandContextInput = {
   profile: Omit<BrandProfileInput, "name" | "slug" | "description" | "website" | "defaultLanguage">;
   examples: StoredBrandExample[];
   assets: StoredBrandAsset[];
+  visualIdentity?: BrandVisualIdentity;
 };
 
 export const normalizedBrandContextSchema = z.object({
@@ -214,6 +267,7 @@ export const normalizedBrandContextSchema = z.object({
       }),
     )
     .max(12),
+  visualIdentity: brandVisualIdentitySchema.optional(),
   completeness: z.object({
     score: z.number().int().min(0).max(100),
     missing: z.array(z.string()),
@@ -297,6 +351,7 @@ export function buildNormalizedBrandContext(input: BrandContextInput): Normalize
       altText: asset.altText,
       dominantColors: asset.dominantColors,
     })),
+    visualIdentity: input.visualIdentity ?? defaultBrandVisualIdentity,
     completeness: calculateCompleteness(input),
   });
 }
