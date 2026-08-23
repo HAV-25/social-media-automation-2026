@@ -22,8 +22,25 @@ type Provenance = {
 
 export type ExtractedSourceResult = Exclude<SourceAdapterResult, { outcome: "raw" }>;
 
-function cleanExtractedText(value: string) {
+// Strips markup and analytics/tracker remnants that leak into RSS/scraped text
+// (e.g. Sentry `Raven.config(...).install();` from an HTML comment, and stray
+// comment markers). High-precision — targets script/comment/tracker patterns
+// only, so it never removes ordinary prose.
+export function stripSourceBoilerplate(value: string) {
   return value
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    .replace(/<script\b[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style\b[\s\S]*?<\/style>/gi, " ")
+    .replace(/<!--|-->/g, " ")
+    .replace(
+      /\b(?:Raven|gtag|ga|fbq|_satellite|dataLayer)\b\s*\.?\s*[\w$.]*\s*\([^)]*\)(?:\s*\.\s*\w+\s*\([^)]*\))*\s*;?/gi,
+      " ",
+    )
+    .replace(/\b[\w$]+(?:\.[\w$]+)*\.(?:install|init|push)\(\s*\)\s*;?/gi, " ");
+}
+
+function cleanExtractedText(value: string) {
+  return stripSourceBoilerplate(value)
     .normalize("NFKC")
     .replace(/\r\n?/g, "\n")
     .split("\n")

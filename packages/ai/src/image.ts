@@ -52,10 +52,17 @@ function compact(value: string, maximum: number) {
 
 export function sanitizeImageDisplayText(value: string, maximum: number) {
   const withoutMarkup = value
+    .replace(/<!--[\s\S]*?-->/g, " ")
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
     .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
     .replace(/<[^>]+>/g, " ")
     .replace(/<[^>]*$/g, " ")
+    .replace(/<!--|-->/g, " ")
+    .replace(
+      /\b(?:Raven|gtag|ga|fbq|_satellite|dataLayer)\b\s*\.?\s*[\w$.]*\s*\([^)]*\)(?:\s*\.\s*\w+\s*\([^)]*\))*\s*;?/gi,
+      " ",
+    )
+    .replace(/\b[\w$]+(?:\.[\w$]+)*\.(?:install|init|push)\(\s*\)\s*;?/gi, " ")
     .replace(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(Number(code)))
     .replace(/&#x([0-9a-f]+);/gi, (_, code: string) =>
       String.fromCodePoint(Number.parseInt(code, 16)),
