@@ -9,7 +9,16 @@ import { z } from "zod";
 import { parseDemoContentRecords, parseDemoDraftRecords } from "./demo-content-store";
 import { createSupabaseServerClient } from "./supabase/server";
 
-const postStatusSchema = z.enum(["ready_for_review", "changes_requested", "approved", "rejected"]);
+const postStatusSchema = z.enum([
+  "drafting",
+  "evaluating",
+  "verifying",
+  "image_pending",
+  "ready_for_review",
+  "changes_requested",
+  "approved",
+  "rejected",
+]);
 const promptSnapshotSchema = z.object({
   promptVersion: z.string().min(1),
   systemPrompt: z.string().min(1),

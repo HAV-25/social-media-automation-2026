@@ -1436,7 +1436,9 @@ export const postRegenerationResultSchema = z
     postDraftId: z.uuid(),
     postVersionId: z.uuid(),
     versionNumber: z.number().int().positive(),
-    status: z.literal("ready_for_review"),
+    // "verifying" is returned when the lightweight worker re-verifies the new
+    // version asynchronously (the real path); demo stays synchronous.
+    status: z.enum(["ready_for_review", "verifying"]),
     duplicate: z.boolean(),
   })
   .strict();
