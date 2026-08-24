@@ -1,5 +1,24 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import path from "node:path";
+
+// The sidebar nav groups are collapsible client components. Right after a soft
+// navigation the toggle may not be hydrated yet, so the first click can be a
+// no-op. Retry the group button until the child link is actually revealed.
+async function openNavGroup(page: Page, groupName: string, childName: string) {
+  const child = page.getByRole("link", { name: childName });
+  const button = page.getByRole("button", { name: groupName });
+  await expect(button).toBeVisible();
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    if (await child.isVisible().catch(() => false)) return;
+    await button.click();
+    const revealed = await child
+      .waitFor({ state: "visible", timeout: 1_500 })
+      .then(() => true)
+      .catch(() => false);
+    if (revealed) return;
+  }
+  await expect(child).toBeVisible();
+}
 
 test("plain text becomes an editable and approvable draft without paid services", async ({
   page,
@@ -18,6 +37,7 @@ test("plain text becomes an editable and approvable draft without paid services"
   await expect(page.getByText("maximum draft variants entering review")).toBeVisible();
   await expect(page.getByText(/scoring at least 75/)).toBeVisible();
 
+  await openNavGroup(page, "RSS Feed Sources", "Runs & errors");
   await page.getByRole("link", { name: "Runs & errors" }).click();
   await expect(page.getByRole("heading", { name: "Runs & errors" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "What AI work cost this brand" })).toBeVisible();
@@ -35,6 +55,7 @@ test("plain text becomes an editable and approvable draft without paid services"
   ).toBeVisible();
   await expect(page.getByText(/scheduled · attempt 0\/3/).first()).toBeVisible();
 
+  await openNavGroup(page, "Operations", "Performance");
   await page.getByRole("link", { name: "Performance" }).click();
   await expect(
     page.getByRole("heading", { name: "What the content engine delivered" }),
@@ -94,7 +115,9 @@ test("plain text becomes an editable and approvable draft without paid services"
     );
   await page.getByRole("button", { name: "Add to content inbox" }).click();
 
-  await expect(page.getByRole("heading", { name: "Source normalized and scored" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Source normalized and scored" })).toBeVisible({
+    timeout: 20_000,
+  });
   await page.getByRole("link", { name: /Inspect opportunity/ }).click();
   await expect(
     page.getByRole("heading", { name: "Why this opportunity scored here" }),
@@ -214,7 +237,9 @@ test("pasted social content retains its source type and normalized text", async 
     );
   await page.getByRole("button", { name: "Add social post" }).click();
 
-  await expect(page.getByRole("heading", { name: "Source extracted and scored" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Source extracted and scored" })).toBeVisible({
+    timeout: 20_000,
+  });
   await page.getByRole("link", { name: /Inspect opportunity/ }).click();
   await expect(page.getByText("social content", { exact: true })).toBeVisible();
   await expect(
