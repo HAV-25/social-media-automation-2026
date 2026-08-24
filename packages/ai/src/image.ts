@@ -1,5 +1,6 @@
 import {
   normalizedBrandContextSchema,
+  type BrandVisualIdentity,
   type NormalizedBrandContext,
 } from "@content-engine/brand-memory";
 import {
@@ -13,7 +14,6 @@ import {
   type GeneratedImage,
   type ImageConcept,
   type ImageDirection,
-  type ImageStyle,
 } from "@content-engine/contracts";
 import { createHash } from "node:crypto";
 import OpenAI from "openai";
@@ -23,6 +23,11 @@ import {
   IMAGE_DIRECTOR_PROMPT_VERSION,
   IMAGE_DIRECTOR_SYSTEM_PROMPT,
 } from "./prompts/image-director.v1";
+import {
+  CONCEPT_AVOID,
+  resolveBrandCatalog,
+  selectDivergentConcepts,
+} from "./image-concept-catalog";
 
 const imageDirectionRequestSchema = z
   .object({
@@ -47,10 +52,17 @@ function compact(value: string, maximum: number) {
 
 export function sanitizeImageDisplayText(value: string, maximum: number) {
   const withoutMarkup = value
+    .replace(/<!--[\s\S]*?-->/g, " ")
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
     .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
     .replace(/<[^>]+>/g, " ")
     .replace(/<[^>]*$/g, " ")
+    .replace(/<!--|-->/g, " ")
+    .replace(
+      /\b(?:Raven|gtag|ga|fbq|_satellite|dataLayer)\b\s*\.?\s*[\w$.]*\s*\([^)]*\)(?:\s*\.\s*\w+\s*\([^)]*\))*\s*;?/gi,
+      " ",
+    )
+    .replace(/\b[\w$]+(?:\.[\w$]+)*\.(?:install|init|push)\(\s*\)\s*;?/gi, " ")
     .replace(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(Number(code)))
     .replace(/&#x([0-9a-f]+);/gi, (_, code: string) =>
       String.fromCodePoint(Number.parseInt(code, 16)),
@@ -79,68 +91,68 @@ function visualPalette(context: NormalizedBrandContext) {
   return [...new Set(valid)].slice(0, 4).concat(["#10243E", "#F5B942"]).slice(0, 4);
 }
 
+// A brand-set palette leads (padded by the asset/fallback palette to stay within
+// the 2-6 colour contract); otherwise the existing asset-derived palette is used.
+function brandPaletteOrFallback(
+  visualIdentity: BrandVisualIdentity | undefined,
+  context: NormalizedBrandContext,
+): string[] {
+  const brandColors = [
+    visualIdentity?.palette.primary,
+    visualIdentity?.palette.accent,
+    visualIdentity?.palette.neutral,
+  ].filter((color): color is string => typeof color === "string");
+  if (brandColors.length === 0) return visualPalette(context);
+  return [...new Set([...brandColors, ...visualPalette(context)])].slice(0, 4);
+}
+
+// Brand-wide art direction appended to each concept's composition. Empty when
+// the brand has no visual identity, so the prompt is unchanged from before.
+function composeArtDirection(visualIdentity: BrandVisualIdentity | undefined): string {
+  if (!visualIdentity) return "";
+  const parts: string[] = [];
+  if (visualIdentity.primaryMedium !== "mixed") {
+    parts.push(`Preferred medium: ${visualIdentity.primaryMedium}.`);
+  }
+  if (visualIdentity.mood) parts.push(`Mood: ${visualIdentity.mood}.`);
+  if (visualIdentity.artDirection)
+    parts.push(`Brand art direction: ${visualIdentity.artDirection}.`);
+  return parts.length > 0 ? ` ${parts.join(" ")}` : "";
+}
+
 export function createImageDirection(request: ImageDirectionRequest): ImageDirection {
   const parsed = imageDirectionRequestSchema.parse(request);
   const brandName = compact(parsed.brandContext.identity.name, 80);
   const nucleus = sanitizeImageDisplayText(parsed.valueNucleus, 500);
-  const audience = compact(request.brandContext.identity.audience || "the intended audience", 160);
-  const palette = visualPalette(parsed.brandContext);
-  const preferred = parsed.preferredStyle ?? "editorial_hero";
-  const styles: ImageStyle[] = [
-    preferred,
-    preferred === "conceptual_illustration" ? "insight_card" : "conceptual_illustration",
-    preferred === "branded_headline_card" ? "editorial_hero" : "branded_headline_card",
-  ];
-  const definitions = [
-    {
-      title: "The editorial signal",
-      literalOrConceptual: "literal" as const,
-      composition:
-        "One confident focal subject placed in the right third, with a quiet contextual background and generous negative space on the left.",
-      score: 92,
-      explanation:
-        "The clearest editorial read with strong mobile legibility and restrained authority.",
-    },
-    {
-      title: "The operating shift",
-      literalOrConceptual: "conceptual" as const,
-      composition:
-        "A restrained visual metaphor showing movement from a fragmented state toward one coherent system, with the focal transition centred.",
-      score: 86,
-      explanation:
-        "Makes the underlying change understandable without illustrating unsupported specifics.",
-    },
-    {
-      title: "The decision frame",
-      literalOrConceptual: "conceptual" as const,
-      composition:
-        "An abstract editorial still life with three purposeful forms, strong depth, and an uncluttered panel area reserved for typography.",
-      score: 79,
-      explanation:
-        "Provides a flexible branded treatment while remaining materially different from the hero concept.",
-    },
-  ];
-  const concepts: ImageConcept[] = definitions.map((definition, index) => {
+  const audience = compact(parsed.brandContext.identity.audience || "the intended audience", 160);
+  const visualIdentity = parsed.brandContext.visualIdentity;
+  const palette = brandPaletteOrFallback(visualIdentity, parsed.brandContext);
+  const artDirection = composeArtDirection(visualIdentity);
+  const avoid = [
+    ...CONCEPT_AVOID,
+    ...(visualIdentity?.dontList ?? []).filter((item) => item.length >= 2),
+  ].slice(0, 20);
+  const archetypes = selectDivergentConcepts({
+    seed: parsed.postDraftId,
+    preferredStyle: visualIdentity?.preferredStyle ?? parsed.preferredStyle,
+    catalog: resolveBrandCatalog(visualIdentity),
+  });
+  const concepts: ImageConcept[] = archetypes.map((archetype, index) => {
     const rank = index + 1;
     return {
-      conceptKey: conceptKey(`${parsed.postDraftId}:${rank}:${styles[index]}`),
-      title: definition.title,
-      visualNucleus: `Express this editorial idea without adding claims: ${nucleus}`,
-      imageStyle: styles[index]!,
-      literalOrConceptual: definition.literalOrConceptual,
-      composition: definition.composition,
+      conceptKey: conceptKey(`${parsed.postDraftId}:${rank}:${archetype.id}`),
+      title: archetype.title,
+      visualNucleus: compact(archetype.brief(nucleus), 1_400),
+      imageStyle: archetype.imageStyle,
+      literalOrConceptual: archetype.treatment,
+      composition: compact(`${archetype.composition}${artDirection}`, 1_400),
       palette,
-      avoid: [
-        "all generated text and typography",
-        "logos, watermarks, or third-party brand marks",
-        "sensational or misleading visual claims",
-        "famous people or protected characters",
-      ],
+      avoid,
       headlineOverlay: compact(nucleus, 96),
       sourceLabel: compact(`${brandName} editorial`, 120),
       rank,
-      score: definition.score,
-      rankExplanation: `${definition.explanation} Designed for ${audience}.`,
+      score: archetype.baseScore,
+      rankExplanation: compact(`${archetype.rationale} Designed for ${audience}.`, 900),
     };
   });
   return imageDirectionSchema.parse({

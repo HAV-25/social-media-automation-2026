@@ -1,7 +1,9 @@
 import {
   brandProfileInputSchema,
   brandAssetMetadataSchema,
+  brandVisualIdentitySchema,
   buildNormalizedBrandContext,
+  defaultBrandVisualIdentity,
   defaultGenerationSettings,
   defaultOpportunitySelectionPolicy,
   defaultVoiceSettings,
@@ -10,6 +12,7 @@ import {
   voiceSettingsSchema,
   type BrandContextInput,
   type BrandProfileInput,
+  type BrandVisualIdentity,
   type OpportunitySelectionPolicy,
   type StoredBrandAsset,
   type StoredBrandExample,
@@ -34,6 +37,7 @@ export type BrandConfiguration = {
   };
   profile: BrandProfileInput;
   opportunityPolicy: OpportunitySelectionPolicy;
+  visualIdentity: BrandVisualIdentity;
   examples: StoredBrandExample[];
   assets: Array<StoredBrandAsset & { previewUrl?: string }>;
   context: ReturnType<typeof buildNormalizedBrandContext>;
@@ -58,6 +62,7 @@ function createContext(configuration: Omit<BrandConfiguration, "context">) {
     },
     examples: configuration.examples,
     assets: configuration.assets,
+    visualIdentity: configuration.visualIdentity,
   };
   return buildNormalizedBrandContext(input);
 }
@@ -67,8 +72,18 @@ async function getDemoBrandConfiguration(brandId: string): Promise<BrandConfigur
   if (!record) return null;
   const cookieStore = await cookies();
   const overrideValue = cookieStore.get(`brand-memory-demo-${brandId}`)?.value;
+  const visualIdentityValue = cookieStore.get(`brand-visual-identity-demo-${brandId}`)?.value;
   let profile = record.profile;
   let opportunityPolicy = defaultOpportunitySelectionPolicy;
+  let visualIdentity = defaultBrandVisualIdentity;
+  if (visualIdentityValue) {
+    try {
+      const parsed = brandVisualIdentitySchema.safeParse(JSON.parse(visualIdentityValue));
+      if (parsed.success) visualIdentity = parsed.data;
+    } catch {
+      // Invalid demo cookies are ignored; production state is never cookie-backed.
+    }
+  }
   if (overrideValue) {
     try {
       const override = JSON.parse(overrideValue) as {
@@ -96,6 +111,7 @@ async function getDemoBrandConfiguration(brandId: string): Promise<BrandConfigur
     },
     profile,
     opportunityPolicy,
+    visualIdentity,
     examples: record.examples,
     assets: record.assets,
   };
@@ -147,6 +163,12 @@ async function getPersistentBrandConfiguration(
     dailyDraftLimit:
       profile?.daily_draft_limit ?? defaultOpportunitySelectionPolicy.dailyDraftLimit,
   });
+  // Tolerant parse: the column may not exist yet, and malformed jsonb must never
+  // break brand loading — fall back to the default visual identity.
+  const visualIdentityResult = brandVisualIdentitySchema.safeParse(profile?.visual_identity ?? {});
+  const visualIdentity = visualIdentityResult.success
+    ? visualIdentityResult.data
+    : defaultBrandVisualIdentity;
   const mappedExamples: StoredBrandExample[] = (examples ?? []).map((example) => ({
     id: example.id,
     brandId: example.brand_id,
@@ -219,6 +241,7 @@ async function getPersistentBrandConfiguration(
       generationDefaults,
     } satisfies BrandProfileInput,
     opportunityPolicy,
+    visualIdentity,
     examples: mappedExamples,
     assets: assetsWithPreviews,
   };
