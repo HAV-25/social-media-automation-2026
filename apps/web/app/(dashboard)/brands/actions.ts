@@ -211,6 +211,30 @@ function optionalHex(value: FormDataEntryValue | null) {
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
+// Custom concepts are edited in a small fixed set of slots. A slot is saved only
+// when its title, brief, and composition are all filled; incomplete slots are
+// skipped so a half-filled row never blocks the save. Ids are slot-stable.
+const CUSTOM_CONCEPT_SLOTS = 3;
+
+function customConceptsFromForm(formData: FormData) {
+  const concepts: Array<Record<string, unknown>> = [];
+  for (let index = 0; index < CUSTOM_CONCEPT_SLOTS; index += 1) {
+    const title = String(formData.get(`customConcept${index}Title`) ?? "").trim();
+    const brief = String(formData.get(`customConcept${index}Brief`) ?? "").trim();
+    const composition = String(formData.get(`customConcept${index}Composition`) ?? "").trim();
+    if (!title || !brief || !composition) continue;
+    concepts.push({
+      id: `custom_${index + 1}`,
+      title,
+      imageStyle: String(formData.get(`customConcept${index}Style`) ?? "conceptual_illustration"),
+      treatment: String(formData.get(`customConcept${index}Treatment`) ?? "conceptual"),
+      brief,
+      composition,
+    });
+  }
+  return concepts;
+}
+
 function visualIdentityFromForm(formData: FormData) {
   const preferredStyle = String(formData.get("preferredStyle") ?? "").trim();
   return brandVisualIdentitySchema.safeParse({
@@ -230,6 +254,7 @@ function visualIdentityFromForm(formData: FormData) {
       .map((value) => String(value))
       .filter(Boolean),
     preferredStyle: preferredStyle.length > 0 ? preferredStyle : undefined,
+    customConcepts: customConceptsFromForm(formData),
   });
 }
 
