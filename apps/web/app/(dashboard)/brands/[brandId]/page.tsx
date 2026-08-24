@@ -50,6 +50,20 @@ const PRIMARY_MEDIUM_OPTIONS = [
   { value: "illustration", label: "Illustration" },
 ] as const;
 
+const CUSTOM_STYLE_OPTIONS = [
+  { value: "editorial_hero", label: "Editorial hero" },
+  { value: "conceptual_illustration", label: "Conceptual illustration" },
+  { value: "insight_card", label: "Insight card" },
+  { value: "branded_headline_card", label: "Branded headline card" },
+] as const;
+
+const TREATMENT_OPTIONS = [
+  { value: "conceptual", label: "Conceptual" },
+  { value: "literal", label: "Literal" },
+] as const;
+
+const CUSTOM_CONCEPT_SLOTS = [0, 1, 2] as const;
+
 export const dynamic = "force-dynamic";
 
 function LinesField({
@@ -634,6 +648,90 @@ export default async function BrandConfigurationPage({
                             <span className="text-[10px] text-[var(--muted)]">{concept.group}</span>
                           </span>
                         </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs font-bold text-[var(--muted)]">
+                    Custom concepts (optional)
+                  </p>
+                  <p className="mt-1 text-[10px] leading-4 text-[var(--muted)]">
+                    Define your own visual approaches. Fill title, brief, and composition to save a
+                    slot; leave a slot blank to skip it.
+                  </p>
+                  <div className="mt-2 space-y-3">
+                    {CUSTOM_CONCEPT_SLOTS.map((slot) => {
+                      const existing = visualIdentity.customConcepts[slot];
+                      return (
+                        <div
+                          key={slot}
+                          className="rounded-2xl border border-[var(--line)] bg-white p-4"
+                        >
+                          <p className="text-[10px] font-bold tracking-[0.1em] text-[var(--muted)] uppercase">
+                            Custom concept {slot + 1}
+                          </p>
+                          <div className="mt-2 grid gap-3 md:grid-cols-2">
+                            <label className="text-xs font-bold text-[var(--muted)]">
+                              Title
+                              <input
+                                name={`customConcept${slot}Title`}
+                                defaultValue={existing?.title ?? ""}
+                                placeholder="Isometric blueprint"
+                                className="mt-1.5 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm font-normal text-[var(--ink)] outline-none focus:border-[var(--sage)]"
+                              />
+                            </label>
+                            <label className="text-xs font-bold text-[var(--muted)]">
+                              Render style
+                              <select
+                                name={`customConcept${slot}Style`}
+                                defaultValue={existing?.imageStyle ?? "conceptual_illustration"}
+                                className="mt-1.5 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm text-[var(--ink)] outline-none focus:border-[var(--sage)]"
+                              >
+                                {CUSTOM_STYLE_OPTIONS.map((option) => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                          </div>
+                          <label className="mt-3 block text-xs font-bold text-[var(--muted)]">
+                            Treatment
+                            <select
+                              name={`customConcept${slot}Treatment`}
+                              defaultValue={existing?.treatment ?? "conceptual"}
+                              className="mt-1.5 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm text-[var(--ink)] outline-none focus:border-[var(--sage)]"
+                            >
+                              {TREATMENT_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="mt-3 block text-xs font-bold text-[var(--muted)]">
+                            Visual brief
+                            <textarea
+                              name={`customConcept${slot}Brief`}
+                              rows={2}
+                              defaultValue={existing?.brief ?? ""}
+                              placeholder="How to translate the topic into this look (min 10 characters)."
+                              className="mt-1.5 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm font-normal leading-5 text-[var(--ink)] outline-none focus:border-[var(--sage)]"
+                            />
+                          </label>
+                          <label className="mt-3 block text-xs font-bold text-[var(--muted)]">
+                            Composition
+                            <textarea
+                              name={`customConcept${slot}Composition`}
+                              rows={2}
+                              defaultValue={existing?.composition ?? ""}
+                              placeholder="Framing and negative-space recipe (min 10 characters)."
+                              className="mt-1.5 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm font-normal leading-5 text-[var(--ink)] outline-none focus:border-[var(--sage)]"
+                            />
+                          </label>
+                        </div>
                       );
                     })}
                   </div>
