@@ -24,6 +24,10 @@ import { reviewPost } from "../actions";
 export const dynamic = "force-dynamic";
 
 const statusStyles = {
+  drafting: "bg-stone-100 text-stone-700 border-stone-200",
+  evaluating: "bg-stone-100 text-stone-700 border-stone-200",
+  verifying: "bg-violet-50 text-violet-800 border-violet-200",
+  image_pending: "bg-stone-100 text-stone-700 border-stone-200",
   ready_for_review: "bg-blue-50 text-blue-800 border-blue-200",
   changes_requested: "bg-amber-50 text-amber-800 border-amber-200",
   approved: "bg-emerald-50 text-emerald-800 border-emerald-200",
@@ -51,12 +55,12 @@ export default async function PostReviewPage({
   const imageState = await getPostImageReviewState(post);
   // A post is only ready to approve once its branded image has been generated.
   const imageReady = imageState.status === "ready";
-  const editable = Boolean(
-    user && canManageBrand(user.role) && !["approved", "rejected"].includes(post.status),
-  );
-  const reviewable = Boolean(
-    user && canReviewContent(user.role) && !["approved", "rejected"].includes(post.status),
-  );
+  // Only review-ready states accept edit/review actions; in-progress states
+  // (e.g. re-verifying after a selective regeneration) show a status note.
+  const inReview = ["ready_for_review", "changes_requested"].includes(post.status);
+  const inProgress = ["drafting", "evaluating", "verifying", "image_pending"].includes(post.status);
+  const editable = Boolean(user && canManageBrand(user.role) && inReview);
+  const reviewable = Boolean(user && canReviewContent(user.role) && inReview);
   const editAction = reviewPost.bind(null, postDraftId, "edit");
   const approveAction = reviewPost.bind(null, postDraftId, "approve");
   const rejectAction = reviewPost.bind(null, postDraftId, "reject");
@@ -94,6 +98,12 @@ export default async function PostReviewPage({
         {query.saved ? (
           <div className="mb-6 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
             <CheckCircle2 size={17} /> Review action persisted with an audit event.
+          </div>
+        ) : null}
+        {inProgress ? (
+          <div className="mb-6 flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900">
+            <Clock3 size={17} /> This version is being re-verified. Review actions return once it is
+            ready.
           </div>
         ) : null}
 

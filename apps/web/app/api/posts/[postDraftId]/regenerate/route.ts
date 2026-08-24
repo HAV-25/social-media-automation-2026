@@ -5,7 +5,6 @@ import {
 } from "@content-engine/contracts";
 import { sha256Hex } from "@content-engine/security";
 import { type NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
 import { enforceUserApiRateLimit } from "@/lib/api-rate-limit";
 import { getBrandConfiguration } from "@/lib/brand-configuration";
@@ -19,16 +18,9 @@ import { canManageBrand } from "@/lib/permissions";
 import { getPostDetail } from "@/lib/post-detail";
 import { isSameOriginRequest } from "@/lib/request-origin";
 import { getResearchEvidence } from "@/lib/research";
-import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
-
-const rpcRowSchema = z.object({
-  post_draft_id: z.uuid(),
-  post_version_id: z.uuid(),
-  version_number: z.number().int().positive(),
-  duplicate: z.boolean(),
-});
 
 function errorResponse(status: number, code: string, message: string) {
   return NextResponse.json({ error: { code, message } }, { status });
@@ -62,45 +54,44 @@ export async function POST(
   if (post.currentVersion.id !== input.data.expectedVersionId) {
     return errorResponse(409, "stale_version", "The post changed. Reload before regenerating.");
   }
-  if (["approved", "rejected"].includes(post.status)) {
-    return errorResponse(409, "terminal_post", "Approved or rejected posts cannot be regenerated.");
-  }
-  const [opportunity, research, brandConfiguration] = await Promise.all([
-    getOpportunityDetail(post.opportunityId),
-    getResearchEvidence(post.opportunityId),
-    getBrandConfiguration(post.brandId),
-  ]);
-  if (!opportunity || !research || !brandConfiguration) {
+  if (!["ready_for_review", "changes_requested"].includes(post.status)) {
     return errorResponse(
       409,
-      "evaluation_context_missing",
-      "Evidence and brand context are required for selective regeneration.",
+      "not_reviewable",
+      "This post is not in a state that can be regenerated.",
     );
   }
+  const opportunity = await getOpportunityDetail(post.opportunityId);
+  if (!opportunity) {
+    return errorResponse(409, "evaluation_context_missing", "The opportunity context is required.");
+  }
+
   try {
+    // Deterministic component rewrite (no model call).
     const content = selectivelyRegeneratePost({
       content: post.currentVersion.content,
       request: input.data,
       valueNucleus: opportunity.valueNucleus,
     });
-    const evaluation = evaluateEditorialDraft({
-      content,
-      brandContext: brandConfiguration.context,
-      evidence: research.evidencePackage,
-      sourceText: opportunity.cleanText,
-    });
-    const requestHash = sha256Hex(
-      JSON.stringify({
-        postDraftId,
-        expectedVersionId: input.data.expectedVersionId,
-        component: input.data.component,
-        instruction: input.data.instruction,
-        content,
-        evaluation,
-      }),
-    );
 
     if (process.env.NEXT_PUBLIC_DEMO_MODE !== "false") {
+      const [research, brandConfiguration] = await Promise.all([
+        getResearchEvidence(post.opportunityId),
+        getBrandConfiguration(post.brandId),
+      ]);
+      if (!research || !brandConfiguration) {
+        return errorResponse(
+          409,
+          "evaluation_context_missing",
+          "Evidence and brand context are required for selective regeneration.",
+        );
+      }
+      const evaluation = evaluateEditorialDraft({
+        content,
+        brandContext: brandConfiguration.context,
+        evidence: research.evidencePackage,
+        sourceText: opportunity.cleanText,
+      });
       const drafts = parseDemoDraftRecords(request.cookies.get("demo-draft-records")?.value);
       const draft = drafts.find((candidate) => candidate.postDraftId === postDraftId);
       if (!draft) return errorResponse(404, "post_not_found", "Demo post is no longer available.");
@@ -159,39 +150,59 @@ export async function POST(
       return response;
     }
 
-    const { data, error } = await createSupabaseServiceClient()
-      .rpc("regenerate_post_component", {
-        payload: {
-          actorId: user.id,
-          postDraftId,
-          ...input.data,
-          requestHash,
-          content,
-          evaluation,
-        },
-      })
-      .single();
+    // Real mode: persist the rewritten component as a new immutable version via
+    // the lightweight edit RPC (as the signed-in editor). It creates the version
+    // and enqueues an async re-verify, replacing the old regenerate_post_component
+    // path whose claim-provenance gate rejects lightweight-generated posts.
+    const authed = await createSupabaseServerClient();
+    const { data, error } = await authed.rpc("save_lightweight_post_edit", {
+      payload: {
+        postDraftId,
+        expectedVersionId: input.data.expectedVersionId,
+        hook: content.hook,
+        body: content.body,
+        closing: content.closing,
+        idempotencyKey: input.data.idempotencyKey,
+      },
+    });
     if (error) {
-      const conflict = ["23505", "40001"].includes(error.code ?? "");
+      if (error.code === "40001") {
+        return errorResponse(409, "stale_version", "The post changed. Reload before regenerating.");
+      }
+      if (error.code === "23505") {
+        return errorResponse(409, "regeneration_conflict", "This regeneration key was reused.");
+      }
+      if (error.code === "42501") {
+        return errorResponse(
+          403,
+          "editor_role_required",
+          "Your role cannot regenerate post content.",
+        );
+      }
+      if (error.code === "22023") {
+        return errorResponse(
+          422,
+          "invalid_regeneration_request",
+          "The regenerated content is out of bounds.",
+        );
+      }
       return errorResponse(
-        conflict ? 409 : 500,
-        conflict ? "regeneration_conflict" : "regeneration_persistence_failed",
-        conflict
-          ? "The post changed or this regeneration key was reused."
-          : "The regenerated version could not be persisted.",
+        500,
+        "regeneration_persistence_failed",
+        "The regenerated version could not be persisted.",
       );
     }
-    const row = rpcRowSchema.parse(data);
+    const postVersionId = typeof data === "string" ? data : String(data);
     return NextResponse.json(
       postRegenerationResultSchema.parse({
         contractVersion: "1.0",
-        postDraftId: row.post_draft_id,
-        postVersionId: row.post_version_id,
-        versionNumber: row.version_number,
-        status: "ready_for_review",
-        duplicate: row.duplicate,
+        postDraftId,
+        postVersionId,
+        versionNumber: post.currentVersion.versionNumber + 1,
+        status: "verifying",
+        duplicate: false,
       }),
-      { status: row.duplicate ? 200 : 201 },
+      { status: 201 },
     );
   } catch {
     return errorResponse(
