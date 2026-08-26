@@ -4,7 +4,6 @@ import {
   CheckCircle2,
   Clock3,
   FileClock,
-  MessageSquareWarning,
   Save,
   ShieldCheck,
   ThumbsDown,
@@ -64,7 +63,6 @@ export default async function PostReviewPage({
   const editAction = reviewPost.bind(null, postDraftId, "edit");
   const approveAction = reviewPost.bind(null, postDraftId, "approve");
   const rejectAction = reviewPost.bind(null, postDraftId, "reject");
-  const requestChangesAction = reviewPost.bind(null, postDraftId, "request_changes");
 
   return (
     <>
@@ -482,34 +480,6 @@ export default async function PostReviewPage({
                     Verification data is unavailable. Approval remains disabled because this is a
                     technical integrity failure, not an editorial warning.
                   </p>
-                ) : null}
-
-                {post.status === "ready_for_review" ? (
-                  <form action={requestChangesAction} className="mt-4">
-                    <input type="hidden" name="expectedVersionId" value={post.currentVersion.id} />
-                    <input
-                      type="hidden"
-                      name="idempotencyKey"
-                      value={reviewKey("request-changes")}
-                    />
-                    <label className="text-[10px] font-bold text-[var(--muted)] uppercase">
-                      Change request
-                      <textarea
-                        required
-                        minLength={3}
-                        maxLength={2000}
-                        name="reason"
-                        rows={3}
-                        className="mt-1.5 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-xs font-normal leading-5 text-[var(--ink)]"
-                      />
-                    </label>
-                    <SubmitButton
-                      pendingLabel="Requesting…"
-                      className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-bold text-amber-900"
-                    >
-                      <MessageSquareWarning size={16} /> Request changes
-                    </SubmitButton>
-                  </form>
                 ) : null}
 
                 <form action={rejectAction} className="mt-4 border-t border-[var(--line)] pt-4">

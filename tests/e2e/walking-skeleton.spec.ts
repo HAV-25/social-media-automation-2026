@@ -211,6 +211,9 @@ test("plain text becomes an editable and approvable draft without paid services"
   await page.getByTestId("download-package").click();
   expect((await packageDownloadPromise).suggestedFilename()).toMatch(/-package\.zip$/);
 
+  // Reviewers only approve or reject now — Request-changes was removed.
+  await expect(page.getByRole("button", { name: "Request changes" })).toHaveCount(0);
+
   await page.getByRole("button", { name: "Approve post" }).click();
   await expect(page.getByText("approved", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Approve post" })).toHaveCount(0);
