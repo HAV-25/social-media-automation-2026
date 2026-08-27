@@ -41,6 +41,22 @@ export function DraftGenerator({
   const [tone, setTone] = useState<Tone>("thoughtful");
   const selectedStyle = getEditorialStyle(contentStyle);
 
+  // Real mode enqueues the draft on the lightweight worker and returns immediately;
+  // poll the GET status until the post draft exists, then navigate to it.
+  async function pollDraft() {
+    const deadline = Date.now() + 180_000;
+    while (Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 3_000));
+      const response = await fetch(`/api/opportunities/${opportunityId}/generate`, {
+        method: "GET",
+      });
+      if (!response.ok) continue;
+      const data = (await response.json()) as { status?: string; postDraftId?: string | null };
+      if (data.status === "ready" && data.postDraftId) return data.postDraftId;
+    }
+    return null;
+  }
+
   async function generate(formData: FormData) {
     setPending(true);
     setError("");
@@ -59,6 +75,16 @@ export function DraftGenerator({
       if (!response.ok) {
         const failure = payload as { error?: { message?: string } };
         throw new Error(failure.error?.message ?? "The draft could not be generated.");
+      }
+      // Real mode: queued -> poll for the worker's draft. Demo mode returns the
+      // draft synchronously.
+      if ((payload as { status?: string }).status === "queued") {
+        const postDraftId = await pollDraft();
+        if (!postDraftId) {
+          throw new Error("The draft is taking longer than expected. Refresh in a moment.");
+        }
+        router.push(`/posts/${postDraftId}`);
+        return;
       }
       const result: DraftGenerationResult = draftGenerationResultSchema.parse(payload);
       router.push(`/posts/${result.postDraftId}`);

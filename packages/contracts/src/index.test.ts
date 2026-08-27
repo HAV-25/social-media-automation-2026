@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   contentStyleSchema,
+  draftGenerationQueuedResultSchema,
+  draftGenerationStatusSchema,
   editorialWorkflowRequestSchema,
   evidencePackageSchema,
   fakeDraftOutputSchema,
   imageReviewActionRequestSchema,
+  researchQueuedResultSchema,
+  researchStatusSchema,
   manualInputRequestSchema,
   organizationRoleSchema,
   postActionWorkflowRequestSchema,
@@ -64,6 +68,42 @@ describe("shared contracts", () => {
       reason: "Please revise the closing.",
     });
     expect(result.success).toBe(false);
+  });
+
+  it("models queued research/draft enqueue results and their poll statuses", () => {
+    const instanceId = "00000000-0000-4000-8000-000000000010";
+    expect(
+      researchQueuedResultSchema.parse({
+        contractVersion: "1.0",
+        status: "queued",
+        pipelineInstanceId: instanceId,
+      }).status,
+    ).toBe("queued");
+    expect(
+      draftGenerationQueuedResultSchema.parse({
+        contractVersion: "1.0",
+        status: "queued",
+        pipelineInstanceId: null,
+      }).pipelineInstanceId,
+    ).toBeNull();
+
+    const research = researchStatusSchema.parse({ contractVersion: "1.0", status: "pending" });
+    expect(research).toMatchObject({ readyForWriting: false, sourceCount: 0, claimCount: 0 });
+    const draft = draftGenerationStatusSchema.parse({
+      contractVersion: "1.0",
+      status: "ready",
+      postDraftId: instanceId,
+    });
+    expect(draft.postDraftId).toBe(instanceId);
+
+    // A queued result must not carry a synchronous id, and status is constrained.
+    expect(
+      researchQueuedResultSchema.safeParse({
+        contractVersion: "1.0",
+        status: "ready",
+        pipelineInstanceId: null,
+      }).success,
+    ).toBe(false);
   });
 
   it("binds initial image generation to the selected concept and template", () => {

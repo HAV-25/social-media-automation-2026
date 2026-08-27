@@ -1,5 +1,10 @@
 import { ResearchProviderError } from "@content-engine/ai";
-import { researchRunResultSchema, researchStartRequestSchema } from "@content-engine/contracts";
+import {
+  researchQueuedResultSchema,
+  researchRunResultSchema,
+  researchStartRequestSchema,
+  researchStatusSchema,
+} from "@content-engine/contracts";
 import { sha256Hex } from "@content-engine/security";
 import { type NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
@@ -13,14 +18,8 @@ import {
 import { getOpportunityDetail } from "@/lib/opportunity-detail";
 import { canReviewContent } from "@/lib/permissions";
 import { isSameOriginRequest } from "@/lib/request-origin";
-import {
-  createResearchPlan,
-  failResearchRun,
-  getResearchResultForGenerationRun,
-  persistResearchEvidence,
-  produceResearchEvidence,
-  reserveResearchBudget,
-} from "@/lib/research";
+import { createResearchPlan, getResearchEvidence, produceResearchEvidence } from "@/lib/research";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -56,11 +55,11 @@ export async function POST(
     return failure(404, "opportunity_not_found", "Opportunity not found or not assigned.");
   }
 
-  let reservedRunId: string | undefined;
-  try {
-    const plan = createResearchPlan(opportunity, parsed.data.allowedDomains);
-
-    if (process.env.NEXT_PUBLIC_DEMO_MODE !== "false") {
+  // Demo mode keeps the deterministic in-process research provider (no model
+  // call, no paid web search) and stores the evidence in a cookie.
+  if (process.env.NEXT_PUBLIC_DEMO_MODE !== "false") {
+    try {
+      const plan = createResearchPlan(opportunity, parsed.data.allowedDomains);
       const { result: providerResult } = await produceResearchEvidence({
         opportunity,
         allowedDomains: parsed.data.allowedDomains,
@@ -107,64 +106,76 @@ export async function POST(
         maxAge: 60 * 60 * 8,
       });
       return response;
+    } catch (error) {
+      if (error instanceof ResearchProviderError) {
+        const status = error.code === "budget_exceeded" ? 422 : error.retryable ? 503 : 502;
+        return failure(status, error.code, error.message);
+      }
+      return failure(500, "research_failed", "The bounded research run could not be completed.");
     }
+  }
 
-    const correlationId = crypto.randomUUID();
-    const reservation = await reserveResearchBudget({
-      actorId: user.id,
-      brandId: opportunity.brandId,
-      correlationId,
-      idempotencyKey: parsed.data.idempotencyKey,
-      opportunityId,
-      plan,
-    });
-    if (reservation.duplicate) {
-      const existingResult = await getResearchResultForGenerationRun(reservation.generationRunId);
-      if (existingResult) return NextResponse.json(existingResult);
-      return failure(
-        409,
-        "research_already_running",
-        "This bounded research request is already running.",
-      );
+  // Real mode: enqueue the bounded research on the lightweight worker (as the
+  // signed-in editor) instead of calling the research provider inline. The worker
+  // is not bound by the serverless timeout and persists evidence via the pipeline;
+  // the client polls the GET below until the evidence package lands.
+  const authed = await createSupabaseServerClient();
+  const { data, error } = await authed
+    .rpc("request_lightweight_action", {
+      payload: {
+        brandId: opportunity.brandId,
+        opportunityId,
+        action: "research",
+        idempotencyKey: parsed.data.idempotencyKey,
+      },
+    })
+    .single();
+  if (error) {
+    if (error.code === "42501") {
+      return failure(403, "reviewer_role_required", "Your role cannot start research.");
     }
-    reservedRunId = reservation.generationRunId;
-    const { result: providerResult } = await produceResearchEvidence({
-      opportunity,
-      allowedDomains: parsed.data.allowedDomains,
-      plan,
-    });
-    const result = await persistResearchEvidence({
-      actorId: user.id,
-      brandId: opportunity.brandId,
-      correlationId,
-      generationRunId: reservation.generationRunId,
-      idempotencyKey: parsed.data.idempotencyKey,
-      opportunityId,
-      plan,
-      providerResult,
-    });
-    return NextResponse.json(result, { status: result.duplicate ? 200 : 201 });
-  } catch (error) {
-    if (reservedRunId) {
-      await failResearchRun({
-        actorId: user.id,
-        generationRunId: reservedRunId,
-        error,
-      }).catch(() => undefined);
-    }
-    if (error instanceof ResearchProviderError) {
-      const status = error.code === "budget_exceeded" ? 422 : error.retryable ? 503 : 502;
-      return failure(status, error.code, error.message);
-    }
-    const databaseCode =
-      error && typeof error === "object" && "code" in error ? String(error.code) : "";
-    if (databaseCode === "23505") {
+    if (error.code === "23505") {
       return failure(
         409,
         "idempotency_conflict",
         "This idempotency key was already used for another research request.",
       );
     }
-    return failure(500, "research_failed", "The bounded research run could not be completed.");
+    if (error.code === "22023") {
+      return failure(422, "invalid_research_request", "The research request is invalid.");
+    }
+    return failure(500, "research_enqueue_failed", "The research request could not be queued.");
   }
+  const instance = data as { id?: string } | null;
+  return NextResponse.json(
+    researchQueuedResultSchema.parse({
+      contractVersion: "1.0",
+      status: "queued",
+      pipelineInstanceId: instance?.id ?? null,
+    }),
+    { status: 202 },
+  );
+}
+
+// Poll target: after enqueuing research the client polls here until the worker's
+// evidence package has landed.
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ opportunityId: string }> },
+) {
+  const user = await getCurrentUser();
+  if (!user || !canReviewContent(user.role)) {
+    return failure(401, "authentication_required", "Sign in to view research status.");
+  }
+  const { opportunityId } = await params;
+  const evidence = await getResearchEvidence(opportunityId);
+  return NextResponse.json(
+    researchStatusSchema.parse({
+      contractVersion: "1.0",
+      status: evidence ? "ready" : "pending",
+      readyForWriting: evidence?.evidencePackage.readyForWriting ?? false,
+      sourceCount: evidence?.evidencePackage.sources.length ?? 0,
+      claimCount: evidence?.evidencePackage.claims.length ?? 0,
+    }),
+  );
 }

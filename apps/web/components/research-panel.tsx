@@ -18,6 +18,29 @@ export function ResearchPanel({
 
   useEffect(() => setHydrated(true), []);
 
+  // Real mode enqueues research on the lightweight worker and returns immediately;
+  // poll the GET status until the evidence package lands. Returns the ready counts,
+  // or null if it did not finish within the window.
+  async function pollResearch() {
+    const deadline = Date.now() + 180_000;
+    while (Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 3_000));
+      const response = await fetch(`/api/opportunities/${opportunityId}/research`, {
+        method: "GET",
+      });
+      if (!response.ok) continue;
+      const data = (await response.json()) as {
+        status?: string;
+        sourceCount?: number;
+        claimCount?: number;
+      };
+      if (data.status === "ready") {
+        return { sourceCount: data.sourceCount ?? 0, claimCount: data.claimCount ?? 0 };
+      }
+    }
+    return null;
+  }
+
   async function startResearch() {
     setBusy(true);
     setMessage("");
@@ -33,11 +56,25 @@ export function ResearchPanel({
       });
       const body = (await response.json()) as {
         error?: { message?: string };
+        status?: string;
         sourceCount?: number;
         claimCount?: number;
       };
       if (!response.ok) {
         throw new Error(body.error?.message ?? "Research could not be completed.");
+      }
+      // Real mode: queued -> poll until evidence lands. Demo mode returns the
+      // evidence synchronously.
+      if (body.status === "queued") {
+        setMessage("Research queued. Gathering evidence…");
+        const ready = await pollResearch();
+        setMessage(
+          ready
+            ? `Evidence ready: ${ready.sourceCount} source and ${ready.claimCount} claim.`
+            : "Research is still running. This page will update shortly.",
+        );
+        router.refresh();
+        return;
       }
       setMessage(
         `Evidence ready: ${body.sourceCount ?? 0} source and ${body.claimCount ?? 0} claim.`,
