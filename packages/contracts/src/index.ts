@@ -787,6 +787,29 @@ export const researchRunResultSchema = z
   .strict();
 export type ResearchRunResult = z.infer<typeof researchRunResultSchema>;
 
+// Real mode enqueues research on the lightweight worker and returns immediately;
+// the client polls the GET status below. Demo mode stays synchronous and returns
+// researchRunResultSchema.
+export const researchQueuedResultSchema = z
+  .object({
+    contractVersion: z.literal("1.0"),
+    status: z.literal("queued"),
+    pipelineInstanceId: z.uuid().nullable(),
+  })
+  .strict();
+export type ResearchQueuedResult = z.infer<typeof researchQueuedResultSchema>;
+
+export const researchStatusSchema = z
+  .object({
+    contractVersion: z.literal("1.0"),
+    status: z.enum(["pending", "ready"]),
+    readyForWriting: z.boolean().default(false),
+    sourceCount: z.number().int().nonnegative().max(100).default(0),
+    claimCount: z.number().int().nonnegative().max(100).default(0),
+  })
+  .strict();
+export type ResearchStatus = z.infer<typeof researchStatusSchema>;
+
 export const researchBudgetReservationResultSchema = z
   .object({
     generationRunId: z.uuid(),
@@ -968,6 +991,27 @@ export const draftGenerationResultSchema = z.object({
   duplicate: z.boolean(),
 });
 export type DraftGenerationResult = z.infer<typeof draftGenerationResultSchema>;
+
+// Real mode enqueues the draft on the lightweight worker and returns immediately;
+// the client polls the GET status below and navigates once the draft exists. Demo
+// mode stays synchronous and returns draftGenerationResultSchema.
+export const draftGenerationQueuedResultSchema = z
+  .object({
+    contractVersion: z.literal("1.0"),
+    status: z.literal("queued"),
+    pipelineInstanceId: z.uuid().nullable(),
+  })
+  .strict();
+export type DraftGenerationQueuedResult = z.infer<typeof draftGenerationQueuedResultSchema>;
+
+export const draftGenerationStatusSchema = z
+  .object({
+    contractVersion: z.literal("1.0"),
+    status: z.enum(["pending", "ready"]),
+    postDraftId: z.uuid().nullable(),
+  })
+  .strict();
+export type DraftGenerationStatus = z.infer<typeof draftGenerationStatusSchema>;
 
 const editorialWorkflowEnvelopeSchema = z
   .object({

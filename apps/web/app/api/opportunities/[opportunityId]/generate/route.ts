@@ -2,16 +2,16 @@ import {
   EditorialProviderError,
   FakeEditorialProvider,
   OpenAIEditorialProvider,
-  buildEditorialPromptSnapshot,
 } from "@content-engine/ai";
 import {
+  draftGenerationQueuedResultSchema,
   draftGenerationRequestSchema,
   draftGenerationResultSchema,
+  draftGenerationStatusSchema,
   serverEnvSchema,
 } from "@content-engine/contracts";
 import { sha256Hex } from "@content-engine/security";
 import { type NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
 import { enforceUserApiRateLimit } from "@/lib/api-rate-limit";
 import { getBrandConfiguration } from "@/lib/brand-configuration";
@@ -25,16 +25,9 @@ import { getOpportunityDetail } from "@/lib/opportunity-detail";
 import { canManageBrand } from "@/lib/permissions";
 import { isSameOriginRequest } from "@/lib/request-origin";
 import { getResearchEvidence } from "@/lib/research";
-import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
-
-const draftRpcRowSchema = z.object({
-  post_draft_id: z.uuid(),
-  post_version_id: z.uuid(),
-  generation_run_id: z.uuid(),
-  duplicate: z.boolean(),
-});
 
 function errorResponse(status: number, code: string, message: string) {
   return NextResponse.json({ error: { code, message } }, { status });
@@ -80,56 +73,65 @@ export async function POST(
       "Complete bounded research before generating a draft.",
     );
   }
+
+  // Real mode: enqueue the draft on the lightweight worker (as the signed-in
+  // editor) instead of calling the writing model inline. The worker is not bound
+  // by the serverless timeout; it performs the model call and persists the draft
+  // via the pipeline, and the client polls the GET below and navigates once the
+  // draft exists. NOTE: the worker derives content_style from the opportunity and
+  // uses its house tone, so the reviewer's style/tone selection is advisory in
+  // real mode (it is honored in demo).
+  if (process.env.NEXT_PUBLIC_DEMO_MODE === "false") {
+    const authed = await createSupabaseServerClient();
+    const { data, error } = await authed
+      .rpc("request_lightweight_action", {
+        payload: {
+          brandId: opportunity.brandId,
+          opportunityId,
+          action: "draft",
+          idempotencyKey: parsed.data.idempotencyKey,
+        },
+      })
+      .single();
+    if (error) {
+      if (error.code === "42501") {
+        return errorResponse(403, "editor_role_required", "Your role cannot generate drafts.");
+      }
+      if (error.code === "23505") {
+        return errorResponse(
+          409,
+          "idempotency_conflict",
+          "This idempotency key was already used for a different request.",
+        );
+      }
+      if (error.code === "22023") {
+        return errorResponse(422, "invalid_generation_request", "The draft request is invalid.");
+      }
+      return errorResponse(500, "draft_enqueue_failed", "The draft request could not be queued.");
+    }
+    const instance = data as { id?: string } | null;
+    return NextResponse.json(
+      draftGenerationQueuedResultSchema.parse({
+        contractVersion: "1.0",
+        status: "queued",
+        pipelineInstanceId: instance?.id ?? null,
+      }),
+      { status: 202 },
+    );
+  }
+
   const existingDrafts =
     process.env.NEXT_PUBLIC_DEMO_MODE !== "false"
       ? parseDemoDraftRecords(request.cookies.get("demo-draft-records")?.value)
       : [];
-  let recentSameBrandPosts = existingDrafts
+  // Demo-only from here down (real mode enqueued and returned above). Similarity
+  // context is derived from the demo cookie records.
+  const recentSameBrandPosts = existingDrafts
     .filter((draft) => draft.brandId === opportunity.brandId)
     .map((draft) => draft.content.fullText);
-  let crossBrandPosts = existingDrafts
+  const crossBrandPosts = existingDrafts
     .filter((draft) => draft.brandId !== opportunity.brandId)
     .map((draft) => draft.content.fullText);
-  if (process.env.NEXT_PUBLIC_DEMO_MODE === "false") {
-    const supabase = createSupabaseServiceClient();
-    const { data: recentDrafts, error: recentDraftError } = await supabase
-      .from("post_drafts")
-      .select("brand_id,current_version_id")
-      .not("current_version_id", "is", null)
-      .order("updated_at", { ascending: false })
-      .limit(100);
-    if (recentDraftError) {
-      return errorResponse(
-        500,
-        "similarity_context_failed",
-        "Recent post similarity context could not be loaded.",
-      );
-    }
-    const versionIds = (recentDrafts ?? [])
-      .map((draft) => draft.current_version_id)
-      .filter((id): id is string => Boolean(id));
-    const { data: recentVersions, error: recentVersionError } = versionIds.length
-      ? await supabase.from("post_versions").select("id,full_text").in("id", versionIds)
-      : { data: [], error: null };
-    if (recentVersionError) {
-      return errorResponse(
-        500,
-        "similarity_context_failed",
-        "Recent post similarity context could not be loaded.",
-      );
-    }
-    const textByVersion = new Map(
-      (recentVersions ?? []).map((version) => [version.id, version.full_text]),
-    );
-    recentSameBrandPosts = (recentDrafts ?? [])
-      .filter((draft) => draft.brand_id === opportunity.brandId)
-      .map((draft) => textByVersion.get(draft.current_version_id ?? ""))
-      .filter((text): text is string => Boolean(text));
-    crossBrandPosts = (recentDrafts ?? [])
-      .filter((draft) => draft.brand_id !== opportunity.brandId)
-      .map((draft) => textByVersion.get(draft.current_version_id ?? ""))
-      .filter((text): text is string => Boolean(text));
-  }
   const env = serverEnvSchema.parse(process.env);
   if (env.AI_PROVIDER === "openai" && !env.AI_EDITORIAL_EVAL_BASELINE_ID) {
     return errorResponse(
@@ -171,7 +173,6 @@ export async function POST(
     recentSameBrandPosts,
     crossBrandPosts,
   };
-  const promptSnapshot = buildEditorialPromptSnapshot(generationRequest);
   let output;
   try {
     output = await provider.generateDraft(generationRequest);
@@ -185,17 +186,6 @@ export async function POST(
     }
     return errorResponse(502, "editorial_provider_failed", "The writing provider failed.");
   }
-  const requestHash = sha256Hex(
-    JSON.stringify({
-      opportunityId,
-      brandId: opportunity.brandId,
-      contentStyle: parsed.data.contentStyle,
-      tone: parsed.data.tone,
-      promptVersion: output.promptVersion,
-      promptChecksum: promptSnapshot.checksum,
-    }),
-  );
-
   if (process.env.NEXT_PUBLIC_DEMO_MODE !== "false") {
     const drafts = existingDrafts;
     const existing = drafts.find(
@@ -267,55 +257,40 @@ export async function POST(
     return response;
   }
 
-  const supabase = createSupabaseServiceClient();
-  const { data, error } = await supabase
-    .rpc("create_evaluated_draft", {
-      payload: {
-        actorId: user.id,
-        opportunityId,
-        idempotencyKey: parsed.data.idempotencyKey,
-        requestHash,
-        contentStyle: output.contentStyle,
-        tone: output.tone,
-        content: output.content,
-        angles: output.angles,
-        selectedAngleKey: output.selectedAngleKey,
-        evaluation: output.evaluation,
-        revisionCount: output.revisionCount,
-        model: output.model,
-        promptVersion: output.promptVersion,
-        modelRecord: {
-          provider: env.AI_PROVIDER,
-          model: output.model,
-          promptVersion: output.promptVersion,
-          promptSnapshot,
-          responseId: output.responseId,
-          usage: output.usage,
-          costUsd: output.usage.estimatedCostUsd,
-          evaluation: output.evaluation,
-          selectedAngleKey: output.selectedAngleKey,
-        },
-      },
-    })
-    .single();
-  if (error) {
-    const conflict = error.code === "23505";
-    return errorResponse(
-      conflict ? 409 : 500,
-      conflict ? "idempotency_conflict" : "draft_persistence_failed",
-      conflict
-        ? "This idempotency key was already used for a different request."
-        : "The draft could not be persisted.",
-    );
+  // Unreachable: real mode enqueued and returned above; demo mode returned inside
+  // the block. Present only so the function is total for the type checker.
+  return errorResponse(500, "draft_generation_failed", "The draft could not be generated.");
+}
+
+// Poll target: after enqueuing a draft the client polls here until the worker's
+// post draft for this opportunity exists, then navigates to it.
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ opportunityId: string }> },
+) {
+  const user = await getCurrentUser();
+  if (!user || !canManageBrand(user.role)) {
+    return errorResponse(401, "authentication_required", "Sign in to view draft status.");
   }
-  const row = draftRpcRowSchema.parse(data);
-  const result = draftGenerationResultSchema.parse({
-    contractVersion: "1.0",
-    postDraftId: row.post_draft_id,
-    postVersionId: row.post_version_id,
-    generationRunId: row.generation_run_id,
-    status: "ready_for_review",
-    duplicate: row.duplicate,
-  });
-  return NextResponse.json(result, { status: result.duplicate ? 200 : 201 });
+  const { opportunityId } = await params;
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("post_drafts")
+    .select("id")
+    .eq("opportunity_id", opportunityId)
+    .not("current_version_id", "is", null)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    return errorResponse(500, "draft_status_failed", "Draft status could not be loaded.");
+  }
+  const postDraftId = data?.id ?? null;
+  return NextResponse.json(
+    draftGenerationStatusSchema.parse({
+      contractVersion: "1.0",
+      status: postDraftId ? "ready" : "pending",
+      postDraftId,
+    }),
+  );
 }
