@@ -56,6 +56,16 @@ describe("shared contracts", () => {
     });
   });
 
+  it("no longer accepts request_changes as a review action", () => {
+    const result = postReviewActionSchema.safeParse({
+      action: "request_changes",
+      idempotencyKey: "request-changes-key-0001",
+      expectedVersionId: "00000000-0000-4000-8000-000000000001",
+      reason: "Please revise the closing.",
+    });
+    expect(result.success).toBe(false);
+  });
+
   it("binds initial image generation to the selected concept and template", () => {
     const request = {
       contractVersion: "1.0",

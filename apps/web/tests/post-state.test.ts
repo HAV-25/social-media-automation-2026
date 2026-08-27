@@ -4,8 +4,12 @@ import { assertCurrentVersion, nextPostStatus } from "../lib/post-state";
 describe("post state transitions", () => {
   it("allows review actions only from defined states", () => {
     expect(nextPostStatus("ready_for_review", "approve")).toBe("approved");
-    expect(nextPostStatus("ready_for_review", "request_changes")).toBe("changes_requested");
+    expect(nextPostStatus("ready_for_review", "reject")).toBe("rejected");
+    expect(nextPostStatus("ready_for_review", "edit")).toBe("ready_for_review");
+    // changes_requested is no longer produced by any action (Request-changes was
+    // removed), but posts already in it stay editable/rejectable.
     expect(nextPostStatus("changes_requested", "edit")).toBe("ready_for_review");
+    expect(nextPostStatus("changes_requested", "reject")).toBe("rejected");
     expect(nextPostStatus("changes_requested", "approve")).toBeNull();
   });
 

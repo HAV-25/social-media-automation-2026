@@ -1,15 +1,10 @@
 "use server";
 
 import { evaluateEditorialDraft } from "@content-engine/ai";
-import {
-  postReviewActionSchema,
-  postReviewResultSchema,
-  type PostReviewAction,
-} from "@content-engine/contracts";
+import { postReviewActionSchema, type PostReviewAction } from "@content-engine/contracts";
 import { sha256Hex } from "@content-engine/security";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
 import { getBrandConfiguration } from "@/lib/brand-configuration";
 import {
@@ -23,18 +18,10 @@ import { getPostDetail } from "@/lib/post-detail";
 import { assertCurrentVersion, nextPostStatus } from "@/lib/post-state";
 import { getResearchEvidence } from "@/lib/research";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 function fail(postDraftId: string, message: string): never {
   redirect(`/posts/${postDraftId}?error=${encodeURIComponent(message)}`);
 }
-
-const reviewRpcRowSchema = z.object({
-  post_draft_id: z.uuid(),
-  post_version_id: z.uuid(),
-  status: z.enum(["ready_for_review", "changes_requested", "approved", "rejected"]),
-  duplicate: z.boolean(),
-});
 
 export async function reviewPost(
   postDraftId: string,
@@ -100,8 +87,12 @@ export async function reviewPost(
   const validated = input.data;
   const editedContent = validated.action === "edit" ? validated.content : undefined;
   const decisionReason = validated.action === "edit" ? "" : validated.reason;
+  // The demo edit path stores a freshly computed evaluation in its cookie record.
+  // Real mode does NOT precompute one: save_lightweight_post_edit re-verifies
+  // asynchronously, and loading research evidence here would wrongly reject
+  // lightweight posts that lack the old evaluated-post evidence shape.
   let nextEvaluation = post.evaluation;
-  if (editedContent) {
+  if (editedContent && process.env.NEXT_PUBLIC_DEMO_MODE !== "false") {
     const [opportunity, research, brandConfiguration] = await Promise.all([
       getOpportunityDetail(post.opportunityId),
       getResearchEvidence(post.opportunityId),
@@ -175,7 +166,7 @@ export async function reviewPost(
   // Approve/reject go through the lightweight pipeline RPC, called as the signed-in
   // user (review_lightweight_post checks auth.uid()/can_edit_brand). The approval
   // gate above (evaluation present, warnings acknowledged, reason) is preserved.
-  // Edit and request_changes stay on the existing evaluated-post path below.
+  // Edit is handled below via the lightweight edit RPC.
   if (validated.action === "approve" || validated.action === "reject") {
     const authedClient = await createSupabaseServerClient();
     const { error: reviewError } = await authedClient.rpc("review_lightweight_post", {
@@ -199,44 +190,34 @@ export async function reviewPost(
     redirect(`/posts/${postDraftId}?saved=${action}`);
   }
 
-  const requestHash = sha256Hex(
-    JSON.stringify({
+  // Edit persists the reviewer's content as a new immutable version via the
+  // lightweight edit RPC (as the signed-in editor); re-verification runs async,
+  // so the post briefly enters `verifying` before returning to ready_for_review.
+  const authedClient = await createSupabaseServerClient();
+  const { error: editError } = await authedClient.rpc("save_lightweight_post_edit", {
+    payload: {
       postDraftId,
-      action,
       expectedVersionId,
-      content: editedContent,
-      evaluation: nextEvaluation ?? undefined,
-      reason: decisionReason || undefined,
-    }),
-  );
-  const supabase = createSupabaseServiceClient();
-  const { data, error } = await supabase
-    .rpc("review_evaluated_post", {
-      payload: {
-        ...validated,
-        actorId: user.id,
-        postDraftId,
-        requestHash,
-        evaluation: nextEvaluation,
-        warningSnapshot: undefined,
-      },
-    })
-    .single();
-  if (error) {
-    if (error.code === "40001") {
+      hook: editedContent!.hook,
+      body: editedContent!.body,
+      closing: editedContent!.closing,
+      idempotencyKey: validated.idempotencyKey,
+    },
+  });
+  if (editError) {
+    if (editError.code === "40001") {
       fail(postDraftId, "This post changed in another session. Reload before saving.");
     }
-    if (error.code === "23505") {
+    if (editError.code === "23505") {
       fail(postDraftId, "This review key was reused for a different action.");
+    }
+    if (editError.code === "42501") {
+      fail(postDraftId, "Your role cannot edit this post.");
+    }
+    if (editError.code === "22023") {
+      fail(postDraftId, "The edited content is out of bounds.");
     }
     fail(postDraftId, "The review action could not be persisted.");
   }
-  postReviewResultSchema.parse({
-    contractVersion: "1.0",
-    postDraftId: reviewRpcRowSchema.parse(data).post_draft_id,
-    postVersionId: reviewRpcRowSchema.parse(data).post_version_id,
-    status: reviewRpcRowSchema.parse(data).status,
-    duplicate: reviewRpcRowSchema.parse(data).duplicate,
-  });
   redirect(`/posts/${postDraftId}?saved=${action}`);
 }

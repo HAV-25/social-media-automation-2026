@@ -1464,12 +1464,6 @@ export const postReviewActionSchema = z.discriminatedUnion("action", [
     expectedVersionId: z.uuid(),
     reason: z.string().trim().min(3).max(2_000),
   }),
-  z.object({
-    action: z.literal("request_changes"),
-    idempotencyKey: z.string().min(16).max(200),
-    expectedVersionId: z.uuid(),
-    reason: z.string().trim().min(3).max(2_000),
-  }),
 ]);
 export type PostReviewAction = z.infer<typeof postReviewActionSchema>;
 
@@ -1477,7 +1471,10 @@ export const postReviewResultSchema = z.object({
   contractVersion: z.literal("1.0"),
   postDraftId: z.uuid(),
   postVersionId: z.uuid(),
-  status: z.enum(["ready_for_review", "changes_requested", "approved", "rejected"]),
+  // `edit` persists a new version and re-verifies asynchronously (real path →
+  // `verifying`); approve/reject land on their terminal status. `request_changes`
+  // was removed — reviewers only approve or reject.
+  status: z.enum(["ready_for_review", "verifying", "approved", "rejected"]),
   duplicate: z.boolean(),
 });
 export type PostReviewResult = z.infer<typeof postReviewResultSchema>;
